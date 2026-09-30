@@ -1,0 +1,54 @@
+name: Database CI
+
+on:
+  push:
+    branches: [ "main", "feature/*" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test-db:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Start PostgreSQL container
+      run: docker compose up -d
+
+    - name: Wait for database to initialize and seed
+      run: |
+        echo "Waiting for PostgreSQL to start and run init scripts..."
+        # Poll until the enrollments table is seeded (this is the last script)
+        for i in {1..30}; do
+          if docker exec olp_postgres psql -U postgres -d online_learning -t -c "SELECT 1 FROM enrollments LIMIT 1;" >/dev/null 2>&1; then
+            echo "Database is fully initialized and seeded!"
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "Database failed to initialize in time."
+        docker logs olp_postgres
+        exit 1
+
+    - name: Run Schema and Data Tests
+      run: |
+        echo "Testing schema..."
+        docker exec olp_postgres psql -U postgres -d online_learning -c "\dt"
+        
+        # Verify exactly 4 tables exist
+        TABLE_COUNT=$(docker exec olp_postgres psql -U postgres -d online_learning -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';" | tr -d ' ')
+        if [ "$TABLE_COUNT" -ne 4 ]; then
+          echo "Expected 4 tables, but found $TABLE_COUNT"
+          exit 1
+        fi
+
+        echo "Testing seed data..."
+        # Verify 5 users exist
+        USER_COUNT=$(docker exec olp_postgres psql -U postgres -d online_learning -t -c "SELECT COUNT(*) FROM users;" | tr -d ' ')
+        if [ "$USER_COUNT" -ne 5 ]; then
+          echo "Expected 5 users, but found $USER_COUNT"
+          exit 1
+        fi
+        
+        echo "All database tests passed successfully!"
