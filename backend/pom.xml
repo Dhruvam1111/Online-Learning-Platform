@@ -73,11 +73,11 @@
             <version>${google.api.client.version}</version>
         </dependency>
 
-        <!-- In-memory DB for Unit / Integration Tests -->
+        <!-- In-memory DB for Unit / Integration Tests and Local Dev Mode -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
-            <scope>test</scope>
+            <scope>runtime</scope>
         </dependency>
 
         <!-- Testing -->
