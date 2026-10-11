@@ -20,16 +20,16 @@ ALTER SEQUENCE enrollments_id_seq RESTART WITH 1;
 -- =========================
 -- All passwords below are: "password123"
 -- Bcrypt hash generated with cost factor 10
--- Hash for "password123": $2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
+-- Valid Hash for "password123": $2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW
 --
 -- NOTE TO TEAM: Use "password123" to log in as any of these users during testing.
 
 INSERT INTO users (name, email, password_hash, role) VALUES
-    ('Dr. Sarah Chen',    'sarah@instructor.com',   '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'instructor'),
-    ('Prof. James Wilson', 'james@instructor.com',   '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'instructor'),
-    ('Alice Johnson',      'alice@student.com',      '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'student'),
-    ('Bob Martinez',       'bob@student.com',        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'student'),
-    ('Charlie Park',       'charlie@student.com',    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'student');
+    ('Dr. Sarah Chen',    'sarah@instructor.com',   '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'instructor'),
+    ('Prof. James Wilson', 'james@instructor.com',   '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'instructor'),
+    ('Alice Johnson',      'alice@student.com',      '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'student'),
+    ('Bob Martinez',       'bob@student.com',        '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'student'),
+    ('Charlie Park',       'charlie@student.com',    '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'student');
 
 -- User IDs after insert:
 --   1 = Dr. Sarah Chen (instructor)
