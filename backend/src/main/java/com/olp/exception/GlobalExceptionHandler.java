@@ -24,6 +24,27 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(401, ex.getMessage()));
     }
 
+    @ExceptionHandler(AccountStatusException.class)
+    public ResponseEntity<ErrorResponse> handleAccountStatus(AccountStatusException ex) {
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)  // 403
+                .body(new ErrorResponse(403, ex.getMessage()));
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleResourceNotFound(ResourceNotFoundException ex) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)  // 404
+                .body(new ErrorResponse(404, ex.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)  // 400
+                .body(new ErrorResponse(400, ex.getMessage()));
+    }
+
     /**
      * Handles validation errors from @Valid on request DTOs.
      * Returns the first validation error message.

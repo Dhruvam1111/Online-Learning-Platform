@@ -22,10 +22,14 @@ CREATE TABLE users (
     email           VARCHAR(255) UNIQUE NOT NULL,
     password_hash   VARCHAR(255) NOT NULL,
     role            VARCHAR(20)  NOT NULL,
+    account_status  VARCHAR(20)  NOT NULL DEFAULT 'active',
     created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
 
-    -- Enforce that role is one of the two allowed values
-    CONSTRAINT chk_users_role CHECK (role IN ('student', 'instructor'))
+    -- Enforce that role is one of the allowed values
+    CONSTRAINT chk_users_role CHECK (role IN ('student', 'instructor', 'admin')),
+
+    -- Enforce account lifecycle status
+    CONSTRAINT chk_users_account_status CHECK (account_status IN ('active', 'pending', 'suspended', 'rejected'))
 );
 
 -- Why VARCHAR for role instead of ENUM?

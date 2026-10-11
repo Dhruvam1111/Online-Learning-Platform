@@ -24,12 +24,14 @@ ALTER SEQUENCE enrollments_id_seq RESTART WITH 1;
 --
 -- NOTE TO TEAM: Use "password123" to log in as any of these users during testing.
 
-INSERT INTO users (name, email, password_hash, role) VALUES
-    ('Dr. Sarah Chen',    'sarah@instructor.com',   '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'instructor'),
-    ('Prof. James Wilson', 'james@instructor.com',   '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'instructor'),
-    ('Alice Johnson',      'alice@student.com',      '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'student'),
-    ('Bob Martinez',       'bob@student.com',        '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'student'),
-    ('Charlie Park',       'charlie@student.com',    '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'student');
+INSERT INTO users (name, email, password_hash, role, account_status) VALUES
+    ('Platform Admin',     'admin@olp.com',          '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'admin',      'active'),
+    ('Dr. Sarah Chen',     'sarah@instructor.com',   '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'instructor', 'active'),
+    ('Prof. James Wilson', 'james@instructor.com',   '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'instructor', 'active'),
+    ('Alice Johnson',      'alice@student.com',      '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'student',    'active'),
+    ('Bob Martinez',       'bob@student.com',        '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'student',    'active'),
+    ('Charlie Park',       'charlie@student.com',    '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'student',    'active'),
+    ('Pending Instructor', 'pending@instructor.com', '$2a$10$h1etqUgZ1ZJs7/mhkvvd3eTR1DPRhpLUW4DmQxQiYpxVVCDMzL8tW', 'instructor', 'pending');
 
 -- User IDs after insert:
 --   1 = Dr. Sarah Chen (instructor)
