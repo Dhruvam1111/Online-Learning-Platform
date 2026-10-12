@@ -119,3 +119,17 @@ CREATE TABLE enrollments (
     -- Prevent the same student from enrolling in the same course twice
     CONSTRAINT uq_enrollment UNIQUE (student_id, course_id)
 );
+
+
+-- =========================
+-- TABLE: reviews (Feature 7)
+-- =========================
+CREATE TABLE reviews (
+    id          SERIAL PRIMARY KEY,
+    student_id  INTEGER  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id   INTEGER  NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    rating      SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    comment     TEXT,
+    created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE (student_id, course_id)
+);
