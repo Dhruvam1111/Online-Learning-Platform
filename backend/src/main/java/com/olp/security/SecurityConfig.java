@@ -78,7 +78,7 @@ public class SecurityConfig {
                 "http://localhost:5173"        // Vite dev server
                 // Person 4 will add the deployed frontend URL here later
         ));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
 

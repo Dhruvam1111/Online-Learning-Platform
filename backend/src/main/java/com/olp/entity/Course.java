@@ -1,3 +1,4 @@
+
 package com.olp.entity;
 
 import jakarta.persistence.*;
@@ -21,8 +22,9 @@ public class Course {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Convert(converter = CourseStatusConverter.class)
     @Column(nullable = false, length = 20)
-    private String status = "draft";
+    private CourseStatus status = CourseStatus.DRAFT;
 
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
@@ -32,29 +34,48 @@ public class Course {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
+        if (this.status == null) {
+            this.status = CourseStatus.DRAFT;
+        }
     }
 
-    // ===== Constructors =====
+    // Constructors
 
-    public Course() {}
+    public Course() {
+    }
 
-    public Course(User instructor, String title, String description, String status) {
+    public Course(User instructor, String title, String description,
+                  CourseStatus status) {
         this.instructor = instructor;
         this.title = title;
         this.description = description;
-        this.status = status;
+        this.status = status != null ? status : CourseStatus.DRAFT;
     }
 
-    public Course(User instructor, String title, String description, String status, String rejectionReason) {
-        this.instructor = instructor;
-        this.title = title;
-        this.description = description;
-        this.status = status;
+    public Course(User instructor, String title, String description,
+                  String status) {
+        this(instructor, title, description, status != null ? CourseStatus.fromString(status) : CourseStatus.DRAFT);
+    }
+
+    public Course(User instructor, String title, String description) {
+        this(instructor, title, description, CourseStatus.DRAFT);
+    }
+
+    public Course(User instructor, String title, String description,
+                  CourseStatus status, String rejectionReason) {
+        this(instructor, title, description, status);
         this.rejectionReason = rejectionReason;
     }
 
-    // ===== Getters and Setters =====
+    public Course(User instructor, String title, String description,
+                  String status, String rejectionReason) {
+        this(instructor, title, description, status != null ? CourseStatus.fromString(status) : CourseStatus.DRAFT, rejectionReason);
+    }
+
+    // Getters and Setters
 
     public Integer getId() {
         return id;
@@ -88,12 +109,16 @@ public class Course {
         this.description = description;
     }
 
-    public String getStatus() {
+    public CourseStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(CourseStatus status) {
         this.status = status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status != null ? CourseStatus.fromString(status) : null;
     }
 
     public String getRejectionReason() {

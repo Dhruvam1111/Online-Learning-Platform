@@ -5,6 +5,7 @@ import com.olp.dto.AdminUserResponse;
 import com.olp.dto.PageResponse;
 import com.olp.dto.RejectCourseRequest;
 import com.olp.entity.Course;
+import com.olp.entity.CourseStatus;
 import com.olp.entity.User;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.CourseRepository;
@@ -194,7 +195,7 @@ public class AdminService {
     @Transactional
     public AdminCourseResponse approveCourse(Integer courseId) {
         Course course = findCourseById(courseId);
-        course.setStatus("published");
+        course.setStatus(CourseStatus.PUBLISHED);
         course.setRejectionReason(null);
         course = courseRepository.save(course);
         return toAdminCourseResponse(course);
@@ -207,7 +208,7 @@ public class AdminService {
     @Transactional
     public AdminCourseResponse rejectCourse(Integer courseId, RejectCourseRequest request) {
         Course course = findCourseById(courseId);
-        course.setStatus("rejected");
+        course.setStatus(CourseStatus.REJECTED);
         course.setRejectionReason(request.getReason().trim());
         course = courseRepository.save(course);
         return toAdminCourseResponse(course);
@@ -220,7 +221,7 @@ public class AdminService {
     @Transactional
     public AdminCourseResponse unpublishCourse(Integer courseId) {
         Course course = findCourseById(courseId);
-        course.setStatus("draft");
+        course.setStatus(CourseStatus.DRAFT);
         course = courseRepository.save(course);
         return toAdminCourseResponse(course);
     }
@@ -267,7 +268,7 @@ public class AdminService {
                 instructor != null ? instructor.getId() : null,
                 instructor != null ? instructor.getName() : null,
                 instructor != null ? instructor.getEmail() : null,
-                course.getStatus(),
+                course.getStatus() != null ? course.getStatus().name().toLowerCase() : null,
                 course.getRejectionReason(),
                 course.getCreatedAt()
         );
