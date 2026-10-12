@@ -22,10 +22,14 @@ CREATE TABLE users (
     email           VARCHAR(255) UNIQUE NOT NULL,
     password_hash   VARCHAR(255) NOT NULL,
     role            VARCHAR(20)  NOT NULL,
+    account_status  VARCHAR(20)  NOT NULL DEFAULT 'active',
     created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
 
-    -- Enforce that role is one of the two allowed values
-    CONSTRAINT chk_users_role CHECK (role IN ('student', 'instructor'))
+    -- Enforce that role is one of the allowed values
+    CONSTRAINT chk_users_role CHECK (role IN ('student', 'instructor', 'admin')),
+
+    -- Enforce account lifecycle status
+    CONSTRAINT chk_users_account_status CHECK (account_status IN ('active', 'pending', 'suspended', 'rejected'))
 );
 
 -- Why VARCHAR for role instead of ENUM?
@@ -48,6 +52,7 @@ CREATE TABLE courses (
     title           VARCHAR(200) NOT NULL,
     description     TEXT,
     status          VARCHAR(20)  NOT NULL DEFAULT 'draft',
+    rejection_reason TEXT,
     created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
 
     CONSTRAINT fk_courses_instructor
@@ -55,7 +60,7 @@ CREATE TABLE courses (
         REFERENCES users(id)
         ON DELETE CASCADE,
 
-    CONSTRAINT chk_courses_status CHECK (status IN ('draft', 'published'))
+    CONSTRAINT chk_courses_status CHECK (status IN ('draft', 'pending_review', 'published', 'rejected'))
 );
 
 -- ON DELETE CASCADE: If an instructor account is deleted, their courses

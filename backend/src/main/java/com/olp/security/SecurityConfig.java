@@ -49,6 +49,9 @@ public class SecurityConfig {
 
 
                         .requestMatchers(HttpMethod.GET, "/api/courses/**").permitAll()
+                        // Admin endpoints require ROLE_admin
+                        .requestMatchers("/api/admin/**").hasRole("admin")
+
                         // Instructor endpoints require instructor role
                         .requestMatchers("/api/instructor/**", "/api/instructors/**").hasRole("instructor")
 
@@ -77,7 +80,7 @@ public class SecurityConfig {
                 "http://localhost:5173"        // Vite dev server
                 // Person 4 will add the deployed frontend URL here later
         ));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
 
