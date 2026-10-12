@@ -18,5 +18,6 @@ public class ErrorResponse {
 
     public int getStatus() { return status; }
     public String getError() { return error; }
+    public String getMessage() { return error; }
     public LocalDateTime getTimestamp() { return timestamp; }
 }
