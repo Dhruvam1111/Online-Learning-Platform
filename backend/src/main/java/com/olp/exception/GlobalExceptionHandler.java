@@ -60,4 +60,19 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST)  // 400
                 .body(new ErrorResponse(400, message));
     }
+
+
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)  // 403
+                .body(new ErrorResponse(403, ex.getMessage() != null ? ex.getMessage() : "Access denied"));
+    }
+
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleMessageNotReadable(org.springframework.http.converter.HttpMessageNotReadableException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)  // 400
+                .body(new ErrorResponse(400, "Malformed request body"));
+    }
 }

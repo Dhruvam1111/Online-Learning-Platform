@@ -50,6 +50,9 @@ public class SecurityConfig {
                         // Admin endpoints require ROLE_admin
                         .requestMatchers("/api/admin/**").hasRole("admin")
 
+                        // Instructor endpoints require instructor role
+                        .requestMatchers("/api/instructor/**", "/api/instructors/**").hasRole("instructor")
+
                         // Everything else requires authentication
                         .anyRequest().authenticated()
                 )
