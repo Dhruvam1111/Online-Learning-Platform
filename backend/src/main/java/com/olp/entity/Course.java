@@ -1,3 +1,4 @@
+
 package com.olp.entity;
 
 import jakarta.persistence.*;
@@ -25,6 +26,9 @@ public class Course {
     @Column(nullable = false, length = 20)
     private CourseStatus status = CourseStatus.DRAFT;
 
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -38,11 +42,13 @@ public class Course {
         }
     }
 
-    // ===== Constructors =====
+    // Constructors
 
-    public Course() {}
+    public Course() {
+    }
 
-    public Course(User instructor, String title, String description, CourseStatus status) {
+    public Course(User instructor, String title, String description,
+                  CourseStatus status) {
         this.instructor = instructor;
         this.title = title;
         this.description = description;
@@ -53,7 +59,13 @@ public class Course {
         this(instructor, title, description, CourseStatus.DRAFT);
     }
 
-    // ===== Getters and Setters =====
+    public Course(User instructor, String title, String description,
+                  CourseStatus status, String rejectionReason) {
+        this(instructor, title, description, status);
+        this.rejectionReason = rejectionReason;
+    }
+
+    // Getters and Setters
 
     public Integer getId() {
         return id;
@@ -93,6 +105,14 @@ public class Course {
 
     public void setStatus(CourseStatus status) {
         this.status = status;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
     }
 
     public LocalDateTime getCreatedAt() {
