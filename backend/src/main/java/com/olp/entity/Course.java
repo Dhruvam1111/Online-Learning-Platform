@@ -55,6 +55,11 @@ public class Course {
         this.status = status != null ? status : CourseStatus.DRAFT;
     }
 
+    public Course(User instructor, String title, String description,
+                  String status) {
+        this(instructor, title, description, status != null ? CourseStatus.fromString(status) : CourseStatus.DRAFT);
+    }
+
     public Course(User instructor, String title, String description) {
         this(instructor, title, description, CourseStatus.DRAFT);
     }
@@ -63,6 +68,11 @@ public class Course {
                   CourseStatus status, String rejectionReason) {
         this(instructor, title, description, status);
         this.rejectionReason = rejectionReason;
+    }
+
+    public Course(User instructor, String title, String description,
+                  String status, String rejectionReason) {
+        this(instructor, title, description, status != null ? CourseStatus.fromString(status) : CourseStatus.DRAFT, rejectionReason);
     }
 
     // Getters and Setters
@@ -105,6 +115,10 @@ public class Course {
 
     public void setStatus(CourseStatus status) {
         this.status = status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status != null ? CourseStatus.fromString(status) : null;
     }
 
     public String getRejectionReason() {
