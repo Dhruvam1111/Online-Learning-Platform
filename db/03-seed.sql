@@ -60,13 +60,18 @@ INSERT INTO courses (instructor_id, title, description, status) VALUES
 
     (2, 'Advanced Machine Learning',
         'Deep dive into neural networks, transformers, and reinforcement learning. Prerequisites: Python proficiency and basic statistics.',
-        'draft');
+        'draft'),
+
+    (2, 'Spring Boot 3 Masterclass',
+        'Comprehensive guide to building production-ready REST APIs with Spring Boot 3.',
+        'pending_review');
 
 -- Course IDs after insert:
 --   1 = Web Development Fundamentals (published, by Sarah)
 --   2 = Introduction to Databases (published, by Sarah)
 --   3 = Python for Beginners (published, by James)
 --   4 = Advanced Machine Learning (draft, by James) — should NOT appear in catalog
+--   5 = Spring Boot 3 Masterclass (pending_review, by James) — awaiting admin approval
 
 
 -- =========================

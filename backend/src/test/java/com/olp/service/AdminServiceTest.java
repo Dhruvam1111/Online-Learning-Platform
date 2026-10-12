@@ -1,9 +1,13 @@
 package com.olp.service;
 
+import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
 import com.olp.dto.PageResponse;
+import com.olp.dto.RejectCourseRequest;
+import com.olp.entity.Course;
 import com.olp.entity.User;
 import com.olp.exception.ResourceNotFoundException;
+import com.olp.repository.CourseRepository;
 import com.olp.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,12 +32,16 @@ class AdminServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private CourseRepository courseRepository;
+
     @InjectMocks
     private AdminService adminService;
 
     private User sampleStudent;
     private User pendingInstructor;
     private User adminUser;
+    private Course sampleCourse;
 
     @BeforeEach
     void setUp() {
@@ -45,6 +53,9 @@ class AdminServiceTest {
 
         adminUser = new User("Admin", "admin@olp.com", "hash", "admin", "active");
         adminUser.setId(3);
+
+        sampleCourse = new Course(pendingInstructor, "Java 101", "Basics of Java", "pending_review");
+        sampleCourse.setId(10);
     }
 
     @Test
@@ -173,6 +184,91 @@ class AdminServiceTest {
 
         assertThrows(ResourceNotFoundException.class, () ->
                 adminService.approveInstructor(999)
+        );
+    }
+
+    @Test
+    void testGetCourses_WithFilters() {
+        Page<Course> coursePage = new PageImpl<>(List.of(sampleCourse));
+        when(courseRepository.findCoursesWithFilters(any(), any(), any(Pageable.class))).thenReturn(coursePage);
+
+        PageResponse<AdminCourseResponse> result = adminService.getCourses("pending_review", "Java", 0, 10, "createdAt", "desc");
+
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        assertEquals("Java 101", result.getContent().get(0).getTitle());
+        verify(courseRepository, times(1)).findCoursesWithFilters(eq("pending_review"), eq("java"), any(Pageable.class));
+    }
+
+    @Test
+    void testGetPendingCourses() {
+        Page<Course> coursePage = new PageImpl<>(List.of(sampleCourse));
+        when(courseRepository.findByStatus(eq("pending_review"), any(Pageable.class))).thenReturn(coursePage);
+
+        PageResponse<AdminCourseResponse> result = adminService.getPendingCourses(0, 10);
+
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        assertEquals("pending_review", result.getContent().get(0).getStatus());
+        verify(courseRepository, times(1)).findByStatus(eq("pending_review"), any(Pageable.class));
+    }
+
+    @Test
+    void testApproveCourse_Success() {
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+        when(courseRepository.save(any(Course.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AdminCourseResponse response = adminService.approveCourse(10);
+
+        assertNotNull(response);
+        assertEquals("published", response.getStatus());
+        assertNull(response.getRejectionReason());
+        verify(courseRepository, times(1)).save(sampleCourse);
+    }
+
+    @Test
+    void testRejectCourse_Success() {
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+        when(courseRepository.save(any(Course.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        RejectCourseRequest request = new RejectCourseRequest("Content is incomplete");
+        AdminCourseResponse response = adminService.rejectCourse(10, request);
+
+        assertNotNull(response);
+        assertEquals("rejected", response.getStatus());
+        assertEquals("Content is incomplete", response.getRejectionReason());
+        verify(courseRepository, times(1)).save(sampleCourse);
+    }
+
+    @Test
+    void testUnpublishCourse_Success() {
+        sampleCourse.setStatus("published");
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+        when(courseRepository.save(any(Course.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AdminCourseResponse response = adminService.unpublishCourse(10);
+
+        assertNotNull(response);
+        assertEquals("draft", response.getStatus());
+        verify(courseRepository, times(1)).save(sampleCourse);
+    }
+
+    @Test
+    void testDeleteCourse_Success() {
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+        doNothing().when(courseRepository).delete(sampleCourse);
+
+        adminService.deleteCourse(10);
+
+        verify(courseRepository, times(1)).delete(sampleCourse);
+    }
+
+    @Test
+    void testCourseNotFound_ThrowsException() {
+        when(courseRepository.findById(999)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () ->
+                adminService.approveCourse(999)
         );
     }
 }

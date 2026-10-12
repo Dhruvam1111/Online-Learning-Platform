@@ -52,6 +52,7 @@ CREATE TABLE courses (
     title           VARCHAR(200) NOT NULL,
     description     TEXT,
     status          VARCHAR(20)  NOT NULL DEFAULT 'draft',
+    rejection_reason TEXT,
     created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
 
     CONSTRAINT fk_courses_instructor
@@ -59,7 +60,7 @@ CREATE TABLE courses (
         REFERENCES users(id)
         ON DELETE CASCADE,
 
-    CONSTRAINT chk_courses_status CHECK (status IN ('draft', 'published'))
+    CONSTRAINT chk_courses_status CHECK (status IN ('draft', 'pending_review', 'published', 'rejected'))
 );
 
 -- ON DELETE CASCADE: If an instructor account is deleted, their courses

@@ -1,9 +1,12 @@
 package com.olp.controller;
 
+import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
 import com.olp.dto.ApiResponse;
 import com.olp.dto.PageResponse;
+import com.olp.dto.RejectCourseRequest;
 import com.olp.service.AdminService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -99,5 +102,83 @@ public class AdminController {
     public ResponseEntity<ApiResponse> deleteUser(@PathVariable Integer id) {
         adminService.deleteUser(id);
         return ResponseEntity.ok(new ApiResponse(true, "User deleted successfully"));
+    }
+
+    // =========================================================================
+    // COURSE GOVERNANCE & MODERATION (Features 15, 16, 17)
+    // =========================================================================
+
+    /**
+     * View master list of all courses with status and search filters.
+     * FR-A09: Master course directory
+     */
+    @GetMapping("/courses")
+    public ResponseEntity<PageResponse<AdminCourseResponse>> getCourses(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+
+        PageResponse<AdminCourseResponse> response = adminService.getCourses(
+                status, search, page, size, sortBy, sortDir);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * List all courses currently awaiting admin approval (status = 'pending_review').
+     * FR-A06: Course review queue
+     */
+    @GetMapping("/courses/pending")
+    public ResponseEntity<PageResponse<AdminCourseResponse>> getPendingCourses(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        PageResponse<AdminCourseResponse> response = adminService.getPendingCourses(page, size);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Approve a submitted course (publishes it to the catalog).
+     * FR-A07: Approve course
+     */
+    @PutMapping("/courses/{id}/approve")
+    public ResponseEntity<AdminCourseResponse> approveCourse(@PathVariable Integer id) {
+        AdminCourseResponse response = adminService.approveCourse(id);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Reject a submitted course with reasons provided to instructor.
+     * FR-A07: Reject course with feedback
+     */
+    @PutMapping("/courses/{id}/reject")
+    public ResponseEntity<AdminCourseResponse> rejectCourse(
+            @PathVariable Integer id,
+            @Valid @RequestBody RejectCourseRequest request) {
+
+        AdminCourseResponse response = adminService.rejectCourse(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Emergency unpublish of a live course (reverts status to 'draft').
+     * FR-A08: Unpublish live course
+     */
+    @PutMapping("/courses/{id}/unpublish")
+    public ResponseEntity<AdminCourseResponse> unpublishCourse(@PathVariable Integer id) {
+        AdminCourseResponse response = adminService.unpublishCourse(id);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Permanently remove a course from the platform.
+     * FR-A08: Remove course
+     */
+    @DeleteMapping("/courses/{id}")
+    public ResponseEntity<ApiResponse> deleteCourse(@PathVariable Integer id) {
+        adminService.deleteCourse(id);
+        return ResponseEntity.ok(new ApiResponse(true, "Course deleted successfully"));
     }
 }
