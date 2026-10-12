@@ -54,6 +54,13 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(403, ex.getMessage() != null ? ex.getMessage() : "Access denied"));
     }
 
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleResourceNotFound(ResourceNotFoundException ex) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)  // 404
+                .body(new ErrorResponse(404, ex.getMessage()));
+    }
+
     @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleMessageNotReadable(org.springframework.http.converter.HttpMessageNotReadableException ex) {
         return ResponseEntity
