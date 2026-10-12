@@ -9,6 +9,8 @@ DROP TABLE IF EXISTS lectures CASCADE;
 DROP TABLE IF EXISTS courses CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS bookmarks CASCADE;
+DROP TABLE IF EXISTS student_profiles CASCADE;
+
 -- =========================
 -- TABLE: users
 -- =========================
@@ -148,4 +150,13 @@ CREATE TABLE bookmarks (
     course_id   INTEGER   NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (student_id, course_id)
+CREATE TABLE student_profiles (
+    id              INT SERIAL PRIMARY KEY,  -- use SERIAL on PostgreSQL
+    student_id      INT NOT NULL UNIQUE,
+    education_level VARCHAR(100),
+    interests       VARCHAR(1000),
+    learning_goals  VARCHAR(1000),
+    bio             VARCHAR(2000),
+    updated_at      TIMESTAMP,
+    CONSTRAINT fk_student_profiles_user FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE
 );
