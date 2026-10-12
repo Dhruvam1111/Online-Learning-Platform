@@ -10,6 +10,7 @@ DROP TABLE IF EXISTS courses CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS bookmarks CASCADE;
 DROP TABLE IF EXISTS student_profiles CASCADE;
+DROP TABLE IF EXISTS lecture_progress CASCADE;
 
 -- =========================
 -- TABLE: users
@@ -129,7 +130,7 @@ CREATE TABLE enrollments (
 
 
 -- =========================
--- TABLE: reviews (Feature 7)
+-- TABLE: reviews 
 -- =========================
 CREATE TABLE reviews (
     id          SERIAL PRIMARY KEY,
@@ -142,7 +143,7 @@ CREATE TABLE reviews (
 );
 
 -- =========================
--- TABLE: bookmarks (Feature 9)
+-- TABLE: bookmarks 
 -- =========================
 CREATE TABLE bookmarks (
     id          SERIAL PRIMARY KEY,
@@ -164,4 +165,16 @@ CREATE TABLE student_profiles (
     bio             VARCHAR(2000),
     updated_at      TIMESTAMP,
     CONSTRAINT fk_student_profiles_user FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+
+-- =========================
+-- TABLE: lecture_progress 
+-- =========================
+CREATE TABLE lecture_progress (
+    id           SERIAL PRIMARY KEY,
+    student_id   INTEGER   NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    lecture_id   INTEGER   NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
+    completed_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE (student_id, lecture_id)
 );
