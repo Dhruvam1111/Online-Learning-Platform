@@ -8,7 +8,7 @@ DROP TABLE IF EXISTS enrollments CASCADE;
 DROP TABLE IF EXISTS lectures CASCADE;
 DROP TABLE IF EXISTS courses CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
-
+DROP TABLE IF EXISTS bookmarks CASCADE;
 -- =========================
 -- TABLE: users
 -- =========================
@@ -130,6 +130,17 @@ CREATE TABLE reviews (
     course_id   INTEGER  NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     rating      SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
     comment     TEXT,
+    created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE (student_id, course_id)
+);
+
+-- =========================
+-- TABLE: bookmarks (Feature 9)
+-- =========================
+CREATE TABLE bookmarks (
+    id          SERIAL PRIMARY KEY,
+    student_id  INTEGER   NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id   INTEGER   NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (student_id, course_id)
 );

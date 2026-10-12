@@ -28,3 +28,5 @@ CREATE INDEX idx_enrollments_course_id ON enrollments(course_id);
 
 
 CREATE INDEX idx_reviews_course_id ON reviews(course_id);
+
+CREATE INDEX idx_bookmarks_student_id ON bookmarks(student_id);
