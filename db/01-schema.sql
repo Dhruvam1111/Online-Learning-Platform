@@ -150,8 +150,13 @@ CREATE TABLE bookmarks (
     course_id   INTEGER   NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (student_id, course_id)
+);
+
+-- =========================
+-- TABLE: student_profiles
+-- =========================
 CREATE TABLE student_profiles (
-    id              INT SERIAL PRIMARY KEY,  -- use SERIAL on PostgreSQL
+    id              SERIAL PRIMARY KEY,
     student_id      INT NOT NULL UNIQUE,
     education_level VARCHAR(100),
     interests       VARCHAR(1000),
