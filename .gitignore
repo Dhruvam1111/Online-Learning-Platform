@@ -1,0 +1,16 @@
+# IDE and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+**/target/
+*.class
+*.jar
+*.war
+
+# Logs
+*.log

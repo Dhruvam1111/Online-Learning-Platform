@@ -34,35 +34,50 @@ public class AuthService {
             throw new DuplicateEmailException("An account with this email already exists");
         }
 
-        // 2. Hash the password
+        String role = request.getRole().toLowerCase().trim();
+        if ("admin".equals(role)) {
+            throw new IllegalArgumentException("Cannot self-register as an administrator");
+        }
+
+        // 2. Determine initial account status
+        // Instructors must undergo administrative approval (FR-A03, FR-I01)
+        String initialStatus = "instructor".equals(role) ? "pending" : "active";
+
+        // 3. Hash the password
         String hashedPassword = passwordEncoder.encode(request.getPassword());
 
-        // 3. Create and save the user
+        // 4. Create and save the user
         User user = new User(
                 request.getName(),
                 request.getEmail().toLowerCase().trim(),
                 hashedPassword,
-                request.getRole().toLowerCase().trim()
+                role,
+                initialStatus
         );
         user = userRepository.save(user);
 
-        // 4. Generate a JWT token
+        // 5. Generate a JWT token
         String token = jwtUtil.generateToken(user.getId(), user.getRole());
 
-        // 5. Build and return the response
+        // 6. Build and return the response
         UserResponse userResponse = new UserResponse(
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
                 user.getRole()
         );
-        return new AuthResponse("Registration successful", token, userResponse);
+
+        String message = "pending".equals(initialStatus)
+                ? "Registration submitted. Your instructor account is pending administrator approval."
+                : "Registration successful";
+
+        return new AuthResponse(message, token, userResponse);
     }
 
     /**
      * Authenticate a user.
      * Throws InvalidCredentialsException on failure.
-     * IMPORTANT: Never reveal whether the email or password was wrong.
+     * Throws AccountStatusException if account is pending or suspended.
      */
     public AuthResponse login(LoginRequest request) {
         // 1. Look up user by email
@@ -74,10 +89,20 @@ public class AuthService {
             throw new InvalidCredentialsException("Invalid email or password");
         }
 
-        // 3. Generate a JWT token
+        // 3. Verify account status
+        String status = user.getAccountStatus();
+        if ("pending".equalsIgnoreCase(status)) {
+            throw new com.olp.exception.AccountStatusException("Your instructor account is pending administrator approval");
+        } else if ("suspended".equalsIgnoreCase(status)) {
+            throw new com.olp.exception.AccountStatusException("Your account has been suspended. Please contact support");
+        } else if ("rejected".equalsIgnoreCase(status)) {
+            throw new com.olp.exception.AccountStatusException("Your instructor application was rejected");
+        }
+
+        // 4. Generate a JWT token
         String token = jwtUtil.generateToken(user.getId(), user.getRole());
 
-        // 4. Build and return the response
+        // 5. Build and return the response
         UserResponse userResponse = new UserResponse(
                 user.getId(),
                 user.getName(),

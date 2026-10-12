@@ -23,6 +23,9 @@ public class User {
     @Column(nullable = false, length = 20)
     private String role;
 
+    @Column(name = "account_status", nullable = false, length = 20)
+    private String accountStatus = "active";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -40,6 +43,15 @@ public class User {
         this.email = email;
         this.passwordHash = passwordHash;
         this.role = role;
+        this.accountStatus = "active";
+    }
+
+    public User(String name, String email, String passwordHash, String role, String accountStatus) {
+        this.name = name;
+        this.email = email;
+        this.passwordHash = passwordHash;
+        this.role = role;
+        this.accountStatus = accountStatus;
     }
 
     // ===== Getters and Setters =====
@@ -82,6 +94,14 @@ public class User {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getAccountStatus() {
+        return accountStatus;
+    }
+
+    public void setAccountStatus(String accountStatus) {
+        this.accountStatus = accountStatus;
     }
 
     public LocalDateTime getCreatedAt() {
