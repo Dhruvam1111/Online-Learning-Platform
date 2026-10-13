@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    overscroll-behavior: none;
+    background-color: #fff8f5;
+  }
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Keyframe Animations */
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes scaleUp {
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes floatGentle {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(0.4deg); }
+}
+
+@keyframes floatGentleDelayed {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-7px) rotate(-0.5deg); }
+}
+
+@keyframes floatRocket {
+  0%, 100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+  50% { transform: translateY(-12px) translateX(4px) rotate(-2deg); }
+}
+
+@keyframes floatTrophy {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(2deg); }
+}
+
+@keyframes floatShape {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(3deg); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.35; transform: scale(1) translate(0px, 0px); }
+  50% { opacity: 0.55; transform: scale(1.12) translate(15px, -10px); }
+}
+
+@keyframes flameWiggle {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.12) rotate(-6deg); }
+  75% { transform: scale(1.18) rotate(6deg); }
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-scaleUp {
+  animation: scaleUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-float {
+  animation: floatGentle 5s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: floatGentleDelayed 6s ease-in-out 1.5s infinite;
+}
+
+.animate-rocket {
+  animation: floatRocket 4.5s ease-in-out infinite;
+}
+
+.animate-trophy {
+  animation: floatTrophy 5.5s ease-in-out 0.8s infinite;
+}
+
+.animate-shape {
+  animation: floatShape 6.5s ease-in-out infinite;
+}
+
+.animate-orb-glow {
+  animation: pulseGlow 8s ease-in-out infinite;
+}
+
+.animate-flame {
+  display: inline-block;
+  animation: flameWiggle 2.5s infinite ease-in-out;
+}

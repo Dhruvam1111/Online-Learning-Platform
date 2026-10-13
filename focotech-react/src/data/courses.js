@@ -1,0 +1,142 @@
+export const courseData = {
+  'advance-ui-ux': {
+    id: 'advance-ui-ux',
+    title: 'Advance UI/UX Design Masterclass',
+    badge: 'Trending',
+    badgeBg: 'bg-primary-container',
+    category: 'Design Track',
+    filterCategory: 'design',
+    rating: '4.9',
+    reviews: '(1,420)',
+    fullReviews: '(1,420 reviews)',
+    hours: '32 Hours',
+    lessons: '40 Lessons',
+    fullLessons: '40 Interactive Lessons',
+    level: 'Intermediate - Advanced',
+    price: '₹4,999',
+    origPrice: '₹9,999',
+    icon: 'palette',
+    iconBg: 'bg-primary-fixed text-primary',
+    instructor: {
+      name: 'Elena Rostova',
+      role: 'Former Senior Designer at Stripe • 9+ yrs product design',
+      avatar: 'ER',
+      avatarBg: 'bg-primary-fixed text-primary'
+    },
+    desc: 'Master production-ready design tokens, multi-platform Figma components, dynamic layout grids, and interactive prototyping methods trusted at Fortune 500 tech companies.',
+    capstoneTitle: 'End-to-End Fintech Web & Mobile UI System',
+    capstoneDesc: 'Build, document, and publish a real multi-platform component library in Figma synced directly with code tokens and verified responsive views.',
+    trailerImg: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAlaRbUWqRYDffcw9W1aqII2RWy08TNFnVF48bj57ugBdWRL8BGp1GAzvWR6LLP7YBFXZjsy_oqHvAo8hnfdJQNth4wO92Z60yGfkJuzQ4AvWEntKDHSkslzoLGCY7i2g6U6ShZ-iGs89GqMVsU_fn3pWMObH_why_c6jghafLRlAICe7mcwjAN5q3AP3-BSlpSvSIIznlsXaKQgZqSGOsoB25hmrsyLWnHDa3kmUkYB9tnXMvDsjIa',
+    modules: [
+      { num: '01', title: 'Foundations of Design Tokens & Semantic Variables', lessons: '8 lessons • 6h', desc: 'Spacing scales, color semantic hierarchies, dark mode mapping.' },
+      { num: '02', title: 'Advanced Auto-Layout & Multi-variant Component Architecture', lessons: '11 lessons • 8h', desc: 'Complex compound components, responsive slot patterns.' },
+      { num: '03', title: 'High-Fidelity Micro-Interactions & Prototyping', lessons: '12 lessons • 9h', desc: 'Physics-based transitions, scroll triggers, nested frame logic.' },
+      { num: '04', title: 'Handoff Architecture, Design Specs & QA Review', lessons: '9 lessons • 9h', desc: 'Developer collaboration, storybook alignment, edge case audits.' }
+    ]
+  },
+  'design-system': {
+    id: 'design-system',
+    title: 'Basic To Advance Design System with UX Strategies',
+    badge: 'Bestseller',
+    badgeBg: 'bg-secondary-container',
+    category: 'Design Systems',
+    filterCategory: 'design',
+    rating: '4.7',
+    reviews: '(540)',
+    fullReviews: '(540 reviews)',
+    hours: '41 Hours',
+    lessons: '52 Lessons',
+    fullLessons: '52 Comprehensive Lessons',
+    level: 'All Levels',
+    price: '₹3,999',
+    origPrice: '₹7,999',
+    icon: 'view_in_ar',
+    iconBg: 'bg-secondary-fixed text-secondary',
+    instructor: {
+      name: 'Scott Warden',
+      role: 'Lead Design Architect • Ex-Atlassian & Design Systems Author',
+      avatar: 'SW',
+      avatarBg: 'bg-secondary-fixed text-secondary'
+    },
+    desc: 'Architect resilient design systems that scale across thousands of engineers and designers. Learn governance, token pipelines, versioning strategies, and UX strategy.',
+    capstoneTitle: 'Multi-Brand Enterprise Design System',
+    capstoneDesc: 'Create a scalable, documentation-first design system with token synchronization, Figma community components, and cross-team adoption metrics.',
+    trailerImg: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAlaRbUWqRYDffcw9W1aqII2RWy08TNFnVF48bj57ugBdWRL8BGp1GAzvWR6LLP7YBFXZjsy_oqHvAo8hnfdJQNth4wO92Z60yGfkJuzQ4AvWEntKDHSkslzoLGCY7i2g6U6ShZ-iGs89GqMVsU_fn3pWMObH_why_c6jghafLRlAICe7mcwjAN5q3AP3-BSlpSvSIIznlsXaKQgZqSGOsoB25hmrsyLWnHDa3kmUkYB9tnXMvDsjIa',
+    modules: [
+      { num: '01', title: 'Design System Governance & Team Workflows', lessons: '10 lessons • 8h', desc: 'Contributions, version management, documentation models.' },
+      { num: '02', title: 'Multi-Tier Token Architecture (Global, Semantic, Component)', lessons: '14 lessons • 11h', desc: 'Style Dictionary, cross-platform exports for iOS/Web.' },
+      { num: '03', title: 'Accessible UI Component Specifications & WCAG 2.2', lessons: '16 lessons • 12h', desc: 'Focus traps, ARIA guidelines, keyboard states, color contrasts.' },
+      { num: '04', title: 'Evangelism & Measuring Design System ROI', lessons: '12 lessons • 10h', desc: 'Telemetry tracking, library adoption rate, design ops sync.' }
+    ]
+  },
+  'webflow-tutorial': {
+    id: 'webflow-tutorial',
+    title: 'Webflow Tutorial: Build Your First Portfolio Website',
+    badge: 'Hot',
+    badgeBg: 'bg-tertiary-container',
+    category: 'No-Code Tech',
+    filterCategory: 'dev',
+    rating: '4.7',
+    reviews: '(32)',
+    fullReviews: '(32 reviews)',
+    hours: '14 Hours',
+    lessons: '18 Lessons',
+    fullLessons: '18 Step-by-Step Lessons',
+    level: 'Beginner - Intermediate',
+    price: '₹999',
+    origPrice: '₹2,499',
+    icon: 'web',
+    iconBg: 'bg-tertiary-fixed text-tertiary',
+    instructor: {
+      name: 'Adam Smith',
+      role: 'Webflow Certified Expert & Award-Winning Agency Founder',
+      avatar: 'AS',
+      avatarBg: 'bg-tertiary-fixed text-tertiary'
+    },
+    desc: 'Learn Webflow from zero to launch. Understand CSS flexbox, responsive grid systems, CMS collections, client-first styling principles, and custom micro-interactions.',
+    capstoneTitle: 'Award-Winning Interactive Designer Portfolio',
+    capstoneDesc: 'Build a bespoke, dynamic portfolio website equipped with custom CMS case studies, 3D card tilts, and sleek contact form automation.',
+    trailerImg: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAlaRbUWqRYDffcw9W1aqII2RWy08TNFnVF48bj57ugBdWRL8BGp1GAzvWR6LLP7YBFXZjsy_oqHvAo8hnfdJQNth4wO92Z60yGfkJuzQ4AvWEntKDHSkslzoLGCY7i2g6U6ShZ-iGs89GqMVsU_fn3pWMObH_why_c6jghafLRlAICe7mcwjAN5q3AP3-BSlpSvSIIznlsXaKQgZqSGOsoB25hmrsyLWnHDa3kmUkYB9tnXMvDsjIa',
+    modules: [
+      { num: '01', title: 'Webflow Canvas, Box Model & Client-First Setup', lessons: '4 lessons • 3h', desc: 'Mental models for HTML elements, classes, and responsive cascades.' },
+      { num: '02', title: 'CMS Architecture & Dynamic Project Showcase Pages', lessons: '5 lessons • 4h', desc: 'Collection lists, filters, multi-reference case studies.' },
+      { num: '03', title: 'Page Interactions, Smooth Scroll & Hover States', lessons: '5 lessons • 4h', desc: 'Trigger timelines, custom cursor trails, nav bar transformations.' },
+      { num: '04', title: 'SEO Optimization, Custom Domain & Publishing Live', lessons: '4 lessons • 3h', desc: 'Lighthouse score audits, metadata setups, analytics hookup.' }
+    ]
+  },
+  'modern-fullstack': {
+    id: 'modern-fullstack',
+    title: 'Modern Full-Stack Web Development with Next.js',
+    badge: 'New',
+    badgeBg: 'bg-primary-container',
+    category: 'Development Track',
+    filterCategory: 'dev',
+    rating: '4.9',
+    reviews: '(912)',
+    fullReviews: '(912 reviews)',
+    hours: '38 Hours',
+    lessons: '45 Lessons',
+    fullLessons: '45 Hands-On Lessons',
+    level: 'Intermediate - Advanced',
+    price: '₹5,999',
+    origPrice: '₹11,999',
+    icon: 'integration_instructions',
+    iconBg: 'bg-primary-fixed-dim text-primary',
+    instructor: {
+      name: 'Marcus Vance',
+      role: 'Core Open Source Contributor & Staff Frontend Engineer',
+      avatar: 'MV',
+      avatarBg: 'bg-primary-fixed-dim text-primary'
+    },
+    desc: 'Build fast, production-ready React applications with Next.js App Router, Tailwind CSS, Server Actions, PostgreSQL, and modern authentication workflows.',
+    capstoneTitle: 'Full-Stack Collaborative SaaS Platform',
+    capstoneDesc: 'Construct an end-to-end cloud application featuring real-time synchronization, Stripe subscription billing, optimistic UI updates, and Edge caching.',
+    trailerImg: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAlaRbUWqRYDffcw9W1aqII2RWy08TNFnVF48bj57ugBdWRL8BGp1GAzvWR6LLP7YBFXZjsy_oqHvAo8hnfdJQNth4wO92Z60yGfkJuzQ4AvWEntKDHSkslzoLGCY7i2g6U6ShZ-iGs89GqMVsU_fn3pWMObH_why_c6jghafLRlAICe7mcwjAN5q3AP3-BSlpSvSIIznlsXaKQgZqSGOsoB25hmrsyLWnHDa3kmUkYB9tnXMvDsjIa',
+    modules: [
+      { num: '01', title: 'App Router, Server Components & Suspense Streams', lessons: '11 lessons • 9h', desc: 'RSC mental model, client boundaries, parallel routing.' },
+      { num: '02', title: 'Type-Safe Data Fetching, Mutations & Server Actions', lessons: '12 lessons • 10h', desc: 'Zod validation, optimistic UI updates, revalidation strategies.' },
+      { num: '03', title: 'Tailwind Mastery, Framer Motion & Accessible UI', lessons: '11 lessons • 9h', desc: 'Radix primitives, layout animations, dark mode tokens.' },
+      { num: '04', title: 'Auth, Edge Middleware & Production Vercel Deployments', lessons: '11 lessons • 10h', desc: 'NextAuth/Clerk, database indexing, latency optimization.' }
+    ]
+  }
+};
