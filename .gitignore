@@ -1,0 +1,13 @@
+# Zip archives
+*.zip
+
+# Node modules (handled inside sub-project)
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
