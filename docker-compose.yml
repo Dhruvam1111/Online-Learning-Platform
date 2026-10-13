@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: olp_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: online_learning
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      # These files run automatically in alphabetical order on first startup
+      - ./db/01-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./db/02-indexes.sql:/docker-entrypoint-initdb.d/02-indexes.sql
+      - ./db/03-seed.sql:/docker-entrypoint-initdb.d/03-seed.sql
+      # Persist data between container restarts
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
