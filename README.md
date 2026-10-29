@@ -9,8 +9,7 @@ The goal of Sprint 1 is to build the core end-to-end functionality of the platfo
 - **Role-based Authentication:** Secure JWT-based login and registration for Students and Instructors.
 - **Instructor Dashboard:** Instructors can create courses, add YouTube-based lectures, manage course status (draft/published), and organize their curriculum.
 - **Student Experience:** Students can browse published courses, enroll instantly (free for Sprint 1), and consume lecture content through an integrated YouTube player.
-- **Premium UI:** A custom-designed frontend using React (Vite) and Vanilla CSS, adhering to strict design guidelines (solid colors, Inter font, responsive layouts).
-
+- **Admin :** The admin team shall be able to oversee the whole content. 
 ## 🛠️ Tech Stack
 - **Frontend:** React 18, Vite, Vanilla CSS
 - **Backend:** Java 17, Spring Boot 3, Spring Security (JWT)
@@ -31,8 +30,4 @@ docker compose up -d
 ```
 *See [DB-README.md](./DB-README.md) for test credentials and schema diagrams.*
 
-### 2. Backend Setup
-*(Instructions will be added as the backend is developed by the team)*
 
-### 3. Frontend Setup
-*(Instructions will be added as the frontend is developed by the team)*
