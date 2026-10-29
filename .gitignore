@@ -1,16 +1,13 @@
-# IDE and OS files
-.vscode/
-.idea/
-*.swp
-*.swo
+# Zip archives
+*.zip
+
+# Node modules (handled inside sub-project)
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# OS files
 .DS_Store
 Thumbs.db
-
-# Build artifacts
-**/target/
-*.class
-*.jar
-*.war
-
-# Logs
-*.log
