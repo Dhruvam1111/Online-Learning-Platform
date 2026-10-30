@@ -4,13 +4,15 @@
 -- ============================================================
 
 -- Clean slate (safe to re-run during development)
+DROP TABLE IF EXISTS lecture_progress CASCADE;
+DROP TABLE IF EXISTS bookmarks CASCADE;
+DROP TABLE IF EXISTS reviews CASCADE;
 DROP TABLE IF EXISTS enrollments CASCADE;
 DROP TABLE IF EXISTS lectures CASCADE;
+DROP TABLE IF EXISTS instructor_profiles CASCADE;
+DROP TABLE IF EXISTS student_profiles CASCADE;
 DROP TABLE IF EXISTS courses CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
-DROP TABLE IF EXISTS bookmarks CASCADE;
-DROP TABLE IF EXISTS student_profiles CASCADE;
-DROP TABLE IF EXISTS lecture_progress CASCADE;
 
 -- =========================
 -- TABLE: users
@@ -130,20 +132,20 @@ CREATE TABLE enrollments (
 
 
 -- =========================
--- TABLE: reviews 
+-- TABLE: reviews
 -- =========================
 CREATE TABLE reviews (
     id          SERIAL PRIMARY KEY,
     student_id  INTEGER  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     course_id   INTEGER  NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-    rating      SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    rating      INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
     comment     TEXT,
     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (student_id, course_id)
 );
 
 -- =========================
--- TABLE: bookmarks 
+-- TABLE: bookmarks
 -- =========================
 CREATE TABLE bookmarks (
     id          SERIAL PRIMARY KEY,
@@ -167,9 +169,22 @@ CREATE TABLE student_profiles (
     CONSTRAINT fk_student_profiles_user FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- =========================
+-- TABLE: instructor_profiles
+-- =========================
+CREATE TABLE instructor_profiles (
+    id              SERIAL PRIMARY KEY,
+    instructor_id   INTEGER NOT NULL UNIQUE,
+    qualifications  TEXT,
+    expertise_areas TEXT,
+    bio             TEXT,
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_instructor_profiles_user FOREIGN KEY (instructor_id) REFERENCES users(id) ON DELETE CASCADE
+);
 
 -- =========================
--- TABLE: lecture_progress 
+-- TABLE: lecture_progress
 -- =========================
 CREATE TABLE lecture_progress (
     id           SERIAL PRIMARY KEY,
