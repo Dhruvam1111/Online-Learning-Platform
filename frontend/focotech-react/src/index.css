@@ -1,0 +1,229 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Plus Jakarta Sans', Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+  body {
+    overscroll-behavior: none;
+    background-color: #fff8f5;
+    color: #1e1b19;
+  }
+
+  /* Refined Professional Typography Hierarchy */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+    letter-spacing: -0.025em;
+    font-feature-settings: 'cv02', 'cv03', 'cv04';
+  }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(220, 200, 190, 0.5);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 90, 54, 0.4);
+}
+
+/* ========================================================
+   PROFESSIONAL MICRO-ANIMATIONS & INTERACTION KEYFRAMES
+   ======================================================== */
+
+/* Entrance & Reveal */
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes scaleUp {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Checkbox Tactile Pop Animation */
+@keyframes checkPop {
+  0% {
+    transform: scale(0.75);
+    opacity: 0.6;
+  }
+  55% {
+    transform: scale(1.16);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Smooth Accordion Slide */
+@keyframes accordionSlide {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Subtle Shimmer for Highlights */
+@keyframes subtleShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Floating Elements */
+@keyframes floatGentle {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-7px) rotate(0.4deg); }
+}
+
+@keyframes floatGentleDelayed {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(-0.4deg); }
+}
+
+@keyframes floatRocket {
+  0%, 100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) translateX(3px) rotate(-1.5deg); }
+}
+
+@keyframes floatTrophy {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-7px) rotate(1.5deg); }
+}
+
+@keyframes floatShape {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-5px) rotate(2deg); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.35; transform: scale(1) translate(0px, 0px); }
+  50% { opacity: 0.55; transform: scale(1.1) translate(12px, -8px); }
+}
+
+@keyframes flameWiggle {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.1) rotate(-5deg); }
+  75% { transform: scale(1.14) rotate(5deg); }
+}
+
+@keyframes softBreathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(0.96); }
+}
+
+/* Animation Utility Classes */
+.animate-fadeInUp {
+  animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scaleUp {
+  animation: scaleUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-check-pop {
+  animation: checkPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-accordion {
+  animation: accordionSlide 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-float {
+  animation: floatGentle 5s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: floatGentleDelayed 6s ease-in-out 1.5s infinite;
+}
+
+.animate-rocket {
+  animation: floatRocket 4.5s ease-in-out infinite;
+}
+
+.animate-trophy {
+  animation: floatTrophy 5.5s ease-in-out 0.8s infinite;
+}
+
+.animate-shape {
+  animation: floatShape 6.5s ease-in-out infinite;
+}
+
+.animate-orb-glow {
+  animation: pulseGlow 8s ease-in-out infinite;
+}
+
+.animate-flame {
+  display: inline-block;
+  animation: flameWiggle 2.5s infinite ease-in-out;
+}
+
+.animate-breathe {
+  animation: softBreathe 2s ease-in-out infinite;
+}
+
+/* Professional Interactive Transitions */
+.pro-card {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease;
+}
+.pro-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px -8px rgba(255, 90, 54, 0.14), 0 4px 12px -2px rgba(230, 200, 180, 0.15);
+}
+
+.pro-btn {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+.pro-btn:hover {
+  transform: translateY(-1px);
+}
+.pro-btn:active {
+  transform: scale(0.97);
+}
+
+.pro-row {
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.15s ease;
+}
+.pro-row:hover {
+  transform: translateX(2px);
+}

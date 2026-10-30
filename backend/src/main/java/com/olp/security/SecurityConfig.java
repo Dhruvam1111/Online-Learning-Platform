@@ -48,7 +48,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
 
 
-                        .requestMatchers(HttpMethod.GET, "/api/courses/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
                         // Admin endpoints require ROLE_admin
                         .requestMatchers("/api/admin/**").hasRole("admin")
 

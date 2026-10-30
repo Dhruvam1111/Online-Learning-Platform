@@ -1,6 +1,7 @@
 package com.olp.service;
 
 import com.olp.dto.CourseResponse;
+import com.olp.dto.CreateCourseRequest;
 import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
 import com.olp.entity.Course;
@@ -58,6 +59,28 @@ public class InstructorCourseService {
         return courses.stream()
                 .map(CourseResponse::fromEntity)
                 .toList();
+    }
+
+    /**
+     * Create a new course for the authenticated instructor (starts in DRAFT status).
+     */
+    @Transactional
+    public CourseResponse createCourse(User currentUser, CreateCourseRequest request) {
+        validateInstructor(currentUser);
+
+        if (request.getTitle() == null || request.getTitle().trim().isEmpty()) {
+            throw new IllegalArgumentException("Course title cannot be blank");
+        }
+
+        Course course = new Course(
+                currentUser,
+                request.getTitle().trim(),
+                request.getDescription() != null ? request.getDescription().trim() : null,
+                CourseStatus.DRAFT
+        );
+
+        Course saved = courseRepository.save(course);
+        return CourseResponse.fromEntity(saved);
     }
 
     /**

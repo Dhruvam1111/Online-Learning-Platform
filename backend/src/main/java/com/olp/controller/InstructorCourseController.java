@@ -1,11 +1,13 @@
 package com.olp.controller;
 
 import com.olp.dto.CourseResponse;
+import com.olp.dto.CreateCourseRequest;
 import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
 import com.olp.entity.User;
 import com.olp.service.InstructorCourseService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,6 +25,20 @@ public class InstructorCourseController {
 
     public InstructorCourseController(InstructorCourseService instructorCourseService) {
         this.instructorCourseService = instructorCourseService;
+    }
+
+    /**
+     * POST /api/instructor/courses
+     * Create a new course owned by the authenticated instructor.
+     */
+    @PostMapping
+    public ResponseEntity<CourseResponse> createCourse(
+            Authentication authentication,
+            @Valid @RequestBody CreateCourseRequest request) {
+
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        CourseResponse response = instructorCourseService.createCourse(currentUser, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
