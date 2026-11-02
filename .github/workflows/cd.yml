@@ -1,0 +1,192 @@
+name: Continuous Deployment (CD)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  # ============================================================================
+  # 0. Path Filtering
+  # ============================================================================
+  detect-changes:
+    name: Filter / Component Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect modified paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+              - 'docker-compose*.yml'
+              - '.github/workflows/cd.yml'
+            backend:
+              - 'backend/**'
+              - 'db/**'
+              - 'docker-compose*.yml'
+              - '.github/workflows/cd.yml'
+
+  # ============================================================================
+  # 1. Build and Publish Frontend Container to GHCR
+  # ============================================================================
+  publish-frontend:
+    name: Publish / Frontend Container
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Frontend Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/frontend
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short,prefix=sha-
+
+      - name: Build and push Frontend container to GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend/focotech-react
+          file: ./frontend/focotech-react/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=frontend-cd
+          cache-to: type=gha,mode=max,scope=frontend-cd
+
+  # ============================================================================
+  # 2. Build and Publish Backend Container to GHCR
+  # ============================================================================
+  publish-backend:
+    name: Publish / Backend Container
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Backend Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/backend
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short,prefix=sha-
+
+      - name: Build and push Backend container to GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=backend-cd
+          cache-to: type=gha,mode=max,scope=backend-cd
+
+  # ============================================================================
+  # 3. Cloud Deployment Dispatch (Pluggable Hooks)
+  # ============================================================================
+  deploy:
+    name: Deploy / Cloud Rollout Dispatch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [detect-changes, publish-frontend, publish-backend]
+    if: |
+      always() &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
+    steps:
+      - name: Trigger Render Backend Deployment
+        env:
+          RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -n "$RENDER_HOOK" ]; then
+            echo "Dispatching deployment hook to Render..."
+            response=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$RENDER_HOOK")
+            if [ "$response" -ge 200 ] && [ "$response" -lt 300 ]; then
+              echo "✅ Successfully dispatched Render deployment (HTTP $response)."
+            else
+              echo "⚠️ Render hook responded with HTTP $response. Please check secret RENDER_DEPLOY_HOOK."
+            fi
+          else
+            echo "ℹ️ RENDER_DEPLOY_HOOK secret not configured. Skipping Render trigger."
+          fi
+
+      - name: Trigger Vercel Frontend Deployment
+        env:
+          VERCEL_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -n "$VERCEL_HOOK" ]; then
+            echo "Dispatching deployment hook to Vercel..."
+            response=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$VERCEL_HOOK")
+            if [ "$response" -ge 200 ] && [ "$response" -lt 300 ]; then
+              echo "✅ Successfully dispatched Vercel deployment (HTTP $response)."
+            else
+              echo "⚠️ Vercel hook responded with HTTP $response. Please check secret VERCEL_DEPLOY_HOOK."
+            fi
+          else
+            echo "ℹ️ VERCEL_DEPLOY_HOOK secret not configured. Skipping Vercel trigger."
+          fi
+
+      - name: CD Summary
+        run: |
+          echo "### 🚀 Continuous Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Registry:** \`ghcr.io/${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend Container:** \`ghcr.io/${{ github.repository }}/backend:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend Container:** \`ghcr.io/${{ github.repository }}/frontend:latest\`" >> $GITHUB_STEP_SUMMARY
