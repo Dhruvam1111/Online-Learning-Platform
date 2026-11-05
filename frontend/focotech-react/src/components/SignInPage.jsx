@@ -11,7 +11,6 @@ const GOOGLE_CLIENT_ID =
 
 /**
  * Sign In & Profile Creation Component.
- * Maintained by Person 1 (Developer A: Identity, JWT & Google SSO).
  */
 export default function SignInPage({ onNavigateHome, onNavigateDashboard, initialNotice }) {
   const { setSession } = useAuth();

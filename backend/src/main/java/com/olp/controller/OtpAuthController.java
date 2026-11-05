@@ -11,7 +11,6 @@ import java.util.Map;
 
 /**
  * Controller for Email OTP Authentication & Password Recovery.
- * Maintained by Person 2 (Developer B: Multi-Factor Security & OTP Verification).
  */
 @RestController
 @RequestMapping("/api/auth")

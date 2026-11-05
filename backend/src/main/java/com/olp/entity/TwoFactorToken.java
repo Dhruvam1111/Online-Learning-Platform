@@ -5,9 +5,7 @@ import java.time.LocalDateTime;
 
 /**
  * Entity representing an OTP token used for email verification.
- * Supports both Password Reset and Passwordless Login authentication.
- *
- * Developer B: Email OTP Verification & Authentication.
+ * Supports both Password Reset and Registration/Login authentication.
  */
 @Entity
 @Table(name = "two_factor_tokens")

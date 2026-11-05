@@ -3,7 +3,6 @@ import api from '../services/api';
 
 /**
  * OTP Verification & Password Recovery Module.
- * Maintained by Person 2 (Developer B: Multi-Factor Security, Transactional Email & Recovery).
  */
 export default function OtpAuthModal({
   mode, // 'verify-signup' | 'forgot-password'

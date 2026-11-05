@@ -11,8 +11,6 @@ import org.springframework.stereotype.Service;
 
 /**
  * Service for sending real email notifications (OTPs, password reset links).
- *
- * Developer B: Real Email Delivery System.
  */
 @Service
 public class EmailService {

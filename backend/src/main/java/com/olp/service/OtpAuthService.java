@@ -23,8 +23,6 @@ import java.time.LocalDateTime;
  *  1. Password Reset via Email OTP (Forgot Password flow)
  *  2. Passwordless Login via Email OTP (Alternative authentication flow)
  *  3. Password Change via Current Password (Standard authenticated profile flow)
- *
- * Developer B: Authentication & Security enhancements.
  */
 @Service
 public class OtpAuthService {
