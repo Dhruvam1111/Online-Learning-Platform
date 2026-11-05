@@ -8,6 +8,10 @@ import com.olp.repository.UserRepository;
 import com.olp.security.JwtUtil;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class AuthService {
@@ -92,6 +96,9 @@ public class AuthService {
         // 3. Verify account status
         String status = user.getAccountStatus();
         if ("pending".equalsIgnoreCase(status)) {
+            if ("student".equalsIgnoreCase(user.getRole())) {
+                throw new com.olp.exception.AccountStatusException("Please verify your email address to activate your account. Check your email for the verification code.");
+            }
             throw new com.olp.exception.AccountStatusException("Your instructor account is pending administrator approval");
         } else if ("suspended".equalsIgnoreCase(status)) {
             throw new com.olp.exception.AccountStatusException("Your account has been suspended. Please contact support");
@@ -123,5 +130,52 @@ public class AuthService {
                 user.getEmail(),
                 user.getRole()
         );
+    }
+
+    /**
+     * Authenticate or auto-register a user via Google Account.
+     * Google has already verified the email ownership.
+     */
+    @Transactional
+    public AuthResponse loginOrRegisterWithGoogle(GoogleAuthRequest request) {
+        String cleanEmail = request.getEmail().toLowerCase().trim();
+        String name = (request.getName() != null && !request.getName().isBlank())
+                ? request.getName().trim()
+                : cleanEmail.split("@")[0];
+
+        Optional<User> existingUser = userRepository.findByEmail(cleanEmail);
+        User user;
+        if (existingUser.isPresent()) {
+            user = existingUser.get();
+            // If user exists with pending status, activate it since Google verified their email
+            if ("pending".equalsIgnoreCase(user.getAccountStatus())) {
+                user.setAccountStatus("active");
+                user = userRepository.save(user);
+            } else if ("suspended".equalsIgnoreCase(user.getAccountStatus())) {
+                throw new com.olp.exception.AccountStatusException("Your account has been suspended. Please contact support");
+            } else if ("rejected".equalsIgnoreCase(user.getAccountStatus())) {
+                throw new com.olp.exception.AccountStatusException("Your instructor application was rejected");
+            }
+        } else {
+            // Auto-provision a new student account verified by Google
+            user = new User(
+                    name,
+                    cleanEmail,
+                    passwordEncoder.encode(UUID.randomUUID().toString()),
+                    "student",
+                    "active"
+            );
+            user = userRepository.save(user);
+        }
+
+        String token = jwtUtil.generateToken(user.getId(), user.getRole());
+        UserResponse userResponse = new UserResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getRole()
+        );
+
+        return new AuthResponse("Authenticated successfully via Google", token, userResponse);
     }
 }

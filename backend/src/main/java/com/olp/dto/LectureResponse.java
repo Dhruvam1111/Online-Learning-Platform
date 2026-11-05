@@ -17,6 +17,7 @@ public class LectureResponse {
     private String thumbnailUrl;
     private Integer orderIndex;
     private Integer position;
+    private Boolean locked;
     private LocalDateTime createdAt;
 
     public LectureResponse() {}
@@ -34,6 +35,7 @@ public class LectureResponse {
         this.thumbnailUrl = thumbnailUrl;
         this.orderIndex = orderIndex;
         this.position = orderIndex;
+        this.locked = false;
         this.createdAt = createdAt;
     }
 
@@ -53,6 +55,30 @@ public class LectureResponse {
                 lecture.getOrderIndex(),
                 lecture.getCreatedAt()
         );
+    }
+
+    /**
+     * Syllabus-only view for visitors without access to the course content.
+     * Every field that can identify or play the video (youtubeUrl, videoUrl, videoId,
+     * embedUrl, thumbnailUrl) is omitted; the thumbnail URL embeds the video id, so it is masked too.
+     */
+    public static LectureResponse previewOf(Lecture lecture) {
+        if (lecture == null) {
+            return null;
+        }
+        LectureResponse response = new LectureResponse(
+                lecture.getId(),
+                lecture.getCourse() != null ? lecture.getCourse().getId() : null,
+                lecture.getTitle(),
+                null,
+                null,
+                null,
+                null,
+                lecture.getOrderIndex(),
+                lecture.getCreatedAt()
+        );
+        response.setLocked(true);
+        return response;
     }
 
     // ===== Getters and Setters =====
@@ -139,6 +165,18 @@ public class LectureResponse {
     public void setPosition(Integer position) {
         this.position = position;
         this.orderIndex = position;
+    }
+
+    public Boolean isLocked() {
+        return locked != null && locked;
+    }
+
+    public Boolean getLocked() {
+        return locked;
+    }
+
+    public void setLocked(Boolean locked) {
+        this.locked = locked;
     }
 
     public LocalDateTime getCreatedAt() {

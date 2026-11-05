@@ -1,0 +1,72 @@
+# ──────────────────────────────────────────────────────────────
+# .dockerignore  –  backend/
+# Excludes files that must NOT be sent to the Docker build daemon.
+# A smaller build context = faster builds and no secrets leaking.
+# ──────────────────────────────────────────────────────────────
+
+# Maven build output – rebuilt inside the container
+target/
+
+# Compiled class files
+*.class
+
+# Maven wrapper (not needed; the image ships its own Maven)
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE / editor metadata
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.code-workspace
+.settings/
+.classpath
+.project
+.factorypath
+
+# OS artefacts
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local environment / secrets  ← most important
+.env
+.env.*
+*.env
+application-local.properties
+application-local.yml
+application-dev.properties
+application-dev.yml
+application-secret.properties
+application-secret.yml
+secrets.properties
+
+# Git history
+.git/
+.gitignore
+.gitattributes
+
+# GitHub Actions / CI configs
+.github/
+
+# Docker files themselves (avoid recursive context)
+Dockerfile*
+.dockerignore
+
+# Test reports and coverage
+surefire-reports/
+jacoco.exec
+*.exec
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+

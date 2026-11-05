@@ -15,9 +15,25 @@ Thumbs.db
 # Local configuration overrides & credentials (NEVER COMMIT)
 *local.properties
 application-local.properties
+backend/src/main/resources/application.properties
 .env
 .env.local
 .env.*.local
+
+# Local sprint specifications
+Documentation/00-sprint1-overview.md
+Documentation/01-database-schema.md
+Documentation/02-auth-module.md
+Documentation/03-instructor-module.md
+Documentation/04-student-module.md
+Documentation/04-student-module.md.pdf
+Documentation/05-deployment.md
+Documentation/06-additional-features.md
+Documentation/Person2_Content_Exam_Corrections.md
+Documentation/person6-student-layout-frontend.md
+
+# Personal Notes (Local Only - Never Commit)
+Notes - personal/
 
 # Test outputs & scripts
 test_devb_auth_suite.py
