@@ -11,3 +11,15 @@ build/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local configuration overrides & credentials (NEVER COMMIT)
+*local.properties
+application-local.properties
+.env
+.env.local
+.env.*.local
+
+# Test outputs & scripts
+test_devb_auth_suite.py
+test_enterprise_payment_suite.py
+*.log
