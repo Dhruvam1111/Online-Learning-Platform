@@ -9,6 +9,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
+/**
+ * Controller for Core User Authentication & Google OAuth SSO.
+ * Maintained by Person 1 (Developer A: Identity, JWT & Modern OAuth Provider).
+ */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -21,7 +27,7 @@ public class AuthController {
 
     /**
      * POST /api/auth/register
-     * Public — no token required.
+     * Public — direct credentials registration.
      */
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -31,7 +37,7 @@ public class AuthController {
 
     /**
      * POST /api/auth/login
-     * Public — no token required.
+     * Public — authenticate with Email + Password.
      */
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
@@ -40,24 +46,27 @@ public class AuthController {
     }
 
     /**
+     * POST /api/auth/google
+     * Public — authenticate or auto-register via official Google account.
+     */
+    @PostMapping("/google")
+    public ResponseEntity<AuthResponse> loginWithGoogle(@Valid @RequestBody GoogleAuthRequest request) {
+        AuthResponse response = authService.loginOrRegisterWithGoogle(request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * POST /api/auth/logout
-     * Authenticated — requires a valid token.
-     *
-     * Since we use stateless JWT (no server-side session), there's nothing
-     * to invalidate on the server. The client simply discards its token.
-     * This endpoint exists so the frontend has a consistent API to call.
+     * Authenticated — terminates user session.
      */
     @PostMapping("/logout")
-    public ResponseEntity<?> logout() {
-        // Stateless JWT: nothing to do server-side.
-        // The client should delete its stored token.
-        return ResponseEntity.ok().body(java.util.Map.of("message", "Logged out successfully"));
+    public ResponseEntity<Map<String, String>> logout() {
+        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 
     /**
      * GET /api/auth/me
-     * Authenticated — requires a valid token.
-     * Returns the current user's info.
+     * Authenticated — returns the currently authenticated user's profile.
      */
     @GetMapping("/me")
     public ResponseEntity<UserResponse> me(Authentication authentication) {

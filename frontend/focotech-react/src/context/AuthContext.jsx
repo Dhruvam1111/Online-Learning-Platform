@@ -118,6 +118,33 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
+  // ── Set Session directly (e.g. after OTP verification) ────────────────────
+  const setSession = useCallback((jwt, userData) => {
+    setToken(jwt);
+    setUser(userData);
+    setError(null);
+  }, []);
+
+  // ── Login with Google ─────────────────────────────────────────────────────
+  const loginWithGoogle = useCallback(async (email, name, idToken) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await authAPI.loginWithGoogle({ email, name, idToken });
+      const { token: jwt, user: userData, message } = res.data;
+      setToken(jwt);
+      setUser(userData);
+      return { success: true, message, user: userData };
+    } catch (err) {
+      const msg =
+        err.response?.data?.message || err.response?.data?.error || 'Google login failed. Please try again.';
+      setError(msg);
+      return { success: false, message: msg };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const isAuthenticated = !!token && !!user;
   const isStudent = user?.role === 'student';
   const isInstructor = user?.role === 'instructor';
@@ -134,6 +161,8 @@ export function AuthProvider({ children }) {
     isAdmin,
     login,
     register,
+    loginWithGoogle,
+    setSession,
     logout,
     refreshUser,
     setError,
