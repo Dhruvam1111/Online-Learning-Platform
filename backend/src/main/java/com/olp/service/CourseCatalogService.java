@@ -130,8 +130,9 @@ public class CourseCatalogService {
         Integer currentUserId = currentUser != null ? currentUser.getId() : null;
 
         List<Lecture> lectures = lectureRepository.findByCourseIdOrderByOrderIndexAsc(courseId);
+        boolean canViewContent = canViewContent(course, currentUser);
         List<LectureResponse> lectureResponses = lectures.stream()
-                .map(LectureResponse::fromEntity)
+                .map(l -> canViewContent ? LectureResponse.fromEntity(l) : LectureResponse.previewOf(l))
                 .toList();
 
         Double avgRating = reviewRepository.findAverageRatingByCourseId(courseId);
@@ -181,15 +182,35 @@ public class CourseCatalogService {
     }
 
     /**
-     * Returns lectures for an enrolled student or course preview.
+     * Returns lectures for a course. Video fields are only populated for the course's
+     * instructor or an enrolled student; everyone else receives the syllabus outline only.
      */
     @Transactional(readOnly = true)
     public List<LectureResponse> getCourseLectures(Integer courseId, User currentUser) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
 
+        boolean canViewContent = canViewContent(course, currentUser);
         return lectureRepository.findByCourseIdOrderByOrderIndexAsc(course.getId()).stream()
-                .map(LectureResponse::fromEntity)
+                .map(l -> canViewContent ? LectureResponse.fromEntity(l) : LectureResponse.previewOf(l))
                 .toList();
+    }
+
+    /**
+     * True when the user may see lecture video data: the course's own instructor,
+     * or a student enrolled in the course. Anonymous users never can.
+     */
+    private boolean canViewContent(Course course, User currentUser) {
+        if (currentUser == null) {
+            return false;
+        }
+        if ("admin".equalsIgnoreCase(currentUser.getRole())) {
+            return true;
+        }
+        if (course.getInstructor() != null
+                && course.getInstructor().getId().equals(currentUser.getId())) {
+            return true;
+        }
+        return enrollmentRepository.existsByStudentIdAndCourseId(currentUser.getId(), course.getId());
     }
 }
