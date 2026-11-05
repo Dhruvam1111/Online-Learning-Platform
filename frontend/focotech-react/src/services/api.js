@@ -61,9 +61,25 @@ export const checkBackendHealth = async () => {
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
+  loginWithGoogle: (data) => api.post('/auth/google', data),
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
 };
+
+// Direct convenience helpers on api instance for flexible caller conventions
+api.login = (email, password) => api.post('/auth/login', { email, password }).then((res) => res.data);
+api.loginWithGoogle = (email, name, idToken) =>
+  api.post('/auth/google', { email, name, idToken }).then((res) => res.data);
+api.sendRegistrationOtp = (name, email, password) =>
+  api.post('/auth/otp/send-registration', { name, email, password }).then((res) => res.data);
+api.verifySignupOtp = (email, otp) =>
+  api.post('/auth/otp/verify', { email, otp }).then((res) => res.data);
+api.resendSignupOtp = (email) =>
+  api.post('/auth/otp/resend', { email }).then((res) => res.data);
+api.sendPasswordResetOtp = (email) =>
+  api.post('/auth/password-reset/request', { email }).then((res) => res.data);
+api.resetPasswordWithOtp = (email, otp, newPassword) =>
+  api.post('/auth/password-reset/confirm', { email, otp, newPassword }).then((res) => res.data);
 
 // ─── User / Profile API ─────────────────────────────────────────────────────
 export const userAPI = {
