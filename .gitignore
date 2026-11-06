@@ -12,9 +12,13 @@ build/
 .DS_Store
 Thumbs.db
 
+# Local configuration overrides & credentials (NEVER COMMIT)
+*local.properties
+application-local.properties
 backend/src/main/resources/application.properties
-
 .env
+.env.local
+.env.*.local
 
 # Local sprint specifications
 Documentation/00-sprint1-overview.md
@@ -31,3 +35,7 @@ Documentation/person6-student-layout-frontend.md
 # Personal Notes (Local Only - Never Commit)
 Notes - personal/
 
+# Test outputs & scripts
+test_devb_auth_suite.py
+test_enterprise_payment_suite.py
+*.log

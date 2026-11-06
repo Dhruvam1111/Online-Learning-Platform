@@ -11,7 +11,6 @@ const GOOGLE_CLIENT_ID =
 
 /**
  * Sign In & Profile Creation Component.
- * Maintained by Person 1 (Developer A: Identity, JWT & Google SSO).
  */
 export default function SignInPage({ onNavigateHome, onNavigateDashboard, initialNotice }) {
   const { setSession } = useAuth();
@@ -191,11 +190,8 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
       try {
         const res = await api.sendRegistrationOtp(fullname.trim(), email.trim(), password);
         setIsVerifyingSignup(true);
-        startCooldown(30);
-        setAlertMessage({
-          type: 'success',
-          text: `Verification code sent to ${res.maskedEmail || email}. Check your email inbox.`,
-        });
+        startCooldown(15);
+        setAlertMessage(null);
       } catch (err) {
         const msg = err.response?.data?.message || err.response?.data?.error || err.message;
         setAlertMessage({ type: 'error', text: msg });
@@ -357,7 +353,21 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
                   ? 'Enter your registered email and 6-digit OTP code to set a new password.'
                   : isSignUp
                   ? isVerifyingSignup
-                    ? `We've sent a 6-digit verification code to ${email}.`
+                    ? (
+                      <span>
+                        We've sent a 6-digit verification code to <strong className="text-neutral-800">{email}</strong>.{' '}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsVerifyingSignup(false);
+                            setAlertMessage(null);
+                          }}
+                          className="text-[#0066cc] hover:underline font-normal cursor-pointer ml-1"
+                        >
+                          Change
+                        </button>
+                      </span>
+                    )
                     : 'Join 120,000+ builders mastering real-world software.'
                   : "It's nice to see you again. Ready to code?"}
               </p>

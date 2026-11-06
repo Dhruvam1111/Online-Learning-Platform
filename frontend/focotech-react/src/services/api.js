@@ -41,45 +41,62 @@ api.interceptors.response.use(
   }
 );
 
-export default api;
-
-// ─── Health Check ───────────────────────────────────────────────────────────
-export const checkBackendHealth = async () => {
-  try {
-    const res = await api.get('/courses');
-    return { online: true, status: res.status };
-  } catch (err) {
-    if (err.response) {
-      // Backend responded with status code
-      return { online: true, status: err.response.status };
-    }
-    return { online: false, error: err.message };
-  }
-};
-
 // ─── Auth API ───────────────────────────────────────────────────────────────
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
+  sendRegistrationOtp: (data) => api.post('/auth/register/send-otp', data),
+  verifyRegistrationOtp: (data) => api.post('/auth/register/verify-otp', data),
+  resendRegistrationOtp: (data) => api.post('/auth/register/resend-otp', data),
   login: (data) => api.post('/auth/login', data),
   loginWithGoogle: (data) => api.post('/auth/google', data),
+  sendPasswordResetOtp: (data) => api.post('/auth/password-reset/send-otp', data),
+  resetPasswordWithOtp: (data) => api.post('/auth/password-reset/reset', data),
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
 };
 
-// Direct convenience helpers on api instance for flexible caller conventions
-api.login = (email, password) => api.post('/auth/login', { email, password }).then((res) => res.data);
-api.loginWithGoogle = (email, name, idToken) =>
-  api.post('/auth/google', { email, name, idToken }).then((res) => res.data);
-api.sendRegistrationOtp = (name, email, password) =>
-  api.post('/auth/otp/send-registration', { name, email, password }).then((res) => res.data);
-api.verifySignupOtp = (email, otp) =>
-  api.post('/auth/otp/verify', { email, otp }).then((res) => res.data);
-api.resendSignupOtp = (email) =>
-  api.post('/auth/otp/resend', { email }).then((res) => res.data);
-api.sendPasswordResetOtp = (email) =>
-  api.post('/auth/password-reset/request', { email }).then((res) => res.data);
-api.resetPasswordWithOtp = (email, otp, newPassword) =>
-  api.post('/auth/password-reset/confirm', { email, otp, newPassword }).then((res) => res.data);
+// ─── Convenience Helpers on api Object ──────────────────────────────────────
+api.login = async (email, password) => {
+  const res = await authAPI.login({ email, password });
+  return res.data;
+};
+
+api.sendRegistrationOtp = async (name, email, password, role = 'student') => {
+  const res = await authAPI.sendRegistrationOtp({ name, email, password, role });
+  return res.data;
+};
+
+api.verifyRegistrationOtp = async (email, otpCode) => {
+  const res = await authAPI.verifyRegistrationOtp({ email, otpCode });
+  return res.data;
+};
+
+api.resendRegistrationOtp = async (email) => {
+  const res = await authAPI.resendRegistrationOtp({ email });
+  return res.data;
+};
+
+api.loginWithGoogle = async (email, name = '', idToken = '') => {
+  const res = await authAPI.loginWithGoogle({ email, name, idToken });
+  return res.data;
+};
+
+api.sendPasswordResetOtp = async (email) => {
+  const res = await authAPI.sendPasswordResetOtp({ email });
+  return res.data;
+};
+
+api.resetPasswordWithOtp = async (email, otpCode, newPassword, confirmPassword) => {
+  const res = await authAPI.resetPasswordWithOtp({
+    email,
+    otpCode,
+    newPassword,
+    confirmPassword: confirmPassword || newPassword,
+  });
+  return res.data;
+};
+
+export default api;
 
 // ─── User / Profile API ─────────────────────────────────────────────────────
 export const userAPI = {
