@@ -44,8 +44,10 @@ public class SecurityConfig {
                 // URL-level access rules
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints (no login required)
-                        .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/register/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/google").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/password-reset/**", "/api/auth/otp/**").permitAll()
+                        .requestMatchers("/api/auth/password-reset/**", "/api/auth/otp/**").permitAll()
 
 
                         .requestMatchers(HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
@@ -75,10 +77,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-                "http://localhost:3000",       // React dev server
-                "http://localhost:5173"        // Vite dev server
-                // Person 4 will add the deployed frontend URL here later
+        config.setAllowedOriginPatterns(List.of(
+                "http://localhost:*",
+                "http://127.0.0.1:*"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
