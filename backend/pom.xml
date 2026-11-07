@@ -105,6 +105,35 @@
                     </excludes>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.12</version>
+                <configuration>
+                    <excludes>
+                        <!-- Exclude DTOs, Entities, and Configs to measure real business logic -->
+                        <exclude>com/olp/dto/**</exclude>
+                        <exclude>com/olp/entity/**</exclude>
+                        <exclude>com/olp/config/**</exclude>
+                        <exclude>com/olp/BackendApplication.class</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
+
     </build>
 </project>
