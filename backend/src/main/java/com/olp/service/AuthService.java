@@ -133,7 +133,7 @@ public class AuthService {
         String status = user.getAccountStatus();
         if ("pending".equalsIgnoreCase(status)) {
             throw new com.olp.exception.AccountStatusException(
-                    "Your instructor account is pending administrator approval");
+                    "Awaiting admin approval: Your instructor account is pending administrator approval");
         } else if ("suspended".equalsIgnoreCase(status)) {
             throw new com.olp.exception.AccountStatusException(
                     "Your account has been suspended. Please contact support");
@@ -164,7 +164,7 @@ public class AuthService {
         }
 
         Integer userId = jwtUtil.getUserIdFromToken(token);
-        User user = userRepository.findById(userId)
+        userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         return new ApiResponse(true,
