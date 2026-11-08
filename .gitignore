@@ -82,6 +82,7 @@ __pycache__/
 # Test outputs & scripts
 test_devb_auth_suite.py
 test_enterprise_payment_suite.py
+unit-tests-categorized/
 *.log
 npm-debug.log*
 yarn-debug.log*
