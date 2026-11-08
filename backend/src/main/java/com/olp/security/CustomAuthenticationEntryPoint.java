@@ -15,7 +15,8 @@ import java.io.IOException;
 
 /**
  * Reusable Authentication Entry Point for Role-Based Access Control (RBAC).
- * Returns consistent 401 Unauthorized JSON when an unauthenticated user attempts to access a protected resource.
+ * Returns consistent 401 Unauthorized JSON when an unauthenticated user
+ * attempts to access a protected resource.
  */
 @Component
 public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint {
@@ -23,11 +24,11 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
     private final ObjectMapper objectMapper;
 
     public CustomAuthenticationEntryPoint() {
-        this.objectMapper = new ObjectMapper();
+        this.objectMapper = new ObjectMapper().findAndRegisterModules();
     }
 
     public CustomAuthenticationEntryPoint(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
+        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper().findAndRegisterModules();
     }
 
     @Override
@@ -48,4 +49,3 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
         objectMapper.writeValue(response.getWriter(), errorResponse);
     }
 }
-

@@ -15,7 +15,8 @@ import java.io.IOException;
 
 /**
  * Reusable Access Denied Handler for Role-Based Access Control (RBAC).
- * Returns consistent 403 Forbidden JSON when an authenticated user lacks the required role.
+ * Returns consistent 403 Forbidden JSON when an authenticated user lacks the
+ * required role.
  */
 @Component
 public class CustomAccessDeniedHandler implements AccessDeniedHandler {
@@ -23,11 +24,11 @@ public class CustomAccessDeniedHandler implements AccessDeniedHandler {
     private final ObjectMapper objectMapper;
 
     public CustomAccessDeniedHandler() {
-        this.objectMapper = new ObjectMapper();
+        this.objectMapper = new ObjectMapper().findAndRegisterModules();
     }
 
     public CustomAccessDeniedHandler(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
+        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper().findAndRegisterModules();
     }
 
     @Override
@@ -48,4 +49,3 @@ public class CustomAccessDeniedHandler implements AccessDeniedHandler {
         objectMapper.writeValue(response.getWriter(), errorResponse);
     }
 }
-
