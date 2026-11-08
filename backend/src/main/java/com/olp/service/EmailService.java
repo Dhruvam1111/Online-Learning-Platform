@@ -67,6 +67,67 @@ public class EmailService {
         }
     }
 
+    /**
+     * Sends a password reset link to the user's real email address.
+     */
+    public void sendPasswordResetLinkEmail(String toEmail, String name, String resetLink, int expiryMinutes) {
+        if (senderEmail == null || senderEmail.isBlank()) {
+            log.warn("[EmailService] No SMTP username configured. Dispatching reset link to log stream: {}", resetLink);
+            return;
+        }
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(senderEmail, "Focotech");
+            helper.setTo(toEmail);
+            helper.setSubject("Focotech Password Reset Request");
+
+            String htmlContent = buildResetLinkHtml(toEmail, name, resetLink, expiryMinutes);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("[EmailService] Successfully sent password reset link email to: {}", toEmail);
+        } catch (Exception e) {
+            log.warn("[EmailService] Failed to dispatch email via SMTP (will continue with link logged): {}", e.getMessage());
+        }
+    }
+
+    private String buildResetLinkHtml(String email, String name, String resetLink, int expiryMinutes) {
+        String displayName = (name != null && !name.isBlank()) ? name.trim() : email;
+        return """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                  <meta charset="UTF-8">
+                  <title>Reset Your Password</title>
+                </head>
+                <body style="margin: 0; padding: 0; background-color: #f7f4f1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%%" style="background-color: #f7f4f1; padding: 48px 16px;">
+                    <tr>
+                      <td align="center">
+                        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%%" style="max-width: 520px; background-color: #ffffff; border-radius: 12px; border: 1px solid #e8e2dc; padding: 32px;">
+                          <tr>
+                            <td>
+                              <h2 style="color: #1e1b19; margin-top: 0;">Password Reset Request</h2>
+                              <p style="color: #5a524c; font-size: 14px;">Hello %s,</p>
+                              <p style="color: #5a524c; font-size: 14px;">We received a request to reset your Focotech account password. Click the button below to choose a new password. This link is valid for %d minutes and can only be used once.</p>
+                              <div style="text-align: center; margin: 32px 0;">
+                                <a href="%s" style="background-color: #ff5a36; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Reset Password</a>
+                              </div>
+                              <p style="color: #8a817a; font-size: 12px;">If you did not request a password reset, you can safely ignore this email.</p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(displayName, expiryMinutes, resetLink);
+    }
+
     private String buildOtpHtml(String email, String name, String otpCode, String purpose, int expiryMinutes) {
         String displayName = (name != null && !name.isBlank()) ? name.trim() : email;
         return """

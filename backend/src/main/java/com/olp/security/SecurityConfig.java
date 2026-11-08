@@ -26,12 +26,19 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final CustomAccessDeniedHandler customAccessDeniedHandler;
+    private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
 
     @Value("${app.cors.allowed-origins:${FRONTEND_URL:}}")
     private String allowedOrigins;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            CustomAccessDeniedHandler customAccessDeniedHandler,
+            CustomAuthenticationEntryPoint customAuthenticationEntryPoint) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.customAccessDeniedHandler = customAccessDeniedHandler;
+        this.customAuthenticationEntryPoint = customAuthenticationEntryPoint;
     }
 
     @Bean
@@ -46,13 +53,18 @@ public class SecurityConfig {
                 // Stateless sessions — no server-side session, JWT only
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
+                // Exception handling for 401 Unauthorized & 403 Forbidden
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(customAuthenticationEntryPoint)
+                        .accessDeniedHandler(customAccessDeniedHandler))
+
                 // URL-level access rules
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints (no login required)
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/register/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/google").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/password-reset/**", "/api/auth/otp/**").permitAll()
-                        .requestMatchers("/api/auth/password-reset/**", "/api/auth/otp/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/password-reset/**", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/otp/**").permitAll()
+                        .requestMatchers("/api/auth/password-reset/**", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/otp/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/verify-email").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
@@ -61,6 +73,9 @@ public class SecurityConfig {
 
                         // Instructor endpoints require instructor role
                         .requestMatchers("/api/instructor/**", "/api/instructors/**").hasRole("instructor")
+
+                        // Student endpoints require student role
+                        .requestMatchers("/api/student/**", "/api/students/**").hasRole("student")
 
                         // Everything else requires authentication
                         .anyRequest().authenticated())
