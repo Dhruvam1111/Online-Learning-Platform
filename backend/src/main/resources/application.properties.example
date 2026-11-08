@@ -22,3 +22,7 @@ jwt.expiration=86400000
 # Server Port
 server.port=8080
 
+# CORS Configuration (optional, defaults to localhost:* and 127.0.0.1:*)
+# Set to your deployed frontend domain (e.g. https://my-app.vercel.app or comma-separated list)
+app.cors.allowed-origins=${FRONTEND_URL:}
+
