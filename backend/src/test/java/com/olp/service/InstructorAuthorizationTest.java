@@ -104,7 +104,7 @@ class InstructorAuthorizationTest {
     }
 
     @Test
-    void testCreateLecture_ActiveInstructor_Success() {
+    void testCreateLecture_ActiveInstructor_WithExplicitOrderIndex_Success() {
         CreateLectureRequest request = new CreateLectureRequest(
                 "Lecture 1",
                 "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
@@ -112,7 +112,6 @@ class InstructorAuthorizationTest {
         );
 
         when(courseRepository.findById(100)).thenReturn(Optional.of(ownedCourse));
-        when(lectureRepository.countByCourseId(100)).thenReturn(0);
         when(lectureRepository.save(any(Lecture.class))).thenAnswer(invocation -> {
             Lecture l = invocation.getArgument(0);
             l.setId(500);
@@ -124,7 +123,33 @@ class InstructorAuthorizationTest {
         assertNotNull(response);
         assertEquals("Lecture 1", response.getTitle());
         assertEquals("dQw4w9WgXcQ", response.getVideoId());
+        assertEquals(1, response.getOrderIndex());
+        verify(lectureRepository, times(1)).save(any(Lecture.class));
+        verify(lectureRepository, never()).countByCourseId(anyInt());
+    }
+
+    @Test
+    void testCreateLecture_ActiveInstructor_WithDefaultOrderIndex_Success() {
+        CreateLectureRequest request = new CreateLectureRequest(
+                "Lecture 2",
+                "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        );
+
+        when(courseRepository.findById(100)).thenReturn(Optional.of(ownedCourse));
+        when(lectureRepository.countByCourseId(100)).thenReturn(3);
+        when(lectureRepository.save(any(Lecture.class))).thenAnswer(invocation -> {
+            Lecture l = invocation.getArgument(0);
+            l.setId(501);
+            return l;
+        });
+
+        LectureResponse response = instructorLectureService.createLecture(activeInstructor, 100, request);
+
+        assertNotNull(response);
+        assertEquals("Lecture 2", response.getTitle());
+        assertEquals("dQw4w9WgXcQ", response.getVideoId());
+        assertEquals(4, response.getOrderIndex());
+        verify(lectureRepository, times(1)).countByCourseId(100);
         verify(lectureRepository, times(1)).save(any(Lecture.class));
     }
 }
-
