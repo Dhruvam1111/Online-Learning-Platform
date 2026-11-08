@@ -1,5 +1,6 @@
 package com.olp.security;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -15,14 +16,19 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity  // enables @PreAuthorize on controller methods
+@EnableMethodSecurity // enables @PreAuthorize on controller methods
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Value("${app.cors.allowed-origins:${FRONTEND_URL:}}")
+    private String allowedOrigins;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
@@ -38,14 +44,15 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
                 // Stateless sessions — no server-side session, JWT only
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 // URL-level access rules
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints (no login required)
-                        .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/register/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/google").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/password-reset/**", "/api/auth/otp/**").permitAll()
+                        .requestMatchers("/api/auth/password-reset/**", "/api/auth/otp/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/verify-email").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
@@ -56,8 +63,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/instructor/**", "/api/instructors/**").hasRole("instructor")
 
                         // Everything else requires authentication
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
 
                 // Add our JWT filter BEFORE Spring's default username/password filter
                 .addFilterBefore(jwtAuthenticationFilter,
@@ -75,11 +81,19 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-                "http://localhost:3000",       // React dev server
-                "http://localhost:5173"        // Vite dev server
-                // Person 4 will add the deployed frontend URL here later
-        ));
+
+        List<String> origins = new ArrayList<>(List.of(
+                "http://localhost:*",
+                "http://127.0.0.1:*"));
+
+        if (allowedOrigins != null && !allowedOrigins.isBlank()) {
+            Arrays.stream(allowedOrigins.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .forEach(origins::add);
+        }
+
+        config.setAllowedOriginPatterns(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

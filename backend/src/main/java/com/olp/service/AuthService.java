@@ -15,6 +15,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+import java.util.UUID;
+
 @Service
 public class AuthService {
 
@@ -26,9 +29,9 @@ public class AuthService {
     private final JwtUtil jwtUtil;
 
     public AuthService(UserRepository userRepository,
-                       InstructorProfileRepository instructorProfileRepository,
-                       PasswordEncoder passwordEncoder,
-                       JwtUtil jwtUtil) {
+            InstructorProfileRepository instructorProfileRepository,
+            PasswordEncoder passwordEncoder,
+            JwtUtil jwtUtil) {
         this.userRepository = userRepository;
         this.instructorProfileRepository = instructorProfileRepository;
         this.passwordEncoder = passwordEncoder;
@@ -38,7 +41,8 @@ public class AuthService {
     /**
      * Register a new user.
      * Throws DuplicateEmailException if the email already exists.
-     * FR-I01: Instructors are registered with pending status, their profile is initialized
+     * FR-I01: Instructors are registered with pending status, their profile is
+     * initialized
      * with expertise & qualification, and an email verification link is dispatched.
      */
     @Transactional
@@ -66,14 +70,15 @@ public class AuthService {
                 request.getEmail().toLowerCase().trim(),
                 hashedPassword,
                 role,
-                initialStatus
-        );
+                initialStatus);
         user = userRepository.save(user);
 
-        // 5. FR-I01: If instructor, initialize profile and dispatch email verification link
+        // 5. FR-I01: If instructor, initialize profile and dispatch email verification
+        // link
         String verificationLink = null;
         if ("instructor".equals(role)) {
-            String qual = request.getQualification() != null ? request.getQualification().trim() : request.getQualifications();
+            String qual = request.getQualification() != null ? request.getQualification().trim()
+                    : request.getQualifications();
             String exp = request.getExpertise() != null ? request.getExpertise().trim() : request.getExpertiseAreas();
             InstructorProfile profile = new InstructorProfile(user, qual, exp, null);
             instructorProfileRepository.save(profile);
@@ -86,7 +91,8 @@ public class AuthService {
             logger.info("================================================================================");
             logger.info("[EMAIL DISPATCH] Verification link sent to {}: {}", user.getEmail(), verificationLink);
             logger.info("================================================================================");
-            System.out.println("[EMAIL DISPATCH] Verification link sent to " + user.getEmail() + ": " + verificationLink);
+            System.out
+                    .println("[EMAIL DISPATCH] Verification link sent to " + user.getEmail() + ": " + verificationLink);
         }
 
         // 6. Generate a JWT token
@@ -98,8 +104,7 @@ public class AuthService {
                 user.getName(),
                 user.getEmail(),
                 user.getRole(),
-                user.getAccountStatus()
-        );
+                user.getAccountStatus());
 
         String message = "pending".equals(initialStatus)
                 ? "Registration submitted. An email verification link has been sent to your email. Your instructor account is awaiting administrator approval."
@@ -126,10 +131,12 @@ public class AuthService {
 
         // 3. Verify account status
         String status = user.getAccountStatus();
-        if ("pending".equalsIgnoreCase(status) || "pending_approval".equalsIgnoreCase(status)) {
-            throw new com.olp.exception.AccountStatusException("Awaiting admin approval. Your instructor account is pending review.");
+        if ("pending".equalsIgnoreCase(status)) {
+            throw new com.olp.exception.AccountStatusException(
+                    "Your instructor account is pending administrator approval");
         } else if ("suspended".equalsIgnoreCase(status)) {
-            throw new com.olp.exception.AccountStatusException("Your account has been suspended. Please contact support");
+            throw new com.olp.exception.AccountStatusException(
+                    "Your account has been suspended. Please contact support");
         } else if ("rejected".equalsIgnoreCase(status)) {
             throw new com.olp.exception.AccountStatusException("Your instructor application was rejected");
         }
@@ -143,8 +150,7 @@ public class AuthService {
                 user.getName(),
                 user.getEmail(),
                 user.getRole(),
-                user.getAccountStatus()
-        );
+                user.getAccountStatus());
         return new AuthResponse("Login successful", token, userResponse);
     }
 
@@ -161,7 +167,8 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        return new ApiResponse(true, "Email verified successfully. Your instructor account is awaiting administrator approval.");
+        return new ApiResponse(true,
+                "Email verified successfully. Your instructor account is awaiting administrator approval.");
     }
 
     /**
@@ -174,7 +181,53 @@ public class AuthService {
                 user.getName(),
                 user.getEmail(),
                 user.getRole(),
-                user.getAccountStatus()
-        );
+                user.getAccountStatus());
+    }
+
+    /**
+     * Authenticate or auto-register a user via Google Account.
+     * Google has already verified the email ownership.
+     */
+    @Transactional
+    public AuthResponse loginOrRegisterWithGoogle(GoogleAuthRequest request) {
+        String cleanEmail = request.getEmail().toLowerCase().trim();
+        String name = (request.getName() != null && !request.getName().isBlank())
+                ? request.getName().trim()
+                : cleanEmail.split("@")[0];
+
+        Optional<User> existingUser = userRepository.findByEmail(cleanEmail);
+        User user;
+        if (existingUser.isPresent()) {
+            user = existingUser.get();
+            // If user exists with pending status, activate it since Google verified their
+            // email
+            if ("pending".equalsIgnoreCase(user.getAccountStatus())) {
+                user.setAccountStatus("active");
+                user = userRepository.save(user);
+            } else if ("suspended".equalsIgnoreCase(user.getAccountStatus())) {
+                throw new com.olp.exception.AccountStatusException(
+                        "Your account has been suspended. Please contact support");
+            } else if ("rejected".equalsIgnoreCase(user.getAccountStatus())) {
+                throw new com.olp.exception.AccountStatusException("Your instructor application was rejected");
+            }
+        } else {
+            // Auto-provision a new student account verified by Google
+            user = new User(
+                    name,
+                    cleanEmail,
+                    passwordEncoder.encode(UUID.randomUUID().toString()),
+                    "student",
+                    "active");
+            user = userRepository.save(user);
+        }
+
+        String token = jwtUtil.generateToken(user.getId(), user.getRole());
+        UserResponse userResponse = new UserResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getRole());
+
+        return new AuthResponse("Authenticated successfully via Google", token, userResponse);
     }
 }
