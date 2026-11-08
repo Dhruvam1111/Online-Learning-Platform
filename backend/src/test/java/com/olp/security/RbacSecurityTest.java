@@ -137,7 +137,7 @@ class RbacSecurityTest {
         assertEquals("application/json;charset=UTF-8", response.getContentType());
         String body = response.getContentAsString();
         assertTrue(body.contains("\"status\":403"));
-        assertTrue(body.contains("Access denied"));
+        assertTrue(body.contains("Access is denied"));
     }
 
     @Test
@@ -153,7 +153,7 @@ class RbacSecurityTest {
         assertEquals("application/json;charset=UTF-8", response.getContentType());
         String body = response.getContentAsString();
         assertTrue(body.contains("\"status\":401"));
-        assertTrue(body.contains("Unauthorized"));
+        assertTrue(body.contains("Full authentication is required"));
     }
 
     // =========================================================================
