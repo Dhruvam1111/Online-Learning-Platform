@@ -46,7 +46,7 @@ public class SecurityConfig {
                         // Public endpoints (no login required)
                         .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-
+                        .requestMatchers(HttpMethod.GET, "/api/auth/verify-email").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
                         // Admin endpoints require ROLE_admin

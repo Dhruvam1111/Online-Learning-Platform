@@ -18,7 +18,7 @@ import { useAuth } from './context/AuthContext';
 export default function App() {
   const { isAuthenticated, user, logout } = useAuth();
   const [currentPage, setCurrentPage] = useState(() => {
-    if (window.location.hash === '#signin') return 'signin';
+    if (window.location.hash.startsWith('#signin') || window.location.hash.startsWith('#verify-email')) return 'signin';
     if (window.location.hash === '#dashboard') return 'dashboard';
     return 'home';
   });
@@ -27,7 +27,7 @@ export default function App() {
 
   useEffect(() => {
     const handleHashChange = () => {
-      if (window.location.hash === '#signin') {
+      if (window.location.hash.startsWith('#signin') || window.location.hash.startsWith('#verify-email')) {
         setCurrentPage('signin');
       } else if (window.location.hash === '#dashboard') {
         setCurrentPage('dashboard');

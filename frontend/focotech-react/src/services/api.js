@@ -63,6 +63,7 @@ export const authAPI = {
   login: (data) => api.post('/auth/login', data),
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
+  verifyEmail: (token) => api.get(`/auth/verify-email?token=${token}`),
 };
 
 // ─── User / Profile API ─────────────────────────────────────────────────────

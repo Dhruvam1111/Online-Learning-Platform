@@ -155,7 +155,8 @@ public class InstructorLectureService {
     }
 
     /**
-     * Create a new lecture for an owned course.
+     * Create a new lecture for an owned course (content upload).
+     * FR-I01: Pending instructors are prevented from creating/uploading lecture content.
      */
     @Transactional
     public LectureResponse createLecture(User currentUser, Integer courseId, CreateLectureRequest request) {
@@ -269,6 +270,10 @@ public class InstructorLectureService {
         }
         if (!"instructor".equalsIgnoreCase(currentUser.getRole())) {
             throw new AccessDeniedException("Access denied: only instructors can access instructor lectures");
+        }
+        // FR-I01: Unapproved / pending instructors cannot upload or manage content
+        if (!"active".equalsIgnoreCase(currentUser.getAccountStatus())) {
+            throw new AccessDeniedException("Access denied: Instructor account is awaiting admin approval");
         }
     }
 }
