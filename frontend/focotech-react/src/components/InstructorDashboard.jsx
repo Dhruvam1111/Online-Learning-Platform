@@ -23,9 +23,47 @@ export default function InstructorDashboard({ onNavigateHome }) {
   const [profile, setProfile] = useState({ qualifications: '', expertiseAreas: '', bio: '', name: '' });
   const [savingProfile, setSavingProfile] = useState(false);
 
+  // Instructor Earnings & Royalties (80/20 split)
+  const [earningsData, setEarningsData] = useState(null);
+  const [loadingEarnings, setLoadingEarnings] = useState(false);
+  const [payoutModalOpen, setPayoutModalOpen] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [withdrawalSuccess, setWithdrawalSuccess] = useState(null);
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const loadEarnings = () => {
+    setLoadingEarnings(true);
+    instructorAPI
+      .getEarnings()
+      .then((res) => {
+        if (res.data) setEarningsData(res.data);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingEarnings(false));
+  };
+
+  const handleWithdrawPayout = async () => {
+    setIsWithdrawing(true);
+    try {
+      const res = await instructorAPI.withdrawEarnings();
+      setWithdrawalSuccess(res.data);
+      // Instantly set pending balance to ZERO and update all sales to 'paid'
+      setEarningsData((prev) => ({
+        ...prev,
+        unpaidBalance: 0,
+        sales: prev?.sales ? prev.sales.map((s) => ({ ...s, payoutStatus: 'paid' })) : []
+      }));
+      showToast(`⚡ ₹${res.data.amountWithdrawn} transferred to your bank account!`);
+      loadEarnings();
+    } catch (err) {
+      showToast('Failed to simulate payout withdrawal.');
+    } finally {
+      setIsWithdrawing(false);
+    }
   };
 
   const loadCourses = () => {
@@ -65,6 +103,7 @@ export default function InstructorDashboard({ onNavigateHome }) {
   useEffect(() => {
     loadCourses();
     loadProfile();
+    loadEarnings();
   }, []);
 
   useEffect(() => {
@@ -184,6 +223,23 @@ export default function InstructorDashboard({ onNavigateHome }) {
               Instructor: {user?.name || 'Dr. Instructor'}
             </span>
             <button
+              type="button"
+              onClick={() => { setActiveTab('earnings'); loadEarnings(); }}
+              className={`px-3 py-1 rounded-full text-xs font-extrabold transition cursor-pointer flex items-center gap-1.5 shadow-xs ${
+                (Number(earningsData?.unpaidBalance) || 0) > 0
+                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
+                  : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700 border border-neutral-300'
+              }`}
+              title="Click to view full 80% instructor royalties ledger"
+            >
+              <span className={`w-2 h-2 rounded-full ${
+                (Number(earningsData?.unpaidBalance) || 0) > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-neutral-400'
+              }`}></span>
+              <span>
+                Pending Royalties: ₹{(Number(earningsData?.unpaidBalance) || 0).toFixed(2)}
+              </span>
+            </button>
+            <button
               onClick={onNavigateHome}
               className="px-3 py-1.5 rounded-full bg-surface-container text-xs font-bold text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
             >
@@ -253,6 +309,15 @@ export default function InstructorDashboard({ onNavigateHome }) {
             <span className="material-symbols-outlined text-[18px]">account_box</span>
             <span>Instructor Profile</span>
           </button>
+          <button
+            onClick={() => { setActiveTab('earnings'); loadEarnings(); }}
+            className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all text-left cursor-pointer ${
+              activeTab === 'earnings' ? 'bg-emerald-50 text-emerald-700 font-extrabold' : 'text-[#6d635c] hover:bg-[#fbf7f4]'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px] text-emerald-600">payments</span>
+            <span>Earnings &amp; Royalties (80%)</span>
+          </button>
         </aside>
 
         {/* Tab Content */}
@@ -272,6 +337,68 @@ export default function InstructorDashboard({ onNavigateHome }) {
                   <span className="material-symbols-outlined text-[18px]">add</span>
                   <span>New Course</span>
                 </button>
+              </div>
+
+              {/* Instant 80% Royalty Summary Widget */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-[#f0fdf4] to-blue-50 border border-emerald-200">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-xs ${
+                    (Number(earningsData?.unpaidBalance) || 0) > 0 ? 'bg-emerald-600 text-white' : 'bg-neutral-500 text-white'
+                  }`}>
+                    <span className="material-symbols-outlined text-[22px]">payments</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                      Pending Net Royalty (80%)
+                    </span>
+                    <h3 className="text-xl font-black text-[#1e1916]">
+                      ₹{(Number(earningsData?.unpaidBalance) || 0).toFixed(2)}
+                    </h3>
+                    <span className="text-[10px] text-[#8e8076] block">
+                      Lifetime Earned: ₹{(Number(earningsData?.netTakeHomeEarnings) || 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+                    <span className="material-symbols-outlined text-[22px]">shopping_cart</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-800">Gross Student Sales</span>
+                    <h3 className="text-xl font-black text-[#1e1916]">
+                      ₹{(Number(earningsData?.lifetimeGrossRevenue) || 0).toFixed(2)}
+                    </h3>
+                    <span className="text-[10px] text-[#8e8076] block">
+                      Platform Fee (20%): -₹{(Number(earningsData?.platformCommissionDeducted) || 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-start sm:justify-end gap-2 flex-wrap">
+                  {(Number(earningsData?.unpaidBalance) || 0) > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => { setPayoutModalOpen(true); setWithdrawalSuccess(null); }}
+                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer"
+                    >
+                      <span>⚡ Withdraw ₹{(Number(earningsData?.unpaidBalance) || 0).toFixed(2)}</span>
+                    </button>
+                  ) : (
+                    <span className="px-3.5 py-2 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                      <span>All Royalties Settled</span>
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { setActiveTab('earnings'); loadEarnings(); }}
+                    className="px-3.5 py-2 rounded-xl bg-white border border-emerald-300 hover:bg-emerald-50 text-emerald-800 text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer"
+                  >
+                    <span>Full Ledger</span>
+                    <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                  </button>
+                </div>
               </div>
 
               {courses.length > 0 ? (
@@ -557,8 +684,265 @@ export default function InstructorDashboard({ onNavigateHome }) {
               </form>
             </div>
           )}
+
+          {/* TAB 5: Earnings & Royalties (80/20 Split) */}
+          {activeTab === 'earnings' && (
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#fae8dc] shadow-xs flex flex-col gap-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#faeae0] pb-4">
+                <div>
+                  <h2 className="text-[20px] font-extrabold text-[#1f1a17]">Instructor Earnings &amp; Royalties</h2>
+                  <p className="text-xs text-[#8e8076] mt-0.5">
+                    Automated 80/20 revenue share calculation linked to student course enrollments.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => { setPayoutModalOpen(true); setWithdrawalSuccess(null); }}
+                    className="px-4 py-1.5 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                  >
+                    <span>⚡ Simulate Bank Payout</span>
+                  </button>
+                  <button
+                    onClick={loadEarnings}
+                    className="px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold hover:bg-emerald-100 transition cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">refresh</span>
+                    Refresh Ledger
+                  </button>
+                </div>
+              </div>
+
+              {/* Metric Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 rounded-2xl bg-[#fbf7f4] border border-[#f0dfd3] flex flex-col gap-1">
+                  <span className="text-xs font-bold text-[#8e8076] uppercase">Gross Course Sales</span>
+                  <span className="text-2xl font-black text-[#1f1a17]">
+                    ₹{earningsData?.lifetimeGrossRevenue || 0}
+                  </span>
+                  <span className="text-[11px] text-[#8e8076]">Total student payments</span>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-rose-50 border border-rose-200 flex flex-col gap-1">
+                  <span className="text-xs font-bold text-rose-700 uppercase">Platform Fee (20%)</span>
+                  <span className="text-2xl font-black text-rose-800">
+                    -₹{earningsData?.platformCommissionDeducted || 0}
+                  </span>
+                  <span className="text-[11px] text-rose-600">Platform maintenance</span>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col gap-1">
+                  <span className="text-xs font-bold text-emerald-700 uppercase">Lifetime Net Royalties (80%)</span>
+                  <span className="text-2xl font-black text-emerald-800">
+                    ₹{(Number(earningsData?.netTakeHomeEarnings) || 0).toFixed(2)}
+                  </span>
+                  <span className="text-[11px] text-emerald-600">Total cumulative earnings</span>
+                </div>
+
+                <div className={`p-5 rounded-2xl flex flex-col gap-1 border ${
+                  (Number(earningsData?.unpaidBalance) || 0) > 0
+                    ? 'bg-amber-50 border-amber-200'
+                    : 'bg-emerald-50 border-emerald-200'
+                }`}>
+                  <span className={`text-xs font-bold uppercase ${
+                    (Number(earningsData?.unpaidBalance) || 0) > 0 ? 'text-amber-700' : 'text-emerald-700'
+                  }`}>
+                    Pending Net Royalty
+                  </span>
+                  <span className={`text-2xl font-black ${
+                    (Number(earningsData?.unpaidBalance) || 0) > 0 ? 'text-amber-800' : 'text-emerald-800'
+                  }`}>
+                    ₹{(Number(earningsData?.unpaidBalance) || 0).toFixed(2)}
+                  </span>
+                  <span className={`text-[11px] ${
+                    (Number(earningsData?.unpaidBalance) || 0) > 0 ? 'text-amber-700' : 'text-emerald-600 font-bold'
+                  }`}>
+                    {(Number(earningsData?.unpaidBalance) || 0) === 0 ? '✅ All royalties paid out (₹0.00 pending)' : 'Available for withdrawal'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Sales Ledger Table */}
+              <div>
+                <h3 className="text-sm font-extrabold text-[#1f1a17] mb-3">Itemized Course Sales</h3>
+                {earningsData?.sales && earningsData.sales.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-[#faeae0] text-[#8e8076] font-bold uppercase text-[11px]">
+                          <th className="py-3 px-3">Order Ref</th>
+                          <th className="py-3 px-3">Course</th>
+                          <th className="py-3 px-3">Gross</th>
+                          <th className="py-3 px-3">Platform Fee (20%)</th>
+                          <th className="py-3 px-3">Your Net (80%)</th>
+                          <th className="py-3 px-3">Status</th>
+                          <th className="py-3 px-3">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#f7f0eb]">
+                        {earningsData.sales.map((sale) => (
+                          <tr key={sale.id || sale.orderId} className="hover:bg-[#fbf7f4] transition">
+                            <td className="py-3 px-3 font-mono font-bold text-[#1f1a17]">
+                              {sale.orderId}
+                            </td>
+                            <td className="py-3 px-3 font-semibold text-[#1f1a17]">
+                              {sale.courseTitle}
+                            </td>
+                            <td className="py-3 px-3 font-mono text-[#1f1a17]">
+                              ₹{sale.grossAmount}
+                            </td>
+                            <td className="py-3 px-3 font-mono text-rose-600">
+                              -₹{sale.platformFee}
+                            </td>
+                            <td className="py-3 px-3 font-mono font-extrabold text-emerald-700">
+                              ₹{sale.netEarning}
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                sale.payoutStatus === 'paid'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {sale.payoutStatus === 'paid' ? 'Paid Out' : 'Accrued (Unpaid)'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-[#8e8076]">
+                              {sale.soldAt ? new Date(sale.soldAt).toLocaleDateString() : 'Recent'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="py-12 text-center text-xs text-[#8e8076] bg-[#fbf7f4] rounded-2xl border border-[#faeae0]">
+                    <span className="material-symbols-outlined text-[36px] text-[#b0a39a] block mb-2">payments</span>
+                    <p className="font-bold text-[#1f1a17]">No course sales yet</p>
+                    <p className="mt-1">When students enroll in your published courses, your 80% royalty earnings will appear here.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </main>
       </div>
+
+      {/* BANK PAYOUT SIMULATION MODAL */}
+      {payoutModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-[#fae8dc] flex flex-col gap-5 relative animate-scaleUp">
+            <button
+              onClick={() => setPayoutModalOpen(false)}
+              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-[#f6eee9] hover:bg-[#fae8dc] text-[#554a43] flex items-center justify-center font-bold text-sm cursor-pointer transition"
+            >
+              ✕
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-md">
+                <span className="material-symbols-outlined text-[26px]">account_balance</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-[#1e1916]">Direct Bank Payout Simulation</h3>
+                <p className="text-xs text-[#8e8076]">Instant IMPS / NEFT Royalty Settlement</p>
+              </div>
+            </div>
+
+            {!withdrawalSuccess ? (
+              <div className="flex flex-col gap-4">
+                <div className="p-4 rounded-2xl bg-[#fbf7f4] border border-[#f0dfd3] flex flex-col gap-2.5 text-xs">
+                  <div className="flex justify-between items-center border-b border-[#f0dfd3] pb-2">
+                    <span className="text-[#8e8076] font-semibold">Beneficiary Name</span>
+                    <span className="font-extrabold text-[#1f1a17]">{user?.name || 'Dr. Sarah Chen'}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-[#f0dfd3] pb-2">
+                    <span className="text-[#8e8076] font-semibold">Bank Name</span>
+                    <span className="font-bold text-[#1f1a17]">HDFC Bank Ltd.</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-[#f0dfd3] pb-2">
+                    <span className="text-[#8e8076] font-semibold">Account Number</span>
+                    <span className="font-mono font-bold text-[#1f1a17]">•••• •••• •••• 4892</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-[#f0dfd3] pb-2">
+                    <span className="text-[#8e8076] font-semibold">IFSC Code</span>
+                    <span className="font-mono font-bold text-[#1f1a17]">HDFC0001234</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-1">
+                    <span className="text-emerald-800 font-bold uppercase text-[11px]">Net Accrued Royalty (80%)</span>
+                    <span className="font-mono font-black text-emerald-700 text-[18px]">
+                      ₹{earningsData?.unpaidBalance || '5,788.40'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-[#8e8076] bg-emerald-50 text-emerald-800 p-3 rounded-xl border border-emerald-200 flex items-start gap-2">
+                  <span className="material-symbols-outlined text-[18px] text-emerald-600 shrink-0">verified_user</span>
+                  <span>
+                    This simulation verifies the banking payout pipeline. Confirming will settle all accrued royalties, generate a valid banking UTR reference, and update your ledger to Paid Out.
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setPayoutModalOpen(false)}
+                    className="flex-1 py-3 rounded-xl border border-[#faeae0] text-xs font-bold text-[#6d635c] hover:bg-[#fbf7f4] transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isWithdrawing || (earningsData?.unpaidBalance === 0)}
+                    onClick={handleWithdrawPayout}
+                    className="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white text-xs font-black shadow-md shadow-emerald-500/20 transition cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <span>{isWithdrawing ? 'Processing Bank IMPS...' : '⚡ Confirm Transfer (Demo)'}</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-4 text-center py-2 animate-fadeIn">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shadow-inner">
+                  <span className="material-symbols-outlined text-[36px]">check_circle</span>
+                </div>
+                <div>
+                  <h4 className="text-lg font-black text-[#1e1916]">Payout Transfer Successful!</h4>
+                  <p className="text-xs text-emerald-700 font-semibold mt-1">
+                    ₹{withdrawalSuccess.amountWithdrawn} credited to your linked HDFC account.
+                  </p>
+                </div>
+
+                <div className="w-full p-4 rounded-2xl bg-[#fbf7f4] border border-[#f0dfd3] flex flex-col gap-2 text-left text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[#8e8076]">Banking UTR Reference:</span>
+                    <span className="font-mono font-bold text-[#1f1a17]">{withdrawalSuccess.utrNumber}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[#8e8076]">Credited Account:</span>
+                    <span className="font-bold text-[#1f1a17]">{withdrawalSuccess.bankName}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[#8e8076]">Settled Sales Count:</span>
+                    <span className="font-bold text-[#1f1a17]">{withdrawalSuccess.itemsSettled} courses</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[#8e8076]">Settlement Timestamp:</span>
+                    <span className="font-mono text-[#8e8076] text-[11px]">Just now (Real-time)</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => { setPayoutModalOpen(false); setWithdrawalSuccess(null); }}
+                  className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+                >
+                  Done &amp; View Updated Ledger
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
