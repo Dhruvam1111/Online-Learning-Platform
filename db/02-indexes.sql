@@ -34,3 +34,10 @@ CREATE INDEX idx_bookmarks_student_id ON bookmarks(student_id);
 
 CREATE INDEX idx_lecture_progress_student_id ON lecture_progress(student_id);
 CREATE INDEX idx_lecture_progress_lecture_id ON lecture_progress(lecture_id);
+
+-- instructor_credentials: list credentials for an instructor
+CREATE INDEX idx_instructor_credentials_instructor_id ON instructor_credentials(instructor_id);
+CREATE INDEX idx_instructor_credentials_status ON instructor_credentials(status);
+
+-- instructor_upload_history: list upload audit trail for an instructor
+CREATE INDEX idx_instructor_upload_history_instructor_id ON instructor_upload_history(instructor_id);

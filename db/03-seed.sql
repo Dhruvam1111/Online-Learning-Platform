@@ -4,6 +4,8 @@
 -- ============================================================
 
 -- Clear existing data (safe to re-run)
+DELETE FROM instructor_upload_history;
+DELETE FROM instructor_credentials;
 DELETE FROM enrollments;
 DELETE FROM lectures;
 DELETE FROM courses;

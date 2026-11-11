@@ -71,12 +71,14 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/instructors/{id:[0-9]+}/summary",
                                                          "/api/instructor/{id:[0-9]+}/summary",
                                                          "/api/instructors/{id:[0-9]+}",
-                                                         "/api/instructor/{id:[0-9]+}").permitAll()
+                                                         "/api/instructor/{id:[0-9]+}",
+                                                         "/api/instructors/{id:[0-9]+}/picture",
+                                                         "/api/instructor/{id:[0-9]+}/picture").permitAll()
                         // Admin endpoints require ROLE_admin
                         .requestMatchers("/api/admin/**").hasRole("admin")
 
-                        // Instructor endpoints require instructor role
-                        .requestMatchers("/api/instructor/**", "/api/instructors/**").hasRole("instructor")
+                        // Instructor endpoints require instructor or admin role
+                        .requestMatchers("/api/instructor/**", "/api/instructors/**").hasAnyRole("instructor", "admin")
 
                         // Student endpoints require student role
                         .requestMatchers("/api/student/**", "/api/students/**").hasRole("student")

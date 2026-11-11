@@ -3,13 +3,18 @@ package com.olp.controller;
 import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
 import com.olp.dto.ApiResponse;
+import com.olp.dto.InstructorCredentialResponse;
 import com.olp.dto.PageResponse;
 import com.olp.dto.RejectCourseRequest;
 import com.olp.service.AdminService;
+import com.olp.service.InstructorMediaService;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -17,9 +22,17 @@ import org.springframework.web.bind.annotation.*;
 public class AdminController {
 
     private final AdminService adminService;
+    private final InstructorMediaService instructorMediaService;
 
     public AdminController(AdminService adminService) {
+        this(adminService, null);
+    }
+
+    @Autowired
+    public AdminController(AdminService adminService,
+                           @Autowired(required = false) InstructorMediaService instructorMediaService) {
         this.adminService = adminService;
+        this.instructorMediaService = instructorMediaService;
     }
 
     /**
@@ -180,5 +193,19 @@ public class AdminController {
     public ResponseEntity<ApiResponse> deleteCourse(@PathVariable Integer id) {
         adminService.deleteCourse(id);
         return ResponseEntity.ok(new ApiResponse(true, "Course deleted successfully"));
+    }
+
+    /**
+     * View credential verification documents uploaded by an instructor.
+     * FR-A03, FR-I04: Admin credentials verification
+     */
+    @GetMapping("/instructors/{instructorId:[0-9]+}/credentials")
+    public ResponseEntity<List<InstructorCredentialResponse>> getInstructorCredentials(
+            @PathVariable Integer instructorId) {
+        if (instructorMediaService == null) {
+            throw new IllegalStateException("InstructorMediaService is not configured");
+        }
+        List<InstructorCredentialResponse> response = instructorMediaService.getCredentialsForAdmin(instructorId);
+        return ResponseEntity.ok(response);
     }
 }

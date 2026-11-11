@@ -9,6 +9,8 @@ DROP TABLE IF EXISTS bookmarks CASCADE;
 DROP TABLE IF EXISTS reviews CASCADE;
 DROP TABLE IF EXISTS enrollments CASCADE;
 DROP TABLE IF EXISTS lectures CASCADE;
+DROP TABLE IF EXISTS instructor_upload_history CASCADE;
+DROP TABLE IF EXISTS instructor_credentials CASCADE;
 DROP TABLE IF EXISTS instructor_profiles CASCADE;
 DROP TABLE IF EXISTS student_profiles CASCADE;
 DROP TABLE IF EXISTS courses CASCADE;
@@ -173,14 +175,70 @@ CREATE TABLE student_profiles (
 -- TABLE: instructor_profiles
 -- =========================
 CREATE TABLE instructor_profiles (
-    id              SERIAL PRIMARY KEY,
-    instructor_id   INTEGER NOT NULL UNIQUE,
-    qualifications  TEXT,
-    expertise_areas TEXT,
-    bio             TEXT,
-    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    id                  SERIAL PRIMARY KEY,
+    instructor_id       INTEGER NOT NULL UNIQUE,
+    qualifications      TEXT,
+    expertise_areas     TEXT,
+    bio                 TEXT,
+    profile_picture_url VARCHAR(500),
+    created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMP NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_instructor_profiles_user FOREIGN KEY (instructor_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- =========================
+-- TABLE: instructor_credentials
+-- =========================
+-- Stores private credential verification documents (degrees, certificates, identity)
+-- uploaded by instructors. Access is restricted to the owning instructor and admins.
+CREATE TABLE instructor_credentials (
+    id                 SERIAL PRIMARY KEY,
+    instructor_id      INTEGER NOT NULL,
+    original_file_name VARCHAR(255) NOT NULL,
+    stored_file_name   VARCHAR(255) NOT NULL,
+    content_type       VARCHAR(100) NOT NULL,
+    file_size          BIGINT NOT NULL,
+    document_type      VARCHAR(100) NOT NULL DEFAULT 'CREDENTIAL',
+    status             VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+    uploaded_at        TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_instructor_credentials_user
+        FOREIGN KEY (instructor_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT chk_credential_status
+        CHECK (status IN ('ACTIVE', 'REPLACED', 'DELETED'))
+);
+
+-- =========================
+-- TABLE: instructor_upload_history
+-- =========================
+-- Audit trail tracking upload, replacement, and deletion lifecycle events
+-- for instructor profile pictures and credential documents.
+CREATE TABLE instructor_upload_history (
+    id                 SERIAL PRIMARY KEY,
+    instructor_id      INTEGER NOT NULL,
+    category           VARCHAR(50) NOT NULL,
+    action             VARCHAR(50) NOT NULL,
+    original_file_name VARCHAR(255) NOT NULL,
+    stored_file_name   VARCHAR(255) NOT NULL,
+    content_type       VARCHAR(100) NOT NULL,
+    file_size          BIGINT NOT NULL,
+    details            TEXT,
+    created_at         TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_instructor_upload_history_user
+        FOREIGN KEY (instructor_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT chk_upload_category
+        CHECK (category IN ('PROFILE_PICTURE', 'CREDENTIAL')),
+
+    CONSTRAINT chk_upload_action
+        CHECK (action IN ('UPLOADED', 'REPLACED', 'DELETED'))
 );
 
 -- =========================

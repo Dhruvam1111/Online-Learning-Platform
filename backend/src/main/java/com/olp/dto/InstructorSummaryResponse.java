@@ -16,6 +16,7 @@ public class InstructorSummaryResponse {
     private String qualifications;
     private String expertiseAreas;
     private String bio;
+    private String profilePictureUrl;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -23,11 +24,18 @@ public class InstructorSummaryResponse {
 
     public InstructorSummaryResponse(Integer id, String name, String email,
                                      String qualifications, String expertiseAreas, String bio) {
-        this(id, name, email, qualifications, expertiseAreas, bio, null, null);
+        this(id, name, email, qualifications, expertiseAreas, bio, null, null, null);
     }
 
     public InstructorSummaryResponse(Integer id, String name, String email,
                                      String qualifications, String expertiseAreas, String bio,
+                                     LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this(id, name, email, qualifications, expertiseAreas, bio, null, createdAt, updatedAt);
+    }
+
+    public InstructorSummaryResponse(Integer id, String name, String email,
+                                     String qualifications, String expertiseAreas, String bio,
+                                     String profilePictureUrl,
                                      LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.instructorId = id;
@@ -36,6 +44,7 @@ public class InstructorSummaryResponse {
         this.qualifications = qualifications;
         this.expertiseAreas = expertiseAreas;
         this.bio = bio;
+        this.profilePictureUrl = profilePictureUrl;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -98,6 +107,14 @@ public class InstructorSummaryResponse {
 
     public void setBio(String bio) {
         this.bio = bio;
+    }
+
+    public String getProfilePictureUrl() {
+        return profilePictureUrl;
+    }
+
+    public void setProfilePictureUrl(String profilePictureUrl) {
+        this.profilePictureUrl = profilePictureUrl;
     }
 
     public LocalDateTime getCreatedAt() {
