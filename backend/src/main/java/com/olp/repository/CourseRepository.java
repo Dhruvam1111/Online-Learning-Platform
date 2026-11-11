@@ -2,6 +2,7 @@
 package com.olp.repository;
 
 import com.olp.entity.Course;
+import com.olp.entity.CourseStatus;
 import com.olp.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -54,5 +55,19 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
         @Param("status") String status,
         @Param("search") String search,
         Pageable pageable
+    );
+
+    // Search courses available for instructor association (FR-I58)
+    @Query("SELECT c FROM Course c JOIN FETCH c.instructor WHERE c.status = :status ORDER BY c.id ASC")
+    List<Course> findByCourseStatusOrderByIdAsc(@Param("status") CourseStatus status);
+
+    @Query("SELECT c FROM Course c JOIN FETCH c.instructor WHERE c.status = :status AND (" +
+           "LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(COALESCE(c.description, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(COALESCE(c.category, '')) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "ORDER BY c.id ASC")
+    List<Course> searchByCourseStatusAndKeyword(
+        @Param("status") CourseStatus status,
+        @Param("search") String search
     );
 }
