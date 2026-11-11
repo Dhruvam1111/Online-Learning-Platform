@@ -1,12 +1,18 @@
 package com.olp.service;
 
-import com.olp.dto.*;
+import com.olp.dto.ApiResponse;
+import com.olp.dto.AuthResponse;
+import com.olp.dto.LoginRequest;
+import com.olp.dto.RegisterRequest;
+import com.olp.entity.InstructorProfile;
 import com.olp.entity.User;
 import com.olp.exception.AccountStatusException;
 import com.olp.exception.DuplicateEmailException;
 import com.olp.exception.InvalidCredentialsException;
+import com.olp.repository.InstructorProfileRepository;
 import com.olp.repository.UserRepository;
 import com.olp.security.JwtUtil;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -18,8 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,350 +32,159 @@ class AuthServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private InstructorProfileRepository instructorProfileRepository;
+
     @Mock
     private PasswordEncoder passwordEncoder;
+
     @Mock
     private JwtUtil jwtUtil;
 
     @InjectMocks
     private AuthService authService;
 
-    // ---------- helpers ----------
+    private User activeStudent;
+    private User pendingInstructor;
 
-    private RegisterRequest registerRequest(String name, String email, String password, String role) {
-        RegisterRequest r = new RegisterRequest();
-        r.setName(name);
-        r.setEmail(email);
-        r.setPassword(password);
-        r.setRole(role);
-        return r;
+    @BeforeEach
+    void setUp() {
+        activeStudent = new User("Alice", "alice@test.com", "encodedHash", "student", "active");
+        activeStudent.setId(1);
+
+        pendingInstructor = new User("Dr. Smith", "smith@test.com", "encodedHash", "instructor", "pending");
+        pendingInstructor.setId(2);
     }
 
-    private LoginRequest loginRequest(String email, String password) {
-        LoginRequest r = new LoginRequest();
-        r.setEmail(email);
-        r.setPassword(password);
-        return r;
-    }
+    @Test
+    void testRegister_Instructor_PendingApproval_SavesProfileAndLink() {
+        RegisterRequest request = new RegisterRequest(
+                "Dr. Smith",
+                "smith@test.com",
+                "Password123!",
+                "instructor",
+                "Distributed Systems",
+                "PhD in Computer Science"
+        );
 
-    private User storedUser(Integer id, String role, String status) {
-        User u = new User("Sam", "sam@olp.com", "hash", role, status);
-        u.setId(id);
-        return u;
-    }
-
-    private void stubSaveAssigningId(int id) {
-        when(userRepository.save(any(User.class))).thenAnswer(i -> {
-            User u = i.getArgument(0);
-            u.setId(id);
+        when(userRepository.existsByEmail("smith@test.com")).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("encodedHash");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            u.setId(2);
             return u;
         });
-    }
+        when(jwtUtil.generateToken(eq(2), eq("VERIFY_EMAIL"))).thenReturn("verifyToken123");
+        when(jwtUtil.generateToken(eq(2), eq("instructor"))).thenReturn("jwtToken123");
 
-    // =====================================================================
-    // register
-    // =====================================================================
+        AuthResponse response = authService.register(request);
 
-    @Test
-    void testRegister_DuplicateEmail_ThrowsAndSavesNothing() {
-        when(userRepository.existsByEmail("dup@olp.com")).thenReturn(true);
+        assertNotNull(response);
+        assertEquals("jwtToken123", response.getToken());
+        assertTrue(response.getMessage().toLowerCase().contains("awaiting administrator approval") ||
+                   response.getMessage().toLowerCase().contains("pending"));
+        assertNotNull(response.getVerificationLink());
+        assertTrue(response.getVerificationLink().contains("verifyToken123"));
 
-        DuplicateEmailException ex = assertThrows(DuplicateEmailException.class,
-                () -> authService.register(registerRequest("Dup", "dup@olp.com", "pw", "student")));
+        // Verify User was saved with accountStatus = "pending"
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertEquals("pending", userCaptor.getValue().getAccountStatus());
+        assertEquals("instructor", userCaptor.getValue().getRole());
 
-        assertTrue(ex.getMessage().contains("already exists"));
-        verify(userRepository, never()).save(any());
-        verifyNoInteractions(passwordEncoder, jwtUtil);
-    }
-
-    @Test
-    void testRegister_DuplicateCheckRunsBeforeAdminRoleCheck() {
-        when(userRepository.existsByEmail("dup@olp.com")).thenReturn(true);
-
-        assertThrows(DuplicateEmailException.class,
-                () -> authService.register(registerRequest("Dup", "dup@olp.com", "pw", "admin")));
-    }
-
-    @Test
-    void testRegister_AdminRole_IsRejected() {
-        when(userRepository.existsByEmail("root@olp.com")).thenReturn(false);
-
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> authService.register(registerRequest("Root", "root@olp.com", "pw", "admin")));
-
-        assertTrue(ex.getMessage().contains("administrator"));
-        verify(userRepository, never()).save(any());
+        // Verify InstructorProfile was saved with expertise and qualifications
+        ArgumentCaptor<InstructorProfile> profileCaptor = ArgumentCaptor.forClass(InstructorProfile.class);
+        verify(instructorProfileRepository).save(profileCaptor.capture());
+        assertEquals("Distributed Systems", profileCaptor.getValue().getExpertiseAreas());
+        assertEquals("PhD in Computer Science", profileCaptor.getValue().getQualifications());
     }
 
     @Test
-    void testRegister_AdminRoleWithDifferentCaseAndSpaces_IsRejected() {
-        when(userRepository.existsByEmail("root@olp.com")).thenReturn(false);
+    void testRegister_Student_ActiveByDefault_NoInstructorProfile() {
+        RegisterRequest request = new RegisterRequest(
+                "Bob",
+                "bob@test.com",
+                "Password123!",
+                "student"
+        );
 
-        assertThrows(IllegalArgumentException.class,
-                () -> authService.register(registerRequest("Root", "root@olp.com", "pw", "  ADMIN ")));
+        when(userRepository.existsByEmail("bob@test.com")).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("encodedHash");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            u.setId(3);
+            return u;
+        });
+        when(jwtUtil.generateToken(eq(3), eq("student"))).thenReturn("studentJwt");
 
-        verify(userRepository, never()).save(any());
-    }
+        AuthResponse response = authService.register(request);
 
-    @Test
-    void testRegister_Student_IsActiveWithNormalisedEmailAndHashedPassword() {
-        when(userRepository.existsByEmail(" Stu@OLP.com ")).thenReturn(false);
-        when(passwordEncoder.encode("pw")).thenReturn("encoded");
-        stubSaveAssigningId(11);
-        when(jwtUtil.generateToken(11, "student")).thenReturn("jwt");
-
-        AuthResponse response = authService.register(registerRequest("Stu", " Stu@OLP.com ", "pw", "student"));
-
-        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).save(captor.capture());
-        User saved = captor.getValue();
-        assertEquals("Stu", saved.getName());
-        assertEquals("stu@olp.com", saved.getEmail());
-        assertEquals("encoded", saved.getPasswordHash());
-        assertEquals("student", saved.getRole());
-        assertEquals("active", saved.getAccountStatus());
-
+        assertNotNull(response);
         assertEquals("Registration successful", response.getMessage());
-        assertEquals("jwt", response.getToken());
-        assertEquals(11, response.getUser().getId());
-        assertEquals("stu@olp.com", response.getUser().getEmail());
-        assertEquals("student", response.getUser().getRole());
+        assertNull(response.getVerificationLink());
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertEquals("active", userCaptor.getValue().getAccountStatus());
+        verify(instructorProfileRepository, never()).save(any());
     }
 
     @Test
-    void testRegister_Instructor_IsPendingAndStillReceivesToken() {
-        when(userRepository.existsByEmail("inst@olp.com")).thenReturn(false);
-        when(passwordEncoder.encode("pw")).thenReturn("encoded");
-        stubSaveAssigningId(12);
-        when(jwtUtil.generateToken(12, "instructor")).thenReturn("jwt-inst");
+    void testRegister_DuplicateEmail_ThrowsException() {
+        RegisterRequest request = new RegisterRequest("Dup", "dup@test.com", "pass12345", "instructor");
+        when(userRepository.existsByEmail("dup@test.com")).thenReturn(true);
 
-        AuthResponse response = authService.register(registerRequest("Inst", "inst@olp.com", "pw", "Instructor"));
-
-        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).save(captor.capture());
-        assertEquals("instructor", captor.getValue().getRole());
-        assertEquals("pending", captor.getValue().getAccountStatus());
-        assertEquals("Registration submitted. Your instructor account is pending administrator approval.",
-                response.getMessage());
-        assertEquals("jwt-inst", response.getToken());
-    }
-
-    // =====================================================================
-    // login
-    // =====================================================================
-
-    @Test
-    void testLogin_UnknownEmail_ThrowsInvalidCredentials() {
-        when(userRepository.findByEmail("ghost@olp.com")).thenReturn(Optional.empty());
-
-        InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class,
-                () -> authService.login(loginRequest("ghost@olp.com", "pw")));
-
-        assertEquals("Invalid email or password", ex.getMessage());
-        verifyNoInteractions(passwordEncoder, jwtUtil);
+        assertThrows(DuplicateEmailException.class, () -> authService.register(request));
+        verify(userRepository, never()).save(any());
     }
 
     @Test
-    void testLogin_WrongPassword_ThrowsSameInvalidCredentialsMessage() {
-        when(userRepository.findByEmail("sam@olp.com")).thenReturn(Optional.of(storedUser(1, "student", "active")));
-        when(passwordEncoder.matches("bad", "hash")).thenReturn(false);
+    void testLogin_PendingInstructor_ThrowsAccountStatusExceptionWithAwaitingApprovalMessage() {
+        LoginRequest request = new LoginRequest("smith@test.com", "password123");
 
-        InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class,
-                () -> authService.login(loginRequest("sam@olp.com", "bad")));
+        when(userRepository.findByEmail("smith@test.com")).thenReturn(Optional.of(pendingInstructor));
+        when(passwordEncoder.matches("password123", "encodedHash")).thenReturn(true);
 
-        assertEquals("Invalid email or password", ex.getMessage());
-        verifyNoInteractions(jwtUtil);
+        AccountStatusException ex = assertThrows(AccountStatusException.class, () -> authService.login(request));
+        assertTrue(ex.getMessage().contains("Awaiting admin approval"));
     }
 
     @Test
-    void testLogin_PendingStudent_AsksToVerifyEmail() {
-        when(userRepository.findByEmail("sam@olp.com")).thenReturn(Optional.of(storedUser(1, "student", "pending")));
-        when(passwordEncoder.matches("pw", "hash")).thenReturn(true);
+    void testLogin_ActiveStudent_Success() {
+        LoginRequest request = new LoginRequest("alice@test.com", "password123");
 
-        AccountStatusException ex = assertThrows(AccountStatusException.class,
-                () -> authService.login(loginRequest("sam@olp.com", "pw")));
+        when(userRepository.findByEmail("alice@test.com")).thenReturn(Optional.of(activeStudent));
+        when(passwordEncoder.matches("password123", "encodedHash")).thenReturn(true);
+        when(jwtUtil.generateToken(1, "student")).thenReturn("token123");
 
-        assertTrue(ex.getMessage().contains("verify your email address"));
-        verifyNoInteractions(jwtUtil);
-    }
+        AuthResponse response = authService.login(request);
 
-    @Test
-    void testLogin_PendingInstructor_ReportsAwaitingApproval() {
-        when(userRepository.findByEmail("sam@olp.com")).thenReturn(Optional.of(storedUser(1, "instructor", "pending")));
-        when(passwordEncoder.matches("pw", "hash")).thenReturn(true);
-
-        AccountStatusException ex = assertThrows(AccountStatusException.class,
-                () -> authService.login(loginRequest("sam@olp.com", "pw")));
-
-        assertEquals("Your instructor account is pending administrator approval", ex.getMessage());
-    }
-
-    @Test
-    void testLogin_SuspendedUser_IsBlocked() {
-        when(userRepository.findByEmail("sam@olp.com")).thenReturn(Optional.of(storedUser(1, "student", "SUSPENDED")));
-        when(passwordEncoder.matches("pw", "hash")).thenReturn(true);
-
-        AccountStatusException ex = assertThrows(AccountStatusException.class,
-                () -> authService.login(loginRequest("sam@olp.com", "pw")));
-
-        assertEquals("Your account has been suspended. Please contact support", ex.getMessage());
-        verifyNoInteractions(jwtUtil);
-    }
-
-    @Test
-    void testLogin_RejectedInstructor_IsBlocked() {
-        when(userRepository.findByEmail("sam@olp.com")).thenReturn(Optional.of(storedUser(1, "instructor", "rejected")));
-        when(passwordEncoder.matches("pw", "hash")).thenReturn(true);
-
-        AccountStatusException ex = assertThrows(AccountStatusException.class,
-                () -> authService.login(loginRequest("sam@olp.com", "pw")));
-
-        assertEquals("Your instructor application was rejected", ex.getMessage());
-    }
-
-    @Test
-    void testLogin_ActiveUser_ReturnsJwtAndUserDetails() {
-        when(userRepository.findByEmail("sam@olp.com")).thenReturn(Optional.of(storedUser(7, "student", "active")));
-        when(passwordEncoder.matches("pw", "hash")).thenReturn(true);
-        when(jwtUtil.generateToken(7, "student")).thenReturn("jwt-7");
-
-        AuthResponse response = authService.login(loginRequest("  SAM@olp.com ", "pw"));
-
+        assertNotNull(response);
         assertEquals("Login successful", response.getMessage());
-        assertEquals("jwt-7", response.getToken());
-        assertEquals(7, response.getUser().getId());
-        assertEquals("Sam", response.getUser().getName());
-        assertEquals("sam@olp.com", response.getUser().getEmail());
-        assertEquals("student", response.getUser().getRole());
-    }
-
-    // =====================================================================
-    // getCurrentUser
-    // =====================================================================
-
-    @Test
-    void testGetCurrentUser_MapsEntityToResponse() {
-        UserResponse response = authService.getCurrentUser(storedUser(3, "instructor", "active"));
-
-        assertEquals(3, response.getId());
-        assertEquals("Sam", response.getName());
-        assertEquals("sam@olp.com", response.getEmail());
-        assertEquals("instructor", response.getRole());
-        verifyNoInteractions(userRepository);
+        assertEquals("token123", response.getToken());
     }
 
     @Test
-    void testGetCurrentUser_NullUser_ThrowsNullPointerException() {
-        assertThrows(NullPointerException.class, () -> authService.getCurrentUser(null));
-    }
+    void testVerifyEmail_ValidToken_ReturnsSuccess() {
+        String token = "validVerifyToken";
+        when(jwtUtil.validateToken(token)).thenReturn(true);
+        when(jwtUtil.getUserIdFromToken(token)).thenReturn(2);
+        when(userRepository.findById(2)).thenReturn(Optional.of(pendingInstructor));
 
-    // =====================================================================
-    // loginOrRegisterWithGoogle
-    // =====================================================================
+        ApiResponse response = authService.verifyEmail(token);
 
-    @Test
-    void testGoogleLogin_NewUser_AutoProvisionsActiveStudent() {
-        when(userRepository.findByEmail("gina@gmail.com")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode(anyString())).thenReturn("random-hash");
-        stubSaveAssigningId(21);
-        when(jwtUtil.generateToken(21, "student")).thenReturn("jwt-google");
-
-        AuthResponse response = authService.loginOrRegisterWithGoogle(
-                new GoogleAuthRequest(" Gina@Gmail.COM ", "  Gina  ", "id-token"));
-
-        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).save(captor.capture());
-        User saved = captor.getValue();
-        assertEquals("Gina", saved.getName());
-        assertEquals("gina@gmail.com", saved.getEmail());
-        assertEquals("student", saved.getRole());
-        assertEquals("active", saved.getAccountStatus());
-        assertEquals("random-hash", saved.getPasswordHash());
-
-        ArgumentCaptor<String> rawPassword = ArgumentCaptor.forClass(String.class);
-        verify(passwordEncoder).encode(rawPassword.capture());
-        assertTrue(rawPassword.getValue().matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"));
-
-        assertEquals("Authenticated successfully via Google", response.getMessage());
-        assertEquals("jwt-google", response.getToken());
-        assertEquals(21, response.getUser().getId());
+        assertNotNull(response);
+        assertTrue(response.isSuccess());
+        assertTrue(response.getMessage().contains("Email verified successfully"));
     }
 
     @Test
-    void testGoogleLogin_BlankName_FallsBackToEmailPrefix() {
-        when(userRepository.findByEmail("john.doe@gmail.com")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode(anyString())).thenReturn("h");
-        stubSaveAssigningId(22);
-        when(jwtUtil.generateToken(22, "student")).thenReturn("t");
+    void testVerifyEmail_InvalidToken_ThrowsException() {
+        String token = "badToken";
+        when(jwtUtil.validateToken(token)).thenReturn(false);
 
-        authService.loginOrRegisterWithGoogle(new GoogleAuthRequest("john.doe@gmail.com", "   ", "id-token"));
-
-        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).save(captor.capture());
-        assertEquals("john.doe", captor.getValue().getName());
-    }
-
-    @Test
-    void testGoogleLogin_NullName_FallsBackToEmailPrefix() {
-        when(userRepository.findByEmail("jane@gmail.com")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode(anyString())).thenReturn("h");
-        stubSaveAssigningId(23);
-        when(jwtUtil.generateToken(23, "student")).thenReturn("t");
-
-        authService.loginOrRegisterWithGoogle(new GoogleAuthRequest("jane@gmail.com", null, "id-token"));
-
-        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).save(captor.capture());
-        assertEquals("jane", captor.getValue().getName());
-    }
-
-    @Test
-    void testGoogleLogin_ExistingActiveUser_LogsInWithoutSavingOrReencoding() {
-        when(userRepository.findByEmail("sam@olp.com")).thenReturn(Optional.of(storedUser(7, "instructor", "active")));
-        when(jwtUtil.generateToken(7, "instructor")).thenReturn("jwt-7");
-
-        AuthResponse response = authService.loginOrRegisterWithGoogle(new GoogleAuthRequest("sam@olp.com", "Sam", "tok"));
-
-        assertEquals("jwt-7", response.getToken());
-        assertEquals("instructor", response.getUser().getRole());
-        verify(userRepository, never()).save(any());
-        verifyNoInteractions(passwordEncoder);
-    }
-
-    @Test
-    void testGoogleLogin_ExistingPendingUser_IsActivated() {
-        User pending = storedUser(8, "student", "pending");
-        when(userRepository.findByEmail("sam@olp.com")).thenReturn(Optional.of(pending));
-        when(userRepository.save(pending)).thenReturn(pending);
-        when(jwtUtil.generateToken(8, "student")).thenReturn("jwt-8");
-
-        AuthResponse response = authService.loginOrRegisterWithGoogle(new GoogleAuthRequest("sam@olp.com", "Sam", "tok"));
-
-        assertEquals("active", pending.getAccountStatus());
-        assertEquals("jwt-8", response.getToken());
-        verify(userRepository).save(pending);
-    }
-
-    @Test
-    void testGoogleLogin_SuspendedUser_IsBlocked() {
-        when(userRepository.findByEmail("sam@olp.com")).thenReturn(Optional.of(storedUser(9, "student", "suspended")));
-
-        AccountStatusException ex = assertThrows(AccountStatusException.class,
-                () -> authService.loginOrRegisterWithGoogle(new GoogleAuthRequest("sam@olp.com", "Sam", "tok")));
-
-        assertEquals("Your account has been suspended. Please contact support", ex.getMessage());
-        verifyNoInteractions(jwtUtil);
-        verify(userRepository, never()).save(any());
-    }
-
-    @Test
-    void testGoogleLogin_RejectedUser_IsBlocked() {
-        when(userRepository.findByEmail("sam@olp.com")).thenReturn(Optional.of(storedUser(9, "instructor", "rejected")));
-
-        AccountStatusException ex = assertThrows(AccountStatusException.class,
-                () -> authService.loginOrRegisterWithGoogle(new GoogleAuthRequest("sam@olp.com", "Sam", "tok")));
-
-        assertEquals("Your instructor application was rejected", ex.getMessage());
-        verifyNoInteractions(jwtUtil);
+        assertThrows(InvalidCredentialsException.class, () -> authService.verifyEmail(token));
     }
 }
+

@@ -41,18 +41,29 @@ public class OtpAuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final EmailService emailService;
+    private final TokenBlacklistService tokenBlacklistService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public OtpAuthService(TwoFactorTokenRepository tokenRepository,
                           UserRepository userRepository,
                           PasswordEncoder passwordEncoder,
                           JwtUtil jwtUtil,
-                          EmailService emailService) {
+                          EmailService emailService,
+                          TokenBlacklistService tokenBlacklistService) {
         this.tokenRepository = tokenRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
         this.emailService = emailService;
+        this.tokenBlacklistService = tokenBlacklistService != null ? tokenBlacklistService : new TokenBlacklistService();
+    }
+
+    public OtpAuthService(TwoFactorTokenRepository tokenRepository,
+                          UserRepository userRepository,
+                          PasswordEncoder passwordEncoder,
+                          JwtUtil jwtUtil,
+                          EmailService emailService) {
+        this(tokenRepository, userRepository, passwordEncoder, jwtUtil, emailService, new TokenBlacklistService());
     }
 
     // =========================================================================
@@ -281,6 +292,10 @@ public class OtpAuthService {
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
 
+        if (tokenBlacklistService != null) {
+            tokenBlacklistService.revokeAllUserTokens(user.getId());
+        }
+
         log.info("[OTP Auth] Password successfully reset via OTP for email: {}", cleanEmail);
     }
 
@@ -385,6 +400,10 @@ public class OtpAuthService {
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+
+        if (tokenBlacklistService != null) {
+            tokenBlacklistService.revokeAllUserTokens(user.getId());
+        }
 
         log.info("[Password Change] User {} successfully changed password using current password", user.getEmail());
     }

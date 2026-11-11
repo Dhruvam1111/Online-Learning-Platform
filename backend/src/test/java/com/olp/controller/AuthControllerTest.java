@@ -16,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 
@@ -108,11 +109,12 @@ class AuthControllerTest {
 
     @Test
     void testLogout_Returns200WithMessageAndNoServiceCall() {
-        ResponseEntity<Map<String, String>> response = authController.logout();
+        MockHttpServletRequest httpRequest = new MockHttpServletRequest();
+        ResponseEntity<Map<String, String>> response = authController.logout(httpRequest);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals("Logged out successfully", response.getBody().get("message"));
-        verifyNoInteractions(authService);
+        verify(authService, times(1)).logout(httpRequest);
     }
 
     @Test

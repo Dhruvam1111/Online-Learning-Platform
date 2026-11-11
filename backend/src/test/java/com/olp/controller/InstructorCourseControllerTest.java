@@ -77,6 +77,28 @@ class InstructorCourseControllerTest {
     }
 
     @Test
+    void testCreateCourse_FullPayloadWithPrerequisites_Returns201() {
+        givenResolvedUser();
+        CreateCourseRequest request = new CreateCourseRequest(
+                "Full Stack Web", "Description", "Web Development",
+                List.of(new com.olp.dto.CoursePrerequisiteRequest("SKILL", "Basic HTML")),
+                List.of("Build sites")
+        );
+        CourseResponse created = new CourseResponse(
+                10, 1, "Full Stack Web", "Description", CourseStatus.DRAFT, LocalDateTime.now(),
+                "Web Development", List.of("Build sites"), List.of()
+        );
+        when(instructorCourseService.createCourse(currentUser, request)).thenReturn(created);
+
+        ResponseEntity<CourseResponse> response = controller.createCourse(authentication, request);
+
+        assertEquals(201, response.getStatusCode().value());
+        assertEquals("Web Development", response.getBody().getCategory());
+        assertEquals(CourseStatus.DRAFT, response.getBody().getStatus());
+        verify(instructorCourseService, times(1)).createCourse(currentUser, request);
+    }
+
+    @Test
     void testCreateCourse_ServiceFailurePropagates() {
         givenResolvedUser();
         CreateCourseRequest request = new CreateCourseRequest("  ", null);

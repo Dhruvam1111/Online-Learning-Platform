@@ -53,6 +53,7 @@ export const authAPI = {
   resetPasswordWithOtp: (data) => api.post('/auth/password-reset/reset', data),
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
+  verifyEmail: (token) => api.get(`/auth/verify-email?token=${token}`),
 };
 
 // ─── Convenience Helpers on api Object ──────────────────────────────────────

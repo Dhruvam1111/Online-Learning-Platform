@@ -23,6 +23,30 @@ public class RegisterRequest {
     @Pattern(regexp = "^(student|instructor)$", message = "Role must be 'student' or 'instructor'")
     private String role;
 
+    // Fields for instructor registration (FR-I01)
+    private String expertise;
+    private String qualification;
+
+    // ===== Constructors =====
+
+    public RegisterRequest() {}
+
+    public RegisterRequest(String name, String email, String password, String role) {
+        this.name = name;
+        this.email = email;
+        this.password = password;
+        this.role = role;
+    }
+
+    public RegisterRequest(String name, String email, String password, String role, String expertise, String qualification) {
+        this.name = name;
+        this.email = email;
+        this.password = password;
+        this.role = role;
+        this.expertise = expertise;
+        this.qualification = qualification;
+    }
+
     // ===== Getters and Setters =====
 
     public String getName() { return name; }
@@ -36,4 +60,16 @@ public class RegisterRequest {
 
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
+
+    public String getExpertise() { return expertise; }
+    public void setExpertise(String expertise) { this.expertise = expertise; }
+
+    public String getQualification() { return qualification; }
+    public void setQualification(String qualification) { this.qualification = qualification; }
+
+    public String getExpertiseAreas() { return expertise; }
+    public void setExpertiseAreas(String expertiseAreas) { this.expertise = expertiseAreas; }
+
+    public String getQualifications() { return qualification; }
+    public void setQualifications(String qualifications) { this.qualification = qualifications; }
 }

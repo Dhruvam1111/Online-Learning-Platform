@@ -2,18 +2,15 @@ import React, { useState, useEffect } from 'react';
 import EarthCanvas from './EarthCanvas';
 import OtpAuthModal from './OtpAuthModal';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
+import api, { authAPI } from '../services/api';
 
 // Official Google OAuth 2.0 Web Client ID from Google Cloud Console
 const GOOGLE_CLIENT_ID =
   import.meta.env.VITE_GOOGLE_CLIENT_ID ||
   '507577176126-kqjfjqqhsh8fc38gb8t5kpejielav77s.apps.googleusercontent.com';
 
-/**
- * Sign In & Profile Creation Component.
- */
 export default function SignInPage({ onNavigateHome, onNavigateDashboard, initialNotice }) {
-  const { setSession } = useAuth();
+  const { login, register, setSession } = useAuth();
 
   // Navigation & view modes
   const [isSignUp, setIsSignUp] = useState(false);
@@ -25,11 +22,16 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullname, setFullname] = useState('');
+  const [role, setRole] = useState('student');
+  const [expertise, setExpertise] = useState('');
+  const [qualification, setQualification] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
 
   // Feedback states
   const [isLoading, setIsLoading] = useState(false);
-  const [alertMessage, setAlertMessage] = useState(() => initialNotice ? { type: 'info', text: initialNotice } : null);
+  const [alertMessage, setAlertMessage] = useState(() =>
+    initialNotice ? { type: 'info', text: initialNotice } : null
+  );
   const [resendCooldown, setResendCooldown] = useState(0);
 
   const startCooldown = (seconds = 30) => {
@@ -44,6 +46,34 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
       });
     }, 1000);
   };
+
+  // Check for email verification link in URL hash
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.includes('verify-email')) {
+      const query = hash.includes('?') ? hash.split('?')[1] : '';
+      const params = new URLSearchParams(query);
+      const token = params.get('token');
+      if (token) {
+        setIsLoading(true);
+        authAPI
+          .verifyEmail(token)
+          .then((res) => {
+            setAlertMessage({
+              type: 'pending_approval',
+              text: res.data?.message || 'Email verified successfully! Your instructor account is awaiting administrator approval.'
+            });
+          })
+          .catch((err) => {
+            setAlertMessage({
+              type: 'error',
+              text: err.response?.data?.message || 'Email verification link is invalid or has expired.'
+            });
+          })
+          .finally(() => setIsLoading(false));
+      }
+    }
+  }, []);
 
   // =========================================================================
   // INITIALIZE GOOGLE IDENTITY SERVICES (OFFICIAL MODERN WEB SDK)
@@ -166,64 +196,78 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
     }
   };
 
-  // =========================================================================
-  // SUBMIT HANDLER (EMAIL/PASSWORD LOGIN & SIGN UP STEP 1)
-  // =========================================================================
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setAlertMessage(null);
+    setAlertMessage({
+      type: 'info',
+      text: isSignUp ? 'Creating your account...' : 'Logging in to your account...'
+    });
 
-    if (isSignUp) {
-      if (!fullname.trim() || !email.trim() || !password) {
+    try {
+      if (isSignUp) {
+        const extra = role === 'instructor' ? { expertise, qualification } : {};
+        const result = await register(fullname, email, password, role, extra);
         setIsLoading(false);
-        setAlertMessage({ type: 'error', text: 'Please fill in all required fields.' });
-        return;
-      }
-
-      if (password.length < 8) {
-        setIsLoading(false);
-        setAlertMessage({ type: 'error', text: 'Password must be at least 8 characters.' });
-        return;
-      }
-
-      try {
-        const res = await api.sendRegistrationOtp(fullname.trim(), email.trim(), password);
-        setIsVerifyingSignup(true);
-        startCooldown(15);
-        setAlertMessage(null);
-      } catch (err) {
-        const msg = err.response?.data?.message || err.response?.data?.error || err.message;
-        setAlertMessage({ type: 'error', text: msg });
-      } finally {
-        setIsLoading(false);
-      }
-    } else {
-      try {
-        const data = await api.login(email.trim(), password);
-        localStorage.setItem('olp_token', data.token);
-        localStorage.setItem('olp_user', JSON.stringify(data.user));
-        if (setSession) setSession(data.token, data.user);
-
-        setAlertMessage({
-          type: 'success',
-          text: `Login successful! Welcome back, ${data.user.name}.`,
-        });
-
-        setTimeout(() => {
-          setAlertMessage(null);
-          if (onNavigateDashboard) {
-            onNavigateDashboard();
-          } else if (onNavigateHome) {
-            onNavigateHome();
+        if (result.success) {
+          if (role === 'instructor') {
+            setAlertMessage({
+              type: 'pending_approval',
+              text: result.message || 'Registration submitted! Your instructor account is awaiting admin approval. Please check your email for the verification link.',
+              verificationLink: result.verificationLink
+            });
+            setTimeout(() => {
+              setIsSignUp(false);
+            }, 3500);
+          } else {
+            setAlertMessage({
+              type: 'success',
+              text: result.message || 'Account created successfully! Redirecting...'
+            });
+            setTimeout(() => {
+              setAlertMessage(null);
+              if (onNavigateDashboard) {
+                onNavigateDashboard();
+              } else if (onNavigateHome) {
+                onNavigateHome();
+              }
+            }, 1200);
           }
-        }, 1200);
-      } catch (err) {
-        const msg = err.response?.data?.message || err.response?.data?.error || err.message;
-        setAlertMessage({ type: 'error', text: msg });
-      } finally {
+        } else {
+          setAlertMessage({
+            type: 'error',
+            text: result.message
+          });
+        }
+      } else {
+        const result = await login(email, password);
         setIsLoading(false);
+        if (result.success) {
+          setAlertMessage({
+            type: 'success',
+            text: result.message || 'Login successful! Redirecting...'
+          });
+          setTimeout(() => {
+            setAlertMessage(null);
+            if (onNavigateDashboard) {
+              onNavigateDashboard();
+            } else if (onNavigateHome) {
+              onNavigateHome();
+            }
+          }, 1200);
+        } else {
+          setAlertMessage({
+            type: 'error',
+            text: result.message
+          });
+        }
       }
+    } catch {
+      setIsLoading(false);
+      setAlertMessage({
+        type: 'error',
+        text: 'An unexpected error occurred. Please check if the backend server is running.'
+      });
     }
   };
 
@@ -313,9 +357,10 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
         </div>
 
         {/* =========================================================================
-            RIGHT PANEL: Clean Login Form directly structured like HackerRank
+            RIGHT PANEL: Clean Login / Sign Up Form
             ========================================================================= */}
         <div className="lg:col-span-6 bg-white flex flex-col justify-center px-6 sm:px-12 lg:px-20 py-12 relative">
+          {/* Top Return Link */}
           <div className="absolute top-8 right-8 hidden lg:flex items-center">
             <button
               type="button"
@@ -331,44 +376,14 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
             {/* Form Headers */}
             <div className="flex flex-col">
               <span className="text-neutral-700 font-semibold text-lg sm:text-xl">
-                {isForgotPassword
-                  ? 'Account Recovery'
-                  : isSignUp
-                  ? isVerifyingSignup
-                    ? 'Verify your email'
-                    : 'Create your profile'
-                  : 'Welcome back!'}
+                {isSignUp ? 'Create your profile' : 'Welcome back!'}
               </span>
               <h2 className="text-neutral-900 font-bold text-2xl sm:text-3xl tracking-tight mt-0.5">
-                {isForgotPassword
-                  ? 'Reset your password'
-                  : isSignUp
-                  ? isVerifyingSignup
-                    ? 'Enter verification code'
-                    : 'Sign up for Focotech'
-                  : 'Login to your account'}
+                {isSignUp ? 'Sign up for Focotech' : 'Login to your account'}
               </h2>
               <p className="text-neutral-500 text-xs sm:text-sm mt-1.5">
-                {isForgotPassword
-                  ? 'Enter your registered email and 6-digit OTP code to set a new password.'
-                  : isSignUp
-                  ? isVerifyingSignup
-                    ? (
-                      <span>
-                        We've sent a 6-digit verification code to <strong className="text-neutral-800">{email}</strong>.{' '}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsVerifyingSignup(false);
-                            setAlertMessage(null);
-                          }}
-                          className="text-[#0066cc] hover:underline font-normal cursor-pointer ml-1"
-                        >
-                          Change
-                        </button>
-                      </span>
-                    )
-                    : 'Join 120,000+ builders mastering real-world software.'
+                {isSignUp
+                  ? 'Join 120,000+ builders mastering real-world software.'
                   : "It's nice to see you again. Ready to code?"}
               </p>
             </div>
@@ -376,27 +391,81 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
             {/* Alert Banner */}
             {alertMessage && (
               <div
-                className={`p-3 rounded-md text-xs sm:text-sm font-medium flex items-center gap-2 transition-all animate-fadeIn ${
+                className={`p-3 rounded-md text-xs sm:text-sm font-medium flex flex-col gap-1 transition-all animate-fadeIn ${
                   alertMessage.type === 'success'
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                    : alertMessage.type === 'error'
-                    ? 'bg-rose-50 text-rose-800 border border-rose-200'
-                    : 'bg-primary-fixed/60 text-on-primary-fixed border border-primary-fixed'
+                    : alertMessage.type === 'pending_approval'
+                      ? 'bg-amber-50 text-amber-900 border border-amber-300'
+                      : alertMessage.type === 'error'
+                        ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                        : 'bg-primary-fixed/60 text-on-primary-fixed border border-primary-fixed'
                 }`}
               >
-                <span className="material-symbols-outlined text-[18px]">
-                  {alertMessage.type === 'success' ? 'check_circle' : alertMessage.type === 'error' ? 'error' : 'info'}
-                </span>
-                <span>{alertMessage.text}</span>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px]">
+                    {alertMessage.type === 'success'
+                      ? 'check_circle'
+                      : alertMessage.type === 'pending_approval'
+                        ? 'hourglass_top'
+                        : alertMessage.type === 'error'
+                          ? 'error'
+                          : 'info'}
+                  </span>
+                  <span>{alertMessage.text}</span>
+                </div>
+                {alertMessage.verificationLink && (
+                  <div className="mt-1 pt-1 border-t border-amber-200 text-xs">
+                    <span className="font-semibold">Simulated Verification Link: </span>
+                    <a
+                      href={alertMessage.verificationLink}
+                      className="underline break-all text-amber-950 font-mono hover:text-black"
+                    >
+                      {alertMessage.verificationLink}
+                    </a>
+                  </div>
+                )}
               </div>
             )}
 
             {/* ===================================================================
-                VIEW A: CREDENTIALS LOGIN & SIGN UP FORM (Person 1 Domain)
+                VIEW A: CREDENTIALS LOGIN & SIGN UP FORM
                 =================================================================== */}
             {!isForgotPassword && !isVerifyingSignup && (
               <>
+                {/* Form Inputs & Submit */}
                 <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+                  {/* Role selection when signing up */}
+                  {isSignUp && (
+                    <div className="flex flex-col gap-1.5 animate-fadeIn">
+                      <label className="text-xs font-semibold text-neutral-600">Register as:</label>
+                      <div className="grid grid-cols-2 gap-2 p-1 bg-neutral-100 rounded-lg">
+                        <button
+                          type="button"
+                          onClick={() => setRole('student')}
+                          className={`py-1.5 px-3 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                            role === 'student'
+                              ? 'bg-white text-neutral-900 shadow-xs'
+                              : 'text-neutral-500 hover:text-neutral-800'
+                          }`}
+                        >
+                          🎓 Student
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRole('instructor')}
+                          className={`py-1.5 px-3 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                            role === 'instructor'
+                              ? 'bg-white text-neutral-900 shadow-xs'
+                              : 'text-neutral-500 hover:text-neutral-800'
+                          }`}
+                        >
+                          👨‍🏫 Instructor
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Optional Name for Sign Up */}
                   {isSignUp && (
                     <div className="animate-fadeIn">
                       <input
@@ -421,20 +490,21 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
                     />
                   </div>
 
+                  {/* Password Input with show/hide toggle */}
                   <div className="relative">
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
-                      minLength={isSignUp ? 8 : 1}
+                      minLength={8}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Your password"
+                      placeholder={isSignUp ? "Password (min 8 characters)" : "Your password"}
                       className="w-full pl-3.5 pr-10 py-2.5 rounded-md border border-neutral-300 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 text-sm transition-all"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 transition-colors focus:outline-none p-0.5 cursor-pointer"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 transition-colors focus:outline-none p-0.5"
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       <span className="material-symbols-outlined text-[19px]">
@@ -443,6 +513,33 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
                     </button>
                   </div>
 
+                  {/* FR-I01: Instructor specific registration fields */}
+                  {isSignUp && role === 'instructor' && (
+                    <>
+                      <div className="animate-fadeIn">
+                        <input
+                          type="text"
+                          required
+                          value={expertise}
+                          onChange={(e) => setExpertise(e.target.value)}
+                          placeholder="Primary expertise (e.g. Distributed Systems, AI, Web)"
+                          className="w-full px-3.5 py-2.5 rounded-md border border-neutral-300 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 text-sm transition-all"
+                        />
+                      </div>
+                      <div className="animate-fadeIn">
+                        <input
+                          type="text"
+                          required
+                          value={qualification}
+                          onChange={(e) => setQualification(e.target.value)}
+                          placeholder="Highest qualification (e.g. Ph.D. in CS, M.Tech, Lead Architect)"
+                          className="w-full px-3.5 py-2.5 rounded-md border border-neutral-300 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 text-sm transition-all"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Primary Action Button */}
                   <button
                     type="submit"
                     disabled={isLoading}
@@ -451,7 +548,11 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
                     {isLoading ? (
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
-                      <span>{isSignUp ? 'Sign Up' : 'Log In'}</span>
+                      <span>
+                        {isSignUp
+                          ? (role === 'instructor' ? 'Submit Instructor Registration' : 'Sign Up')
+                          : 'Log In'}
+                      </span>
                     )}
                   </button>
 
@@ -589,3 +690,4 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
     </div>
   );
 }
+
