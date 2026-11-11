@@ -52,3 +52,13 @@ CREATE INDEX idx_course_instructors_instructor_id ON course_instructors(instruct
 -- course_prerequisites: lookups for enrollment eligibility checks (FR-I05)
 CREATE INDEX idx_course_prerequisites_course_id ON course_prerequisites(course_id);
 CREATE INDEX idx_course_prerequisites_required_course_id ON course_prerequisites(required_course_id);
+
+-- course_modules: list ordered modules for a course (FR-I06)
+CREATE INDEX idx_course_modules_course_order ON course_modules(course_id, order_index);
+
+-- course_sections: list ordered sections for a module (FR-I06)
+CREATE INDEX idx_course_sections_module_order ON course_sections(module_id, order_index);
+
+-- lessons: list ordered lessons for a section and filter by type (FR-I06)
+CREATE INDEX idx_lessons_section_order ON lessons(section_id, order_index);
+CREATE INDEX idx_lessons_lesson_type ON lessons(lesson_type);

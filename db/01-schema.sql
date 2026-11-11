@@ -4,6 +4,9 @@
 -- ============================================================
 
 -- Clean slate (safe to re-run during development)
+DROP TABLE IF EXISTS lessons CASCADE;
+DROP TABLE IF EXISTS course_sections CASCADE;
+DROP TABLE IF EXISTS course_modules CASCADE;
 DROP TABLE IF EXISTS course_prerequisites CASCADE;
 DROP TABLE IF EXISTS course_instructors CASCADE;
 DROP TABLE IF EXISTS lecture_progress CASCADE;
@@ -134,6 +137,74 @@ CREATE TABLE course_prerequisites (
 
     CONSTRAINT chk_course_prerequisite_type
         CHECK (prerequisite_type IN ('COURSE', 'SKILL'))
+);
+
+
+-- =========================
+-- TABLE: course_modules
+-- =========================
+-- Course hierarchy Level 1: Modules grouping content within a course (FR-I06)
+CREATE TABLE course_modules (
+    id          SERIAL PRIMARY KEY,
+    course_id   INTEGER      NOT NULL,
+    title       VARCHAR(200) NOT NULL,
+    description TEXT,
+    order_index INTEGER      NOT NULL DEFAULT 0,
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_course_modules_course
+        FOREIGN KEY (course_id)
+        REFERENCES courses(id)
+        ON DELETE CASCADE
+);
+
+
+-- =========================
+-- TABLE: course_sections
+-- =========================
+-- Course hierarchy Level 2: Sections dividing a module into logical topics (FR-I06)
+CREATE TABLE course_sections (
+    id          SERIAL PRIMARY KEY,
+    module_id   INTEGER      NOT NULL,
+    title       VARCHAR(200) NOT NULL,
+    description TEXT,
+    order_index INTEGER      NOT NULL DEFAULT 0,
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_course_sections_module
+        FOREIGN KEY (module_id)
+        REFERENCES course_modules(id)
+        ON DELETE CASCADE
+);
+
+
+-- =========================
+-- TABLE: lessons
+-- =========================
+-- Course hierarchy Level 3: Individual learning units with specific types (FR-I06)
+-- Extensible for quizzes, assignments, materials, and SCORM/xAPI packaging (DR-14)
+CREATE TABLE lessons (
+    id               SERIAL PRIMARY KEY,
+    section_id       INTEGER      NOT NULL,
+    title            VARCHAR(200) NOT NULL,
+    lesson_type      VARCHAR(50)  NOT NULL DEFAULT 'VIDEO',
+    content          TEXT,
+    content_url      VARCHAR(500),
+    duration_minutes INTEGER,
+    order_index      INTEGER      NOT NULL DEFAULT 0,
+    metadata         TEXT,
+    created_at       TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMP    NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_lessons_section
+        FOREIGN KEY (section_id)
+        REFERENCES course_sections(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT chk_lesson_type
+        CHECK (lesson_type IN ('VIDEO', 'MATERIAL', 'QUIZ', 'ASSIGNMENT'))
 );
 
 

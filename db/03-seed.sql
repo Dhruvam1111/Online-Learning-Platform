@@ -4,6 +4,9 @@
 -- ============================================================
 
 -- Clear existing data (safe to re-run)
+DELETE FROM lessons;
+DELETE FROM course_sections;
+DELETE FROM course_modules;
 DELETE FROM course_prerequisites;
 DELETE FROM course_instructors;
 DELETE FROM instructor_upload_history;
@@ -18,6 +21,9 @@ ALTER SEQUENCE users_id_seq RESTART WITH 1;
 ALTER SEQUENCE courses_id_seq RESTART WITH 1;
 ALTER SEQUENCE lectures_id_seq RESTART WITH 1;
 ALTER SEQUENCE enrollments_id_seq RESTART WITH 1;
+ALTER SEQUENCE course_modules_id_seq RESTART WITH 1;
+ALTER SEQUENCE course_sections_id_seq RESTART WITH 1;
+ALTER SEQUENCE lessons_id_seq RESTART WITH 1;
 
 -- =========================
 -- USERS
@@ -154,3 +160,26 @@ INSERT INTO enrollments (student_id, course_id) VALUES
 --   Bob (4):     enrolled in course 1 only, NOT in 2 or 3
 --   Charlie (5): enrolled in course 2 only, NOT in 1 or 3
 --   Nobody is enrolled in course 4 (which is draft anyway)
+
+
+-- =========================
+-- COURSE STRUCTURE (FR-I06)
+-- Modules → Sections → Lessons
+-- =========================
+
+INSERT INTO course_modules (course_id, title, description, order_index) VALUES
+    (1, 'Module 1: Getting Started with HTML', 'Introduction to web markup and structure', 1),
+    (1, 'Module 2: Styling with Modern CSS', 'Cascading Style Sheets, flexbox and grid layouts', 2);
+
+INSERT INTO course_sections (module_id, title, description, order_index) VALUES
+    (1, 'Section 1.1: HTML Basics', 'Core elements and page anatomy', 1),
+    (1, 'Section 1.2: Semantic HTML', 'Accessible and semantic tag usage', 2),
+    (2, 'Section 2.1: CSS Fundamentals', 'Selectors, box model, and cascade', 1);
+
+INSERT INTO lessons (section_id, title, lesson_type, content, content_url, duration_minutes, order_index) VALUES
+    (1, 'Introduction to HTML Tags', 'VIDEO', 'Overview of basic HTML syntax and elements', 'https://www.youtube.com/watch?v=UB1O30fR-EE', 15, 1),
+    (1, 'HTML Document Skeleton', 'MATERIAL', 'Reference guide and starter template code', NULL, 10, 2),
+    (1, 'HTML Quick Check', 'QUIZ', 'Knowledge check on tags and attributes', NULL, 5, 3),
+    (2, 'Semantic Markup Best Practices', 'MATERIAL', 'In-depth reading on landmark elements', NULL, 20, 1),
+    (2, 'Building an Accessible Blog Page', 'ASSIGNMENT', 'Create a semantic HTML portfolio page', NULL, 45, 2),
+    (3, 'Mastering the CSS Box Model', 'VIDEO', 'Detailed visual walkthrough of margin, border, padding', 'https://www.youtube.com/watch?v=rIO5326FgPE', 18, 1);
