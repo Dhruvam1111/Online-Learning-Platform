@@ -4,6 +4,7 @@
 -- ============================================================
 
 -- Clear existing data (safe to re-run)
+DELETE FROM course_association_requests;
 DELETE FROM lessons;
 DELETE FROM course_sections;
 DELETE FROM course_modules;
@@ -24,6 +25,7 @@ ALTER SEQUENCE enrollments_id_seq RESTART WITH 1;
 ALTER SEQUENCE course_modules_id_seq RESTART WITH 1;
 ALTER SEQUENCE course_sections_id_seq RESTART WITH 1;
 ALTER SEQUENCE lessons_id_seq RESTART WITH 1;
+ALTER SEQUENCE course_association_requests_id_seq RESTART WITH 1;
 
 -- =========================
 -- USERS

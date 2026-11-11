@@ -11,7 +11,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -81,8 +80,7 @@ public class CourseStructureService {
                 course.getId(),
                 course.getTitle(),
                 course.getStatus() != null ? course.getStatus().name() : null,
-                moduleResponses
-        );
+                moduleResponses);
     }
 
     // =========================================================================
@@ -112,8 +110,7 @@ public class CourseStructureService {
                 course,
                 title,
                 request.getDescription() != null ? request.getDescription().trim() : null,
-                orderIndex
-        );
+                orderIndex);
 
         CourseModule saved = courseModuleRepository.save(module);
         return CourseModuleResponse.fromEntity(saved, false);
@@ -136,7 +133,8 @@ public class CourseStructureService {
     }
 
     @Transactional
-    public CourseModuleResponse updateModule(User currentUser, Integer courseId, Integer moduleId, CourseModuleRequest request) {
+    public CourseModuleResponse updateModule(User currentUser, Integer courseId, Integer moduleId,
+            CourseModuleRequest request) {
         verifyCourseAssociation(courseId, currentUser);
         CourseModule module = findAndVerifyModule(courseId, moduleId);
 
@@ -169,7 +167,8 @@ public class CourseStructureService {
     }
 
     @Transactional
-    public List<CourseModuleResponse> reorderModules(User currentUser, Integer courseId, ReorderStructureRequest request) {
+    public List<CourseModuleResponse> reorderModules(User currentUser, Integer courseId,
+            ReorderStructureRequest request) {
         verifyCourseAssociation(courseId, currentUser);
 
         if (request == null || request.getOrderedIds() == null || request.getOrderedIds().isEmpty()) {
@@ -194,7 +193,8 @@ public class CourseStructureService {
     // =========================================================================
 
     @Transactional
-    public CourseSectionResponse createSection(User currentUser, Integer courseId, Integer moduleId, CourseSectionRequest request) {
+    public CourseSectionResponse createSection(User currentUser, Integer courseId, Integer moduleId,
+            CourseSectionRequest request) {
         verifyCourseAssociation(courseId, currentUser);
         CourseModule module = findAndVerifyModule(courseId, moduleId);
 
@@ -217,8 +217,7 @@ public class CourseStructureService {
                 module,
                 title,
                 request.getDescription() != null ? request.getDescription().trim() : null,
-                orderIndex
-        );
+                orderIndex);
 
         CourseSection saved = courseSectionRepository.save(section);
         return CourseSectionResponse.fromEntity(saved, false);
@@ -244,7 +243,8 @@ public class CourseStructureService {
     }
 
     @Transactional
-    public CourseSectionResponse updateSection(User currentUser, Integer courseId, Integer moduleId, Integer sectionId, CourseSectionRequest request) {
+    public CourseSectionResponse updateSection(User currentUser, Integer courseId, Integer moduleId, Integer sectionId,
+            CourseSectionRequest request) {
         verifyCourseAssociation(courseId, currentUser);
         findAndVerifyModule(courseId, moduleId);
         CourseSection section = findAndVerifySection(moduleId, sectionId);
@@ -279,7 +279,8 @@ public class CourseStructureService {
     }
 
     @Transactional
-    public List<CourseSectionResponse> reorderSections(User currentUser, Integer courseId, Integer moduleId, ReorderStructureRequest request) {
+    public List<CourseSectionResponse> reorderSections(User currentUser, Integer courseId, Integer moduleId,
+            ReorderStructureRequest request) {
         verifyCourseAssociation(courseId, currentUser);
         findAndVerifyModule(courseId, moduleId);
 
@@ -305,7 +306,8 @@ public class CourseStructureService {
     // =========================================================================
 
     @Transactional
-    public LessonResponse createLesson(User currentUser, Integer courseId, Integer moduleId, Integer sectionId, LessonRequest request) {
+    public LessonResponse createLesson(User currentUser, Integer courseId, Integer moduleId, Integer sectionId,
+            LessonRequest request) {
         verifyCourseAssociation(courseId, currentUser);
         findAndVerifyModule(courseId, moduleId);
         CourseSection section = findAndVerifySection(moduleId, sectionId);
@@ -335,8 +337,7 @@ public class CourseStructureService {
                 request.getContentUrl() != null ? request.getContentUrl().trim() : null,
                 request.getDurationMinutes(),
                 orderIndex,
-                request.getMetadata()
-        );
+                request.getMetadata());
 
         Lesson saved = lessonRepository.save(lesson);
         return LessonResponse.fromEntity(saved);
@@ -355,7 +356,8 @@ public class CourseStructureService {
     }
 
     @Transactional(readOnly = true)
-    public LessonResponse getLesson(User currentUser, Integer courseId, Integer moduleId, Integer sectionId, Integer lessonId) {
+    public LessonResponse getLesson(User currentUser, Integer courseId, Integer moduleId, Integer sectionId,
+            Integer lessonId) {
         verifyCourseAssociation(courseId, currentUser);
         findAndVerifyModule(courseId, moduleId);
         findAndVerifySection(moduleId, sectionId);
@@ -364,7 +366,8 @@ public class CourseStructureService {
     }
 
     @Transactional
-    public LessonResponse updateLesson(User currentUser, Integer courseId, Integer moduleId, Integer sectionId, Integer lessonId, LessonRequest request) {
+    public LessonResponse updateLesson(User currentUser, Integer courseId, Integer moduleId, Integer sectionId,
+            Integer lessonId, LessonRequest request) {
         verifyCourseAssociation(courseId, currentUser);
         findAndVerifyModule(courseId, moduleId);
         findAndVerifySection(moduleId, sectionId);
@@ -403,7 +406,8 @@ public class CourseStructureService {
     }
 
     @Transactional
-    public ApiResponse deleteLesson(User currentUser, Integer courseId, Integer moduleId, Integer sectionId, Integer lessonId) {
+    public ApiResponse deleteLesson(User currentUser, Integer courseId, Integer moduleId, Integer sectionId,
+            Integer lessonId) {
         verifyCourseAssociation(courseId, currentUser);
         findAndVerifyModule(courseId, moduleId);
         findAndVerifySection(moduleId, sectionId);
@@ -413,7 +417,8 @@ public class CourseStructureService {
     }
 
     @Transactional
-    public List<LessonResponse> reorderLessons(User currentUser, Integer courseId, Integer moduleId, Integer sectionId, ReorderStructureRequest request) {
+    public List<LessonResponse> reorderLessons(User currentUser, Integer courseId, Integer moduleId, Integer sectionId,
+            ReorderStructureRequest request) {
         verifyCourseAssociation(courseId, currentUser);
         findAndVerifyModule(courseId, moduleId);
         findAndVerifySection(moduleId, sectionId);
@@ -455,7 +460,8 @@ public class CourseStructureService {
         boolean isAdmin = "admin".equalsIgnoreCase(currentUser.getRole());
 
         if (!isOwner && !isCoInstructor && !isAdmin) {
-            throw new AccessDeniedException("Cannot modify course structure: you are not an authorized instructor for this course");
+            throw new AccessDeniedException(
+                    "Cannot modify course structure: you are not an authorized instructor for this course");
         }
 
         return course;
@@ -495,7 +501,8 @@ public class CourseStructureService {
         if (!"instructor".equalsIgnoreCase(currentUser.getRole()) && !"admin".equalsIgnoreCase(currentUser.getRole())) {
             throw new AccessDeniedException("Access denied: only instructors or admins can manage course structure");
         }
-        if ("instructor".equalsIgnoreCase(currentUser.getRole()) && !"active".equalsIgnoreCase(currentUser.getAccountStatus())) {
+        if ("instructor".equalsIgnoreCase(currentUser.getRole())
+                && !"active".equalsIgnoreCase(currentUser.getAccountStatus())) {
             throw new AccessDeniedException("Access denied: Instructor account is awaiting admin approval");
         }
     }
@@ -512,4 +519,3 @@ public class CourseStructureService {
         }
     }
 }
-

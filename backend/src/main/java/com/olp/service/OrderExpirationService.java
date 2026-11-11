@@ -4,7 +4,6 @@ import com.olp.entity.Payment;
 import com.olp.repository.PaymentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,7 +14,8 @@ import java.util.List;
 /**
  * Service managing automatic session expiration and stale order cleanup.
  * Owned by Shubh (Order Lifecycle Engine).
- * Releases held discounts and returns reserved wallet funds when checkout times out.
+ * Releases held discounts and returns reserved wallet funds when checkout times
+ * out.
  */
 @Service
 public class OrderExpirationService {
@@ -26,7 +26,7 @@ public class OrderExpirationService {
     private final WalletService walletService;
 
     public OrderExpirationService(PaymentRepository paymentRepository,
-                                  WalletService walletService) {
+            WalletService walletService) {
         this.paymentRepository = paymentRepository;
         this.walletService = walletService;
     }
@@ -42,7 +42,8 @@ public class OrderExpirationService {
         int expiredCount = 0;
         for (String orderId : staleOrders) {
             Payment payment = paymentRepository.findByOrderIdForUpdate(orderId).orElse(null);
-            if (payment == null || !"created".equalsIgnoreCase(payment.getStatus())) continue;
+            if (payment == null || !"created".equalsIgnoreCase(payment.getStatus()))
+                continue;
             payment.setStatus("expired");
             payment.setFailureReason("Checkout authorization session timed out ");
 
@@ -51,8 +52,7 @@ public class OrderExpirationService {
                 walletService.creditWallet(
                         payment.getStudent(),
                         payment.getWalletAmountUsed(),
-                        "Auto-refund from expired checkout order " + payment.getOrderId()
-                );
+                        "Auto-refund from expired checkout order " + payment.getOrderId());
                 log.info("[Order Expiry] Restored ₹{} wallet credits to Student ID {}",
                         payment.getWalletAmountUsed(), payment.getStudent().getId());
             }

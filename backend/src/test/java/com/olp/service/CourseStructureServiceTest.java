@@ -2,7 +2,6 @@ package com.olp.service;
 
 import com.olp.dto.*;
 import com.olp.entity.*;
-import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,8 +11,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 
 import java.util.List;
 import java.util.Optional;
@@ -333,23 +330,27 @@ class CourseStructureServiceTest {
         });
 
         // 1. VIDEO
-        LessonRequest videoReq = new LessonRequest("Video Lesson", "VIDEO", "Overview", "https://youtube.com/v1", 10, null, "{}");
+        LessonRequest videoReq = new LessonRequest("Video Lesson", "VIDEO", "Overview", "https://youtube.com/v1", 10,
+                null, "{}");
         LessonResponse videoRes = service.createLesson(owner, 10, 101, 201, videoReq);
         assertEquals("VIDEO", videoRes.getLessonType());
         assertEquals("https://youtube.com/v1", videoRes.getContentUrl());
 
         // 2. MATERIAL
-        LessonRequest materialReq = new LessonRequest("Reading Material", "MATERIAL", "# Markdown Guide", null, 15, null, null);
+        LessonRequest materialReq = new LessonRequest("Reading Material", "MATERIAL", "# Markdown Guide", null, 15,
+                null, null);
         LessonResponse matRes = service.createLesson(owner, 10, 101, 201, materialReq);
         assertEquals("MATERIAL", matRes.getLessonType());
 
         // 3. QUIZ
-        LessonRequest quizReq = new LessonRequest("Quiz Check", "QUIZ", "Quiz instructions", null, 5, null, "{\"quizId\": 10}");
+        LessonRequest quizReq = new LessonRequest("Quiz Check", "QUIZ", "Quiz instructions", null, 5, null,
+                "{\"quizId\": 10}");
         LessonResponse quizRes = service.createLesson(owner, 10, 101, 201, quizReq);
         assertEquals("QUIZ", quizRes.getLessonType());
 
         // 4. ASSIGNMENT
-        LessonRequest assignReq = new LessonRequest("Final Assignment", "ASSIGNMENT", "Build portfolio", null, 60, null, null);
+        LessonRequest assignReq = new LessonRequest("Final Assignment", "ASSIGNMENT", "Build portfolio", null, 60, null,
+                null);
         LessonResponse assignRes = service.createLesson(owner, 10, 101, 201, assignReq);
         assertEquals("ASSIGNMENT", assignRes.getLessonType());
     }
@@ -401,7 +402,8 @@ class CourseStructureServiceTest {
         when(lessonRepository.findByIdAndSectionId(301, 201)).thenReturn(Optional.of(lesson));
         when(lessonRepository.save(any(Lesson.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        LessonRequest req = new LessonRequest("New Lesson Title", "MATERIAL", "Updated Content", "https://doc.com", 25, 2, "{\"scorm\": true}");
+        LessonRequest req = new LessonRequest("New Lesson Title", "MATERIAL", "Updated Content", "https://doc.com", 25,
+                2, "{\"scorm\": true}");
         LessonResponse response = service.updateLesson(owner, 10, 101, 201, 301, req);
 
         assertEquals("New Lesson Title", response.getTitle());
@@ -496,4 +498,3 @@ class CourseStructureServiceTest {
         assertEquals("Lesson 1.1.1", response.getModules().get(0).getSections().get(0).getLessons().get(0).getTitle());
     }
 }
-

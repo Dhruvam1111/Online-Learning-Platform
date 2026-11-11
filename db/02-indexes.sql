@@ -74,3 +74,11 @@ CREATE INDEX idx_course_sections_module_order ON course_sections(module_id, orde
 -- lessons: list ordered lessons for a section and filter by type (FR-I06)
 CREATE INDEX idx_lessons_section_order ON lessons(section_id, order_index);
 CREATE INDEX idx_lessons_lesson_type ON lessons(lesson_type);
+
+-- course_association_requests: lookups, admin queue, and duplicate pending guard (FR-I58)
+CREATE INDEX idx_assoc_req_instructor_id ON course_association_requests(instructor_id);
+CREATE INDEX idx_assoc_req_course_id ON course_association_requests(course_id);
+CREATE INDEX idx_assoc_req_status ON course_association_requests(status);
+CREATE UNIQUE INDEX uq_assoc_req_pending_course_instructor
+    ON course_association_requests(course_id, instructor_id)
+    WHERE status = 'PENDING';

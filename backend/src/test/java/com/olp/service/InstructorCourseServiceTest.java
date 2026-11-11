@@ -88,7 +88,8 @@ class InstructorCourseServiceTest {
     void testResolveUser_NullPrincipal_Throws() {
         Authentication auth = mock(Authentication.class);
 
-        InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class, () -> service.resolveUser(auth));
+        InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class,
+                () -> service.resolveUser(auth));
 
         assertTrue(ex.getMessage().contains("not authenticated"));
     }
@@ -116,7 +117,8 @@ class InstructorCourseServiceTest {
         Authentication auth = new UsernamePasswordAuthenticationToken("ghost@olp.com", null);
         when(userRepository.findByEmail("ghost@olp.com")).thenReturn(Optional.empty());
 
-        InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class, () -> service.resolveUser(auth));
+        InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class,
+                () -> service.resolveUser(auth));
 
         assertTrue(ex.getMessage().contains("User not found"));
     }
@@ -131,7 +133,8 @@ class InstructorCourseServiceTest {
 
     @Test
     void testGetInstructorCourses_NonInstructor_ThrowsAccessDenied() {
-        AccessDeniedException ex = assertThrows(AccessDeniedException.class, () -> service.getInstructorCourses(student(2)));
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> service.getInstructorCourses(student(2)));
 
         assertTrue(ex.getMessage().contains("only instructors"));
         verifyNoInteractions(courseRepository);
@@ -202,7 +205,8 @@ class InstructorCourseServiceTest {
         User owner = instructor(1);
         stubSaveReturnsArgument();
 
-        CourseResponse response = service.createCourse(owner, new CreateCourseRequest("  Spring Boot  ", "  Learn it  "));
+        CourseResponse response = service.createCourse(owner,
+                new CreateCourseRequest("  Spring Boot  ", "  Learn it  "));
 
         ArgumentCaptor<Course> captor = ArgumentCaptor.forClass(Course.class);
         verify(courseRepository, times(1)).save(captor.capture());
@@ -242,7 +246,8 @@ class InstructorCourseServiceTest {
                 .thenAnswer(inv -> inv.getArgument(0));
 
         CoursePrerequisiteRequest p1 = new CoursePrerequisiteRequest("COURSE", 5, null, "Must complete course 5");
-        CoursePrerequisiteRequest p2 = new CoursePrerequisiteRequest("SKILL", null, "Basic Java", "Familiarity with syntax");
+        CoursePrerequisiteRequest p2 = new CoursePrerequisiteRequest("SKILL", null, "Basic Java",
+                "Familiarity with syntax");
         List<String> outcomes = List.of("Master Spring Boot", "Build microservices");
 
         CreateCourseRequest request = new CreateCourseRequest(
@@ -250,8 +255,7 @@ class InstructorCourseServiceTest {
                 "Deep dive into production engineering",
                 "Software Engineering",
                 List.of(p1, p2),
-                outcomes
-        );
+                outcomes);
 
         CourseResponse response = service.createCourse(owner, request);
 
@@ -277,8 +281,7 @@ class InstructorCourseServiceTest {
 
         CreateCourseRequest request = new CreateCourseRequest(
                 "Earn an Accredited Degree in 3 Months",
-                "Valid description"
-        );
+                "Valid description");
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> service.createCourse(owner, request));
@@ -291,8 +294,7 @@ class InstructorCourseServiceTest {
 
         CreateCourseRequest request = new CreateCourseRequest(
                 "Full Stack Web Development",
-                "This course offers university degree equivalence for tech jobs."
-        );
+                "This course offers university degree equivalence for tech jobs.");
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> service.createCourse(owner, request));
@@ -316,8 +318,7 @@ class InstructorCourseServiceTest {
 
         CreateCourseRequest request = new CreateCourseRequest(
                 "Valid Title", "Desc", "Category",
-                null, List.of("Valid Outcome", "   ")
-        );
+                null, List.of("Valid Outcome", "   "));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> service.createCourse(owner, request));
@@ -331,8 +332,7 @@ class InstructorCourseServiceTest {
         CoursePrerequisiteRequest badPrereq = new CoursePrerequisiteRequest("UNKNOWN", "Some requirement");
         CreateCourseRequest request = new CreateCourseRequest(
                 "Valid Title", "Desc", "Category",
-                List.of(badPrereq), null
-        );
+                List.of(badPrereq), null);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> service.createCourse(owner, request));
@@ -347,8 +347,7 @@ class InstructorCourseServiceTest {
         CoursePrerequisiteRequest p = new CoursePrerequisiteRequest("COURSE", 999, null, null);
         CreateCourseRequest request = new CreateCourseRequest(
                 "Valid Title", "Desc", "Category",
-                List.of(p), null
-        );
+                List.of(p), null);
 
         assertThrows(ResourceNotFoundException.class, () -> service.createCourse(owner, request));
     }
@@ -464,7 +463,8 @@ class InstructorCourseServiceTest {
         Course existing = givenOwnedCourse(10, instructor(1));
         stubSaveReturnsArgument();
 
-        CourseResponse response = service.updateCourse(instructor(1), 10, new UpdateCourseRequest("  New Title  ", "  New Desc  "));
+        CourseResponse response = service.updateCourse(instructor(1), 10,
+                new UpdateCourseRequest("  New Title  ", "  New Desc  "));
 
         assertEquals("New Title", existing.getTitle());
         assertEquals("  New Desc  ", existing.getDescription());
@@ -680,9 +680,8 @@ class InstructorCourseServiceTest {
 
     @Test
     void testSaveDraft_ExistingDraft_CoInstructorAllowed() {
-        User owner = instructor(1);
+        givenOwnedCourse(10, instructor(1));
         User coInstructor = instructor(2);
-        Course existing = givenOwnedCourse(10, owner);
         when(courseInstructorRepository.existsByCourseIdAndInstructorId(10, 2)).thenReturn(true);
         stubSaveReturnsArgument();
 
