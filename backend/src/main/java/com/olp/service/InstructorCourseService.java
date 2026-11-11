@@ -63,6 +63,7 @@ public class InstructorCourseService {
 
     /**
      * Create a new course for the authenticated instructor (starts in DRAFT status).
+     * FR-I01: Pending instructors are prevented from creating courses.
      */
     @Transactional
     public CourseResponse createCourse(User currentUser, CreateCourseRequest request) {
@@ -153,6 +154,10 @@ public class InstructorCourseService {
         }
         if (!"instructor".equalsIgnoreCase(currentUser.getRole())) {
             throw new AccessDeniedException("Access denied: only instructors can access instructor courses");
+        }
+        // FR-I01: Unapproved / pending instructors cannot access course management/creation
+        if (!"active".equalsIgnoreCase(currentUser.getAccountStatus())) {
+            throw new AccessDeniedException("Access denied: Instructor account is awaiting admin approval");
         }
     }
 }

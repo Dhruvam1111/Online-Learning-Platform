@@ -22,7 +22,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity  // enables @PreAuthorize on controller methods
+@EnableMethodSecurity // enables @PreAuthorize on controller methods
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -44,8 +44,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
                 // Stateless sessions — no server-side session, JWT only
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 // URL-level access rules
                 .authorizeHttpRequests(auth -> auth
@@ -54,7 +53,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/google").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/password-reset/**", "/api/auth/otp/**").permitAll()
                         .requestMatchers("/api/auth/password-reset/**", "/api/auth/otp/**").permitAll()
-
+                        .requestMatchers(HttpMethod.GET, "/api/auth/verify-email").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
                         // Admin endpoints require ROLE_admin
@@ -64,8 +63,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/instructor/**", "/api/instructors/**").hasRole("instructor")
 
                         // Everything else requires authentication
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
 
                 // Add our JWT filter BEFORE Spring's default username/password filter
                 .addFilterBefore(jwtAuthenticationFilter,
@@ -86,8 +84,7 @@ public class SecurityConfig {
 
         List<String> origins = new ArrayList<>(List.of(
                 "http://localhost:*",
-                "http://127.0.0.1:*"
-        ));
+                "http://127.0.0.1:*"));
 
         if (allowedOrigins != null && !allowedOrigins.isBlank()) {
             Arrays.stream(allowedOrigins.split(","))

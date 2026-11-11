@@ -46,6 +46,17 @@ public class AuthController {
     }
 
     /**
+     * GET /api/auth/verify-email?token=...
+     * Public — no token header required.
+     * FR-I01: Validates instructor email verification link.
+     */
+    @GetMapping("/verify-email")
+    public ResponseEntity<ApiResponse> verifyEmail(@RequestParam("token") String token) {
+        ApiResponse response = authService.verifyEmail(token);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * POST /api/auth/google
      * Public — authenticate or auto-register via official Google account.
      */
