@@ -1,10 +1,14 @@
 package com.olp.dto;
 
 import com.olp.entity.Course;
+import com.olp.entity.CourseInstructor;
+import com.olp.entity.CourseInstructorRole;
 import com.olp.entity.CourseStatus;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class CourseResponse {
 
@@ -15,6 +19,7 @@ public class CourseResponse {
     private String category = "General";
     private List<String> learningOutcomes = new ArrayList<>();
     private List<CoursePrerequisiteResponse> prerequisites = new ArrayList<>();
+    private List<CourseInstructorResponse> instructors = new ArrayList<>();
     private CourseStatus status;
     private LocalDateTime createdAt;
 
@@ -52,7 +57,7 @@ public class CourseResponse {
                     .toList();
         }
 
-        return new CourseResponse(
+        CourseResponse response = new CourseResponse(
                 course.getId(),
                 course.getInstructor() != null ? course.getInstructor().getId() : null,
                 course.getTitle(),
@@ -63,6 +68,25 @@ public class CourseResponse {
                 course.getLearningOutcomesList(),
                 prereqResponses
         );
+
+        Map<Integer, CourseInstructorResponse> instructorMap = new LinkedHashMap<>();
+        if (course.getInstructor() != null && course.getInstructor().getId() != null) {
+            instructorMap.put(
+                    course.getInstructor().getId(),
+                    CourseInstructorResponse.fromUser(
+                            course.getInstructor(), CourseInstructorRole.OWNER, null, course.getCreatedAt()));
+        }
+        if (course.getInstructors() != null) {
+            for (CourseInstructor ci : course.getInstructors()) {
+                if (ci != null && ci.getInstructor() != null && ci.getInstructor().getId() != null) {
+                    CourseInstructorResponse mapped = CourseInstructorResponse.from(ci, null);
+                    instructorMap.put(ci.getInstructor().getId(), mapped);
+                }
+            }
+        }
+        response.setInstructors(new ArrayList<>(instructorMap.values()));
+
+        return response;
     }
 
     // ===== Getters and Setters =====
@@ -121,6 +145,14 @@ public class CourseResponse {
 
     public void setPrerequisites(List<CoursePrerequisiteResponse> prerequisites) {
         this.prerequisites = prerequisites != null ? prerequisites : new ArrayList<>();
+    }
+
+    public List<CourseInstructorResponse> getInstructors() {
+        return instructors;
+    }
+
+    public void setInstructors(List<CourseInstructorResponse> instructors) {
+        this.instructors = instructors != null ? instructors : new ArrayList<>();
     }
 
     public CourseStatus getStatus() {

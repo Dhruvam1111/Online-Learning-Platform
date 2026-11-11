@@ -4,12 +4,14 @@ import com.olp.dto.AvailableCourseAssociationResponse;
 import com.olp.dto.CourseAssociationRequestDto;
 import com.olp.dto.CourseAssociationRequestResponse;
 import com.olp.dto.CourseAssociationReviewRequest;
+import com.olp.dto.CourseInstructorResponse;
 import com.olp.entity.*;
 import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.CourseAssociationRequestRepository;
 import com.olp.repository.CourseInstructorRepository;
 import com.olp.repository.CourseRepository;
+import com.olp.repository.InstructorProfileRepository;
 import com.olp.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,6 +41,8 @@ class CourseAssociationServiceTest {
     private UserRepository userRepository;
     @Mock
     private EmailService emailService;
+    @Mock
+    private InstructorProfileRepository instructorProfileRepository;
 
     @InjectMocks
     private CourseAssociationService service;
@@ -338,7 +342,8 @@ class CourseAssociationServiceTest {
         verify(courseInstructorRepository).save(ciCaptor.capture());
         assertEquals(10, ciCaptor.getValue().getCourse().getId());
         assertEquals(2, ciCaptor.getValue().getInstructor().getId());
-        assertEquals("co-instructor", ciCaptor.getValue().getRole());
+        assertEquals(CourseInstructorRole.CO_INSTRUCTOR, ciCaptor.getValue().getRole());
+        assertTrue(ciCaptor.getValue().isCoInstructor());
 
         verify(emailService).sendCourseAssociationDecisionEmail(
                 "inst2@olp.com", "Prof. James", "Databases",
@@ -403,6 +408,72 @@ class CourseAssociationServiceTest {
         assertThrows(AccessDeniedException.class, () -> service.submitAssociationRequest(student(3), 10, null));
         assertThrows(AccessDeniedException.class, () -> service.submitAssociationRequest(pendingInstructor(4), 10, null));
         assertThrows(AccessDeniedException.class, () -> service.getMyRequests(student(3), null));
+    }
+
+    // =========================================================================
+    // 5. FR-I59: MULTIPLE CO-INSTRUCTORS & ADMIN RETRIEVAL
+    // =========================================================================
+
+    @Test
+    void testSubmitAndApprove_UpperCaseCoInstructorRole_MultipleInstructorsAssociated() {
+        User owner = instructor(1, "Dr. Sarah");
+        User co1 = instructor(2, "Prof. James");
+        User co2 = instructor(3, "Dr. Priya");
+        User platformAdmin = admin(99);
+        Course target = course(10, owner, "Databases", "Databases", CourseStatus.PUBLISHED);
+
+        when(courseRepository.findById(10)).thenReturn(Optional.of(target));
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(10, 2)).thenReturn(false);
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(10, 3)).thenReturn(false);
+        when(requestRepository.existsByCourseIdAndInstructorIdAndStatus(10, 2, AssociationRequestStatus.PENDING))
+                .thenReturn(false);
+        when(requestRepository.existsByCourseIdAndInstructorIdAndStatus(10, 3, AssociationRequestStatus.PENDING))
+                .thenReturn(false);
+        when(requestRepository.save(any(CourseAssociationRequest.class))).thenAnswer(inv -> {
+            CourseAssociationRequest r = inv.getArgument(0);
+            if (r.getId() == null) {
+                r.setId(r.getInstructor().getId().equals(2) ? 501 : 502);
+            }
+            return r;
+        });
+
+        CourseAssociationRequestResponse req1 = service.submitAssociationRequest(
+                co1, 10, new CourseAssociationRequestDto(null, "CO_INSTRUCTOR", "Can lead SQL"));
+        CourseAssociationRequestResponse req2 = service.submitAssociationRequest(
+                co2, 10, new CourseAssociationRequestDto(null, "CO_INSTRUCTOR", "Can grade labs"));
+
+        CourseAssociationRequest entity1 = new CourseAssociationRequest(target, co1, req1.getRequestedRole(), req1.getMessage());
+        entity1.setId(501);
+        CourseAssociationRequest entity2 = new CourseAssociationRequest(target, co2, req2.getRequestedRole(), req2.getMessage());
+        entity2.setId(502);
+
+        when(requestRepository.findByIdWithDetails(501)).thenReturn(Optional.of(entity1));
+        when(requestRepository.findByIdWithDetails(502)).thenReturn(Optional.of(entity2));
+
+        service.approveRequest(platformAdmin, 501, null);
+        service.approveRequest(platformAdmin, 502, null);
+
+        verify(courseInstructorRepository, times(2)).save(any(CourseInstructor.class));
+    }
+
+    @Test
+    void testGetCourseInstructorsForAdmin_SuccessAndNonAdminDenied() {
+        User owner = instructor(1, "Dr. Sarah");
+        User co1 = instructor(2, "Prof. James");
+        Course target = course(10, owner, "Databases", "Databases", CourseStatus.DRAFT);
+
+        when(courseRepository.findById(10)).thenReturn(Optional.of(target));
+        when(courseInstructorRepository.findByCourseIdWithInstructor(10)).thenReturn(List.of(
+                new CourseInstructor(target, owner, CourseInstructorRole.OWNER),
+                new CourseInstructor(target, co1, CourseInstructorRole.CO_INSTRUCTOR)
+        ));
+
+        List<CourseInstructorResponse> list = service.getCourseInstructorsForAdmin(admin(99), 10);
+
+        assertEquals(2, list.size());
+        assertEquals(CourseInstructorRole.OWNER, list.get(0).getRole());
+        assertEquals(CourseInstructorRole.CO_INSTRUCTOR, list.get(1).getRole());
+        assertThrows(AccessDeniedException.class, () -> service.getCourseInstructorsForAdmin(owner, 10));
     }
 }
 

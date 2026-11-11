@@ -8,6 +8,7 @@ import com.olp.entity.Course;
 import com.olp.entity.CourseStatus;
 import com.olp.entity.Lecture;
 import com.olp.entity.User;
+import com.olp.repository.CourseInstructorRepository;
 import com.olp.repository.CourseRepository;
 import com.olp.repository.LectureRepository;
 import com.olp.repository.UserRepository;
@@ -36,6 +37,9 @@ class InstructorAuthorizationTest {
 
     @Mock
     private LectureRepository lectureRepository;
+
+    @Mock
+    private CourseInstructorRepository courseInstructorRepository;
 
     @InjectMocks
     private InstructorCourseService instructorCourseService;
@@ -151,5 +155,30 @@ class InstructorAuthorizationTest {
         assertEquals(4, response.getOrderIndex());
         verify(lectureRepository, times(1)).countByCourseId(100);
         verify(lectureRepository, times(1)).save(any(Lecture.class));
+    }
+
+    @Test
+    void testCreateLecture_CoInstructorAllowed_UnassociatedInstructorDenied() {
+        User coInstructor = new User("Dr. Co", "co@olp.com", "hash", "instructor", "active");
+        coInstructor.setId(21);
+        User stranger = new User("Dr. Stranger", "stranger@olp.com", "hash", "instructor", "active");
+        stranger.setId(22);
+
+        when(courseRepository.findById(100)).thenReturn(Optional.of(ownedCourse));
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(100, 21)).thenReturn(true);
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(100, 22)).thenReturn(false);
+        when(lectureRepository.countByCourseId(100)).thenReturn(0);
+        when(lectureRepository.save(any(Lecture.class))).thenAnswer(inv -> {
+            Lecture l = inv.getArgument(0);
+            l.setId(502);
+            return l;
+        });
+
+        CreateLectureRequest req = new CreateLectureRequest("Co Lecture", "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+        LectureResponse created = instructorLectureService.createLecture(coInstructor, 100, req);
+
+        assertEquals(502, created.getId());
+        assertThrows(AccessDeniedException.class,
+                () -> instructorLectureService.createLecture(stranger, 100, req));
     }
 }

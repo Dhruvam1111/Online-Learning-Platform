@@ -4,8 +4,8 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 /**
- * Entity representing an instructor associated with a course (FR-I05, FR-I59).
- * Every course creator is initially assigned the 'owner' role.
+ * Entity representing an instructor associated with a course (FR-I05, FR-I58, FR-I59).
+ * Supports OWNER (course creator) and CO_INSTRUCTOR roles.
  */
 @Entity
 @Table(name = "course_instructors", uniqueConstraints = {
@@ -25,18 +25,26 @@ public class CourseInstructor {
     @JoinColumn(name = "instructor_id", nullable = false)
     private User instructor;
 
+    @Convert(converter = CourseInstructorRoleConverter.class)
     @Column(nullable = false, length = 50)
-    private String role = "owner"; // 'owner' or 'co-instructor'
+    private CourseInstructorRole role = CourseInstructorRole.OWNER;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     public CourseInstructor() {}
 
-    public CourseInstructor(Course course, User instructor, String role) {
+    public CourseInstructor(Course course, User instructor, CourseInstructorRole role) {
         this.course = course;
         this.instructor = instructor;
-        this.role = role != null ? role : "owner";
+        this.role = role != null ? role : CourseInstructorRole.OWNER;
+    }
+
+    public CourseInstructor(Course course, User instructor, String role) {
+        this(course, instructor,
+                (role != null && !role.trim().isEmpty())
+                        ? CourseInstructorRole.fromString(role)
+                        : CourseInstructorRole.OWNER);
     }
 
     @PrePersist
@@ -45,8 +53,16 @@ public class CourseInstructor {
             this.createdAt = LocalDateTime.now();
         }
         if (this.role == null) {
-            this.role = "owner";
+            this.role = CourseInstructorRole.OWNER;
         }
+    }
+
+    public boolean isOwner() {
+        return this.role == CourseInstructorRole.OWNER;
+    }
+
+    public boolean isCoInstructor() {
+        return this.role == CourseInstructorRole.CO_INSTRUCTOR;
     }
 
     public Integer getId() {
@@ -73,12 +89,16 @@ public class CourseInstructor {
         this.instructor = instructor;
     }
 
-    public String getRole() {
+    public CourseInstructorRole getRole() {
         return role;
     }
 
-    public void setRole(String role) {
+    public void setRole(CourseInstructorRole role) {
         this.role = role;
+    }
+
+    public void setRole(String role) {
+        this.role = role != null ? CourseInstructorRole.fromString(role) : null;
     }
 
     public LocalDateTime getCreatedAt() {

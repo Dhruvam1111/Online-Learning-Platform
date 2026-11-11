@@ -1,6 +1,7 @@
 package com.olp.service;
 
 import com.olp.dto.CourseDraftRequest;
+import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CoursePrerequisiteRequest;
 import com.olp.dto.CourseResponse;
 import com.olp.dto.CreateCourseRequest;
@@ -8,6 +9,7 @@ import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
 import com.olp.entity.Course;
 import com.olp.entity.CourseInstructor;
+import com.olp.entity.CourseInstructorRole;
 import com.olp.entity.CoursePrerequisite;
 import com.olp.entity.CourseStatus;
 import com.olp.entity.User;
@@ -16,6 +18,7 @@ import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.CourseInstructorRepository;
 import com.olp.repository.CoursePrerequisiteRepository;
 import com.olp.repository.CourseRepository;
+import com.olp.repository.InstructorProfileRepository;
 import com.olp.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
@@ -47,9 +50,18 @@ public class InstructorCourseService {
     private final UserRepository userRepository;
     private final CourseInstructorRepository courseInstructorRepository;
     private final CoursePrerequisiteRepository coursePrerequisiteRepository;
+    private final InstructorProfileRepository instructorProfileRepository;
 
     public InstructorCourseService(CourseRepository courseRepository, UserRepository userRepository) {
-        this(courseRepository, userRepository, null, null);
+        this(courseRepository, userRepository, null, null, null);
+    }
+
+    public InstructorCourseService(
+            CourseRepository courseRepository,
+            UserRepository userRepository,
+            CourseInstructorRepository courseInstructorRepository,
+            CoursePrerequisiteRepository coursePrerequisiteRepository) {
+        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository, null);
     }
 
     @Autowired
@@ -57,11 +69,13 @@ public class InstructorCourseService {
             CourseRepository courseRepository,
             UserRepository userRepository,
             @Autowired(required = false) CourseInstructorRepository courseInstructorRepository,
-            @Autowired(required = false) CoursePrerequisiteRepository coursePrerequisiteRepository) {
+            @Autowired(required = false) CoursePrerequisiteRepository coursePrerequisiteRepository,
+            @Autowired(required = false) InstructorProfileRepository instructorProfileRepository) {
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.courseInstructorRepository = courseInstructorRepository;
         this.coursePrerequisiteRepository = coursePrerequisiteRepository;
+        this.instructorProfileRepository = instructorProfileRepository;
     }
 
     /**
@@ -91,7 +105,7 @@ public class InstructorCourseService {
         validateInstructor(currentUser);
 
         return findAllAssociatedCourses(currentUser).stream()
-                .map(CourseResponse::fromEntity)
+                .map(this::enrichCourseResponse)
                 .toList();
     }
 
@@ -104,7 +118,7 @@ public class InstructorCourseService {
 
         return findAllAssociatedCourses(currentUser).stream()
                 .filter(c -> c.getStatus() == CourseStatus.DRAFT)
-                .map(CourseResponse::fromEntity)
+                .map(this::enrichCourseResponse)
                 .toList();
     }
 
@@ -115,7 +129,66 @@ public class InstructorCourseService {
     public CourseResponse getInstructorCourseById(User currentUser, Integer courseId) {
         validateInstructor(currentUser);
         Course course = findCourseAndVerifyOwnership(courseId, currentUser);
-        return CourseResponse.fromEntity(course);
+        return enrichCourseResponse(course);
+    }
+
+    /**
+     * FR-I59 — Retrieve all instructors associated with a course, including roles and basic profile info.
+     * Accessible to associated instructors (OWNER / CO_INSTRUCTOR) and admins.
+     */
+    @Transactional(readOnly = true)
+    public List<CourseInstructorResponse> getCourseInstructors(User currentUser, Integer courseId) {
+        if (currentUser == null) {
+            throw new InvalidCredentialsException("User is not authenticated");
+        }
+        boolean isAdmin = "admin".equalsIgnoreCase(currentUser.getRole());
+        Course course;
+        if (isAdmin) {
+            if (courseId == null) {
+                throw new IllegalArgumentException("Course ID cannot be null");
+            }
+            course = courseRepository.findById(courseId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
+        } else {
+            validateInstructor(currentUser);
+            course = findCourseAndVerifyOwnership(courseId, currentUser);
+        }
+        return CourseInstructorResponse.resolveInstructorsForCourse(
+                course, courseInstructorRepository, instructorProfileRepository);
+    }
+
+    /**
+     * FR-I59 — Remove a co-instructor from a course (sensitive operation restricted to OWNER only).
+     */
+    @Transactional
+    public void removeCourseInstructor(User currentUser, Integer courseId, Integer targetInstructorId) {
+        validateInstructor(currentUser);
+        Course course = findCourseAndVerifyOwnerOnly(courseId, currentUser);
+
+        if (targetInstructorId == null) {
+            throw new IllegalArgumentException("Instructor ID cannot be null");
+        }
+        if (course.getInstructor() != null && targetInstructorId.equals(course.getInstructor().getId())) {
+            throw new IllegalStateException("Cannot remove the primary course owner");
+        }
+        if (courseInstructorRepository == null) {
+            throw new IllegalStateException("CourseInstructorRepository is not configured");
+        }
+
+        CourseInstructor mapping = courseInstructorRepository
+                .findByCourseIdAndInstructorId(courseId, targetInstructorId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Instructor " + targetInstructorId + " is not associated with course " + courseId));
+
+        if (mapping.isOwner()) {
+            throw new IllegalStateException("Cannot remove a course owner");
+        }
+
+        courseInstructorRepository.delete(mapping);
+        if (course.getInstructors() != null) {
+            course.getInstructors().removeIf(ci -> ci.getInstructor() != null
+                    && targetInstructorId.equals(ci.getInstructor().getId()));
+        }
     }
 
     /**
@@ -183,9 +256,9 @@ public class InstructorCourseService {
 
         Course saved = courseRepository.save(course);
 
-        // FR-I05 & FR-I59: Maintain multi-instructor ownership mapping
+        // FR-I05 & FR-I59: Maintain multi-instructor ownership mapping (creator is OWNER)
         if (saved != null && courseInstructorRepository != null) {
-            CourseInstructor ownerMapping = new CourseInstructor(saved, currentUser, "owner");
+            CourseInstructor ownerMapping = new CourseInstructor(saved, currentUser, CourseInstructorRole.OWNER);
             courseInstructorRepository.save(ownerMapping);
             saved.getInstructors().add(ownerMapping);
         }
@@ -277,7 +350,7 @@ public class InstructorCourseService {
         Course saved = courseRepository.save(course);
 
         if (saved != null && courseInstructorRepository != null) {
-            CourseInstructor ownerMapping = new CourseInstructor(saved, currentUser, "owner");
+            CourseInstructor ownerMapping = new CourseInstructor(saved, currentUser, CourseInstructorRole.OWNER);
             courseInstructorRepository.save(ownerMapping);
             saved.getInstructors().add(ownerMapping);
         }
@@ -358,7 +431,7 @@ public class InstructorCourseService {
     }
 
     /**
-     * FR-I09 — Update title and description for an owned course.
+     * FR-I09 & FR-I59 — Update course content for an associated instructor (OWNER or CO_INSTRUCTOR).
      */
     @Transactional
     public CourseResponse updateCourse(User currentUser, Integer courseId, UpdateCourseRequest request) {
@@ -385,11 +458,12 @@ public class InstructorCourseService {
         }
 
         Course updated = courseRepository.save(course);
-        return CourseResponse.fromEntity(updated);
+        return enrichCourseResponse(updated);
     }
 
     /**
-     * FR-I09 — Change course status for an owned course.
+     * FR-I09 & FR-I59 — Change course status for an associated course.
+     * Transitioning to or from ARCHIVED is a sensitive operation restricted to the OWNER only.
      */
     @Transactional
     public CourseResponse updateCourseStatus(User currentUser, Integer courseId, UpdateCourseStatusRequest request) {
@@ -402,10 +476,36 @@ public class InstructorCourseService {
         }
 
         CourseStatus newStatus = CourseStatus.fromString(request.getStatus());
+        if (newStatus == CourseStatus.ARCHIVED || course.getStatus() == CourseStatus.ARCHIVED) {
+            verifyOwnerOnly(course, currentUser, "archive or unarchive");
+        }
+
         course.setStatus(newStatus);
 
         Course updated = courseRepository.save(course);
-        return CourseResponse.fromEntity(updated);
+        return enrichCourseResponse(updated);
+    }
+
+    /**
+     * FR-I59 — Archive a course (restricted to OWNER only).
+     */
+    @Transactional
+    public CourseResponse archiveCourse(User currentUser, Integer courseId) {
+        validateInstructor(currentUser);
+        Course course = findCourseAndVerifyOwnerOnly(courseId, currentUser);
+        course.setStatus(CourseStatus.ARCHIVED);
+        Course updated = courseRepository.save(course);
+        return enrichCourseResponse(updated);
+    }
+
+    /**
+     * FR-I59 — Delete a course (restricted to OWNER only).
+     */
+    @Transactional
+    public void deleteCourse(User currentUser, Integer courseId) {
+        validateInstructor(currentUser);
+        Course course = findCourseAndVerifyOwnerOnly(courseId, currentUser);
+        courseRepository.delete(course);
     }
 
     /**
@@ -542,6 +642,45 @@ public class InstructorCourseService {
             CoursePrerequisite cp = new CoursePrerequisite(course, type, requiredCourseEntity, title, desc);
             CoursePrerequisite savedCp = coursePrerequisiteRepository.save(cp);
             course.getPrerequisites().add(savedCp);
+        }
+    }
+
+    private CourseResponse enrichCourseResponse(Course course) {
+        CourseResponse response = CourseResponse.fromEntity(course);
+        if (response != null && course != null) {
+            response.setInstructors(CourseInstructorResponse.resolveInstructorsForCourse(
+                    course, courseInstructorRepository, instructorProfileRepository));
+        }
+        return response;
+    }
+
+    private boolean isCourseOwner(Course course, User currentUser) {
+        if (course == null || currentUser == null || currentUser.getId() == null) {
+            return false;
+        }
+        if (course.getInstructor() != null && currentUser.getId().equals(course.getInstructor().getId())) {
+            return true;
+        }
+        return courseInstructorRepository != null
+                && courseInstructorRepository.existsByCourseIdAndInstructorIdAndRole(
+                        course.getId(), currentUser.getId(), CourseInstructorRole.OWNER);
+    }
+
+    private Course findCourseAndVerifyOwnerOnly(Integer courseId, User currentUser) {
+        if (courseId == null) {
+            throw new IllegalArgumentException("Course ID cannot be null");
+        }
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
+
+        verifyOwnerOnly(course, currentUser, "archive, delete, or manage owners of");
+        return course;
+    }
+
+    private void verifyOwnerOnly(Course course, User currentUser, String actionDescription) {
+        if (!isCourseOwner(course, currentUser)) {
+            throw new AccessDeniedException(
+                    "Access denied: Only the course OWNER can " + actionDescription + " this course");
         }
     }
 

@@ -5,7 +5,9 @@ import com.olp.dto.AvailableCourseAssociationResponse;
 import com.olp.dto.CourseAssociationRequestDto;
 import com.olp.dto.CourseAssociationRequestResponse;
 import com.olp.dto.CourseAssociationReviewRequest;
+import com.olp.dto.CourseInstructorResponse;
 import com.olp.entity.AssociationRequestStatus;
+import com.olp.entity.CourseInstructorRole;
 import com.olp.entity.User;
 import com.olp.service.AdminService;
 import com.olp.service.CourseAssociationService;
@@ -175,6 +177,26 @@ class CourseAssociationControllerTest {
                 adminController.rejectAssociationRequest(51, rejectBody, adminAuth);
         assertEquals(200, rejectResp.getStatusCode().value());
         assertEquals(AssociationRequestStatus.REJECTED, rejectResp.getBody().getStatus());
+    }
+
+    @Test
+    void testAdminGetCourseInstructors_Returns200WithOrderedTeam() {
+        when(courseAssociationService.resolveUser(adminAuth)).thenReturn(adminUser);
+        List<CourseInstructorResponse> team = List.of(
+                new CourseInstructorResponse(1, "Dr. Sarah", "sarah@olp.com", CourseInstructorRole.OWNER,
+                        "Ph.D.", "DB", "Bio", null, null),
+                new CourseInstructorResponse(2, "Prof. James", "james@olp.com", CourseInstructorRole.CO_INSTRUCTOR,
+                        "M.Sc.", "SQL", "Bio 2", null, null)
+        );
+        when(courseAssociationService.getCourseInstructorsForAdmin(adminUser, 10)).thenReturn(team);
+
+        ResponseEntity<List<CourseInstructorResponse>> response =
+                adminController.getCourseInstructors(10, adminAuth);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(2, response.getBody().size());
+        assertEquals(CourseInstructorRole.OWNER, response.getBody().get(0).getRole());
+        assertEquals(CourseInstructorRole.CO_INSTRUCTOR, response.getBody().get(1).getRole());
     }
 }
 

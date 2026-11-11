@@ -110,7 +110,7 @@ CREATE TABLE course_instructors (
         UNIQUE (course_id, instructor_id),
 
     CONSTRAINT chk_course_instructor_role
-        CHECK (role IN ('owner', 'co-instructor'))
+        CHECK (role IN ('owner', 'co-instructor', 'OWNER', 'CO_INSTRUCTOR'))
 );
 
 

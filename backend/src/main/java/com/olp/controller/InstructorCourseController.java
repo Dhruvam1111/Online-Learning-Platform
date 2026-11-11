@@ -1,6 +1,8 @@
 package com.olp.controller;
 
+import com.olp.dto.ApiResponse;
 import com.olp.dto.CourseDraftRequest;
+import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CourseResponse;
 import com.olp.dto.CreateCourseRequest;
 import com.olp.dto.UpdateCourseRequest;
@@ -18,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping({"/api/instructor/courses", "/api/instructors/courses"})
+@RequestMapping({ "/api/instructor/courses", "/api/instructors/courses" })
 @PreAuthorize("hasRole('instructor')")
 public class InstructorCourseController {
 
@@ -55,7 +57,7 @@ public class InstructorCourseController {
         User currentUser = instructorCourseService.resolveUser(authentication);
 
         if ((queryInstructorId != null && !queryInstructorId.equals(currentUser.getId())) ||
-            (queryUserId != null && !queryUserId.equals(currentUser.getId()))) {
+                (queryUserId != null && !queryUserId.equals(currentUser.getId()))) {
             throw new AccessDeniedException("Cannot access another instructor's courses");
         }
 
@@ -76,7 +78,8 @@ public class InstructorCourseController {
 
     /**
      * GET /api/instructor/courses/{courseId}
-     * FR-I07: Retrieve a specific course (including DRAFT) for an associated instructor.
+     * FR-I07: Retrieve a specific course (including DRAFT) for an associated
+     * instructor.
      */
     @GetMapping("/{courseId:\\d+}")
     public ResponseEntity<CourseResponse> getCourseById(
@@ -89,7 +92,8 @@ public class InstructorCourseController {
 
     /**
      * POST /api/instructor/courses/draft
-     * FR-I07: Save a new course draft (or update an existing draft if id is provided)
+     * FR-I07: Save a new course draft (or update an existing draft if id is
+     * provided)
      * without requiring all mandatory course fields.
      */
     @PostMapping("/draft")
@@ -106,7 +110,7 @@ public class InstructorCourseController {
      * PUT / PATCH /api/instructor/courses/{courseId}/draft
      * FR-I07: Partially update an existing course and save it as a draft.
      */
-    @RequestMapping(value = "/{courseId}/draft", method = {RequestMethod.PUT, RequestMethod.PATCH})
+    @RequestMapping(value = "/{courseId}/draft", method = { RequestMethod.PUT, RequestMethod.PATCH })
     public ResponseEntity<CourseResponse> updateDraft(
             Authentication authentication,
             @PathVariable Integer courseId,
@@ -133,7 +137,8 @@ public class InstructorCourseController {
 
     /**
      * PATCH /api/instructor/courses/{courseId}/status
-     * FR-I09: Change course status between DRAFT and PUBLISHED for an owned course.
+     * FR-I09 & FR-I59: Change course status for an associated course (ARCHIVED
+     * restricted to OWNER).
      */
     @PatchMapping("/{courseId}/status")
     public ResponseEntity<CourseResponse> updateCourseStatus(
@@ -144,5 +149,64 @@ public class InstructorCourseController {
         User currentUser = instructorCourseService.resolveUser(authentication);
         CourseResponse response = instructorCourseService.updateCourseStatus(currentUser, courseId, request);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}/instructors
+     * FR-I59: Retrieve all instructors associated with a course, including roles
+     * and basic profile info.
+     */
+    @GetMapping("/{courseId:\\d+}/instructors")
+    @PreAuthorize("hasRole('instructor') or hasRole('admin')")
+    public ResponseEntity<List<CourseInstructorResponse>> getCourseInstructors(
+            Authentication authentication,
+            @PathVariable Integer courseId) {
+
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        List<CourseInstructorResponse> instructors = instructorCourseService.getCourseInstructors(currentUser,
+                courseId);
+        return ResponseEntity.ok(instructors);
+    }
+
+    /**
+     * DELETE /api/instructor/courses/{courseId}/instructors/{instructorId}
+     * FR-I59: Remove a co-instructor from a course (restricted to OWNER only).
+     */
+    @DeleteMapping("/{courseId:\\d+}/instructors/{instructorId:\\d+}")
+    public ResponseEntity<ApiResponse> removeCourseInstructor(
+            Authentication authentication,
+            @PathVariable Integer courseId,
+            @PathVariable Integer instructorId) {
+
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        instructorCourseService.removeCourseInstructor(currentUser, courseId, instructorId);
+        return ResponseEntity.ok(new ApiResponse(true, "Co-instructor removed from course successfully"));
+    }
+
+    /**
+     * PATCH / POST /api/instructor/courses/{courseId}/archive
+     * FR-I59: Archive a course (restricted to OWNER only).
+     */
+    @RequestMapping(value = "/{courseId:\\d+}/archive", method = {RequestMethod.PATCH, RequestMethod.POST})
+    public ResponseEntity<CourseResponse> archiveCourse(    Authentication authentication,
+            @PathVariable Integer courseId) {
+
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        CourseResponse response = instructorCourseService.archiveCourse(currentUser, courseId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * DELETE /api/instructor/courses/{courseId}
+     * FR-I59: Delete a course (restricted to OWNER only).
+     */
+    @DeleteMapping("/{courseId:\\d+}")
+    public ResponseEntity<ApiResponse> deleteCourse(
+            Authentication authentication,
+            @PathVariable Integer courseId) {
+
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        instructorCourseService.deleteCourse(currentUser, courseId);
+        return ResponseEntity.ok(new ApiResponse(true, "Course deleted successfully"));
     }
 }

@@ -1,10 +1,13 @@
 package com.olp.controller;
 
+import com.olp.dto.ApiResponse;
 import com.olp.dto.CourseDraftRequest;
+import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CourseResponse;
 import com.olp.dto.CreateCourseRequest;
 import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
+import com.olp.entity.CourseInstructorRole;
 import com.olp.entity.CourseStatus;
 import com.olp.entity.User;
 import com.olp.exception.ResourceNotFoundException;
@@ -264,5 +267,60 @@ class InstructorCourseControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertSame(course, response.getBody());
         verify(instructorCourseService).getInstructorCourseById(currentUser, 10);
+    }
+
+    @Test
+    void testGetCourseInstructors_Returns200AndAllowsAdminOrInstructor() throws NoSuchMethodException {
+        givenResolvedUser();
+        CourseInstructorResponse ownerDto = new CourseInstructorResponse(
+                1, "Dr. Chen", "chen@olp.com", CourseInstructorRole.OWNER,
+                "Ph.D.", "AI", "Bio", null, LocalDateTime.now());
+        when(instructorCourseService.getCourseInstructors(currentUser, 10)).thenReturn(List.of(ownerDto));
+
+        ResponseEntity<List<CourseInstructorResponse>> response = controller.getCourseInstructors(authentication, 10);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(1, response.getBody().size());
+        assertEquals(CourseInstructorRole.OWNER, response.getBody().get(0).getRole());
+
+        var method = InstructorCourseController.class.getMethod("getCourseInstructors", Authentication.class, Integer.class);
+        PreAuthorize methodAuth = method.getAnnotation(PreAuthorize.class);
+        assertNotNull(methodAuth);
+        assertEquals("hasRole('instructor') or hasRole('admin')", methodAuth.value());
+    }
+
+    @Test
+    void testRemoveCourseInstructor_Returns200() {
+        givenResolvedUser();
+
+        ResponseEntity<ApiResponse> response = controller.removeCourseInstructor(authentication, 10, 2);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertTrue(response.getBody().isSuccess());
+        verify(instructorCourseService).removeCourseInstructor(currentUser, 10, 2);
+    }
+
+    @Test
+    void testArchiveCourse_Returns200() {
+        givenResolvedUser();
+        CourseResponse archived = new CourseResponse(10, 1, "Title", "Desc", CourseStatus.ARCHIVED, LocalDateTime.now());
+        when(instructorCourseService.archiveCourse(currentUser, 10)).thenReturn(archived);
+
+        ResponseEntity<CourseResponse> response = controller.archiveCourse(authentication, 10);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(CourseStatus.ARCHIVED, response.getBody().getStatus());
+        verify(instructorCourseService).archiveCourse(currentUser, 10);
+    }
+
+    @Test
+    void testDeleteCourse_Returns200() {
+        givenResolvedUser();
+
+        ResponseEntity<ApiResponse> response = controller.deleteCourse(authentication, 10);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertTrue(response.getBody().isSuccess());
+        verify(instructorCourseService).deleteCourse(currentUser, 10);
     }
 }

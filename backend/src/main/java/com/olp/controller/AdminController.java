@@ -5,6 +5,7 @@ import com.olp.dto.AdminUserResponse;
 import com.olp.dto.ApiResponse;
 import com.olp.dto.CourseAssociationRequestResponse;
 import com.olp.dto.CourseAssociationReviewRequest;
+import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.InstructorCredentialResponse;
 import com.olp.dto.PageResponse;
 import com.olp.dto.RejectCourseRequest;
@@ -273,6 +274,22 @@ public class AdminController {
         User adminUser = courseAssociationService.resolveUser(authentication);
         CourseAssociationRequestResponse response =
                 courseAssociationService.rejectRequest(adminUser, requestId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * List all instructors associated with a specific course (OWNER and CO_INSTRUCTORs) (FR-I59).
+     */
+    @GetMapping("/courses/{courseId:[0-9]+}/instructors")
+    public ResponseEntity<List<CourseInstructorResponse>> getCourseInstructors(
+            @PathVariable Integer courseId,
+            Authentication authentication) {
+        if (courseAssociationService == null) {
+            throw new IllegalStateException("CourseAssociationService is not configured");
+        }
+        User adminUser = courseAssociationService.resolveUser(authentication);
+        List<CourseInstructorResponse> response =
+                courseAssociationService.getCourseInstructorsForAdmin(adminUser, courseId);
         return ResponseEntity.ok(response);
     }
 }
