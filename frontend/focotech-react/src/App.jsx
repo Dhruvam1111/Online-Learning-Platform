@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy } from 'react';
+const PaymentSimulation = lazy(() => import('./components/PaymentSimulation'));
 import Header from './components/Header';
 import HeroSection from './components/HeroSection';
 import StatsBanner from './components/StatsBanner';
@@ -10,15 +11,19 @@ import CtaBanner from './components/CtaBanner';
 import Footer from './components/Footer';
 import CourseModal from './components/CourseModal';
 import SignInPage from './components/SignInPage';
-import StudentDashboard from './components/StudentDashboard';
-import InstructorDashboard from './components/InstructorDashboard';
-import AdminDashboard from './components/AdminDashboard';
+const StudentDashboard = lazy(() => import('./components/StudentDashboard'));
+const InstructorDashboard = lazy(() => import('./components/InstructorDashboard'));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
 import { useAuth } from './context/AuthContext';
 
 export default function App() {
   const { isAuthenticated, user, logout } = useAuth();
   const [currentPage, setCurrentPage] = useState(() => {
-    if (window.location.hash.startsWith('#signin') || window.location.hash.startsWith('#verify-email')) return 'signin';
+    if (window.location.search.includes('stripe_session_id') || window.location.hash.includes('stripe_session_id')) {
+      return 'dashboard';
+    }
+    if (window.location.hash === '#payments') return 'payments';
+    if (window.location.hash === '#signin') return 'signin';
     if (window.location.hash === '#dashboard') return 'dashboard';
     return 'home';
   });
@@ -27,7 +32,8 @@ export default function App() {
 
   useEffect(() => {
     const handleHashChange = () => {
-      if (window.location.hash.startsWith('#signin') || window.location.hash.startsWith('#verify-email')) {
+      if (window.location.hash === '#payments') { setCurrentPage('payments');
+      } else if (window.location.hash === '#signin') {
         setCurrentPage('signin');
       } else if (window.location.hash === '#dashboard') {
         setCurrentPage('dashboard');
@@ -70,6 +76,9 @@ export default function App() {
     }
   };
 
+  if (currentPage === 'payments') {
+    return isAuthenticated ? <PaymentSimulation user={user} /> : <SignInPage onNavigateHome={() => navigateTo('home')} onNavigateDashboard={() => { window.location.hash = 'payments'; }} initialNotice="Sign in to use the payment simulation." />;
+  }
   // View 1: Sign In Page
   if (currentPage === 'signin') {
     return (
@@ -113,6 +122,7 @@ export default function App() {
         onNavigateDashboard={() => navigateTo('dashboard')}
       />
 
+      {isAuthenticated && <a href="#payments" className="fixed bottom-4 right-4 z-50 rounded-xl bg-orange-600 px-4 py-3 text-white">Payment simulation</a>}
       {/* Main Page Canvas */}
       <main className="w-full pt-20 bg-surface">
         <div className="flex flex-col w-full">
