@@ -4,6 +4,7 @@
 -- ============================================================
 
 -- Clean slate (safe to re-run during development)
+DROP TABLE IF EXISTS course_association_requests CASCADE;
 DROP TABLE IF EXISTS lessons CASCADE;
 DROP TABLE IF EXISTS course_sections CASCADE;
 DROP TABLE IF EXISTS course_modules CASCADE;
@@ -110,6 +111,46 @@ CREATE TABLE course_instructors (
 
     CONSTRAINT chk_course_instructor_role
         CHECK (role IN ('owner', 'co-instructor'))
+);
+
+
+-- =========================
+-- TABLE: course_association_requests
+-- =========================
+-- Instructor requests to join existing courses as co-instructors (FR-I58, FR-I59)
+CREATE TABLE course_association_requests (
+    id             SERIAL PRIMARY KEY,
+    course_id      INTEGER     NOT NULL,
+    instructor_id  INTEGER     NOT NULL,
+    requested_role VARCHAR(50) NOT NULL DEFAULT 'co-instructor',
+    message        TEXT,
+    status         VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    admin_notes    TEXT,
+    reviewed_by    INTEGER,
+    reviewed_at    TIMESTAMP,
+    created_at     TIMESTAMP   NOT NULL DEFAULT NOW(),
+    updated_at     TIMESTAMP   NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_assoc_req_course
+        FOREIGN KEY (course_id)
+        REFERENCES courses(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_assoc_req_instructor
+        FOREIGN KEY (instructor_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_assoc_req_reviewer
+        FOREIGN KEY (reviewed_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT chk_assoc_req_status
+        CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+
+    CONSTRAINT chk_assoc_req_role
+        CHECK (requested_role IN ('co-instructor'))
 );
 
 
