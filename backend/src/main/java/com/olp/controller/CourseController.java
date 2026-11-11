@@ -1,6 +1,7 @@
 package com.olp.controller;
 
 import com.olp.dto.CourseDetailResponse;
+import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.EnrollmentResponse;
 import com.olp.dto.LectureResponse;
 import com.olp.dto.PublicCourseResponse;
@@ -49,6 +50,20 @@ public class CourseController {
         User currentUser = courseCatalogService.resolveUserOptional(authentication);
         CourseDetailResponse course = courseCatalogService.getCourseDetail(id, currentUser);
         return ResponseEntity.ok(course);
+    }
+
+    /**
+     * GET /api/courses/{id}/instructors
+     * FR-I59: Retrieve all instructors associated with a course, including roles and basic profile info.
+     */
+    @GetMapping("/{id}/instructors")
+    public ResponseEntity<List<CourseInstructorResponse>> getCourseInstructors(
+            @PathVariable Integer id,
+            Authentication authentication) {
+
+        User currentUser = courseCatalogService.resolveUserOptional(authentication);
+        List<CourseInstructorResponse> instructors = courseCatalogService.getCourseInstructors(id, currentUser);
+        return ResponseEntity.ok(instructors);
     }
 
     /**
