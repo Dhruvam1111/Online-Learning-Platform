@@ -86,6 +86,7 @@ INSERT INTO courses (instructor_id, title, description, category, status) VALUES
 -- Link initial course creators as 'owner' in course_instructors (FR-I05, FR-I59)
 INSERT INTO course_instructors (course_id, instructor_id, role) VALUES
     (1, 1, 'owner'),
+    (1, 3, 'co-instructor'),
     (2, 1, 'owner'),
     (3, 2, 'owner'),
     (4, 2, 'owner'),
