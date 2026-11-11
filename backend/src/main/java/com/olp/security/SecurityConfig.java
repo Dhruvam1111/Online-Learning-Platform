@@ -68,6 +68,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/auth/verify-email").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/instructors/{id:[0-9]+}/summary",
+                                                         "/api/instructor/{id:[0-9]+}/summary",
+                                                         "/api/instructors/{id:[0-9]+}",
+                                                         "/api/instructor/{id:[0-9]+}").permitAll()
                         // Admin endpoints require ROLE_admin
                         .requestMatchers("/api/admin/**").hasRole("admin")
 

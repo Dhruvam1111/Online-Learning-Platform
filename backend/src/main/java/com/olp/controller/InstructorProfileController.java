@@ -1,6 +1,7 @@
 package com.olp.controller;
 
 import com.olp.dto.InstructorProfileResponse;
+import com.olp.dto.InstructorSummaryResponse;
 import com.olp.dto.UpdateInstructorProfileRequest;
 import com.olp.entity.User;
 import com.olp.service.InstructorProfileService;
@@ -13,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping({"/api/instructor", "/api/instructors"})
-@PreAuthorize("hasRole('instructor')")
 public class InstructorProfileController {
 
     private final InstructorProfileService instructorProfileService;
@@ -23,11 +23,12 @@ public class InstructorProfileController {
     }
 
     /**
-     * GET /api/instructor/profile
+     * GET /api/instructor/profile or /api/instructors/profile
      * Authenticated instructor retrieves their own profile.
      * Prevents selecting another instructor's profile by supplying a different user ID.
      */
     @GetMapping("/profile")
+    @PreAuthorize("hasRole('instructor')")
     public ResponseEntity<InstructorProfileResponse> getProfile(
             Authentication authentication,
             @RequestParam(name = "id", required = false) Integer queryId,
@@ -47,17 +48,43 @@ public class InstructorProfileController {
     }
 
     /**
-     * PUT /api/instructor/profile
+     * PUT /api/instructor/profile or /api/instructors/profile
      * Authenticated instructor updates their editable profile fields
      * (qualifications, expertise areas, bio, name).
      */
     @PutMapping("/profile")
+    @PreAuthorize("hasRole('instructor')")
     public ResponseEntity<InstructorProfileResponse> updateProfile(
             Authentication authentication,
             @Valid @RequestBody UpdateInstructorProfileRequest request) {
 
         User currentUser = instructorProfileService.resolveUser(authentication);
         InstructorProfileResponse response = instructorProfileService.updateProfile(currentUser, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/instructors/{instructorId}/summary or /api/instructor/{instructorId}/summary
+     * Also GET /api/instructors/{instructorId}
+     * FR-I03: Public reusable instructor summary API for instructor cards on course pages.
+     */
+    @GetMapping({"/{instructorId:[0-9]+}/summary", "/{instructorId:[0-9]+}"})
+    public ResponseEntity<InstructorSummaryResponse> getInstructorSummary(
+            @PathVariable Integer instructorId) {
+        InstructorSummaryResponse response = instructorProfileService.getInstructorSummary(instructorId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/instructor/summary or /api/instructors/summary
+     * Authenticated instructor retrieves their own summary card.
+     */
+    @GetMapping("/summary")
+    @PreAuthorize("hasRole('instructor')")
+    public ResponseEntity<InstructorSummaryResponse> getCurrentInstructorSummary(
+            Authentication authentication) {
+        User currentUser = instructorProfileService.resolveUser(authentication);
+        InstructorSummaryResponse response = instructorProfileService.getInstructorSummary(currentUser.getId());
         return ResponseEntity.ok(response);
     }
 }
