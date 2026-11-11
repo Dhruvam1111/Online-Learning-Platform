@@ -1,6 +1,7 @@
 package com.olp.service;
 
 import com.olp.dto.CourseDraftRequest;
+import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CoursePrerequisiteRequest;
 import com.olp.dto.CourseResponse;
 import com.olp.dto.CreateCourseRequest;
@@ -8,14 +9,17 @@ import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
 import com.olp.entity.Course;
 import com.olp.entity.CourseInstructor;
+import com.olp.entity.CourseInstructorRole;
 import com.olp.entity.CoursePrerequisite;
 import com.olp.entity.CourseStatus;
+import com.olp.entity.InstructorProfile;
 import com.olp.entity.User;
 import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.CourseInstructorRepository;
 import com.olp.repository.CoursePrerequisiteRepository;
 import com.olp.repository.CourseRepository;
+import com.olp.repository.InstructorProfileRepository;
 import com.olp.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,6 +49,8 @@ class InstructorCourseServiceTest {
     private CourseInstructorRepository courseInstructorRepository;
     @Mock
     private CoursePrerequisiteRepository coursePrerequisiteRepository;
+    @Mock
+    private InstructorProfileRepository instructorProfileRepository;
 
     @InjectMocks
     private InstructorCourseService service;
@@ -269,7 +275,8 @@ class InstructorCourseServiceTest {
 
         ArgumentCaptor<CourseInstructor> instCaptor = ArgumentCaptor.forClass(CourseInstructor.class);
         verify(courseInstructorRepository, times(1)).save(instCaptor.capture());
-        assertEquals("owner", instCaptor.getValue().getRole());
+        assertEquals(CourseInstructorRole.OWNER, instCaptor.getValue().getRole());
+        assertTrue(instCaptor.getValue().isOwner());
         assertSame(owner, instCaptor.getValue().getInstructor());
 
         verify(coursePrerequisiteRepository, times(2)).save(any(CoursePrerequisite.class));
@@ -836,5 +843,149 @@ class InstructorCourseServiceTest {
         assertEquals(CourseStatus.DRAFT, found.getStatus());
 
         assertThrows(AccessDeniedException.class, () -> service.getInstructorCourseById(instructor(2), 10));
+    }
+
+    // ===== FR-I59: Multiple Instructors per Course =====
+
+    @Test
+    void testCourseInstructorRole_SupportsOwnerAndCoInstructorFormats() {
+        assertEquals(CourseInstructorRole.OWNER, CourseInstructorRole.fromString("OWNER"));
+        assertEquals(CourseInstructorRole.OWNER, CourseInstructorRole.fromString("owner"));
+        assertEquals(CourseInstructorRole.CO_INSTRUCTOR, CourseInstructorRole.fromString("CO_INSTRUCTOR"));
+        assertEquals(CourseInstructorRole.CO_INSTRUCTOR, CourseInstructorRole.fromString("co-instructor"));
+        assertEquals("owner", CourseInstructorRole.OWNER.toDatabaseValue());
+        assertEquals("co-instructor", CourseInstructorRole.CO_INSTRUCTOR.toDatabaseValue());
+        assertThrows(IllegalArgumentException.class, () -> CourseInstructorRole.fromString("STUDENT"));
+        assertThrows(IllegalArgumentException.class, () -> CourseInstructorRole.fromString("  "));
+    }
+
+    @Test
+    void testUpdateCourse_CoInstructorAllowed_StrangerDenied() {
+        User owner = instructor(1);
+        User coInstructor = instructor(2);
+        User stranger = instructor(3);
+        givenOwnedCourse(10, owner);
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(10, 2)).thenReturn(true);
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(10, 3)).thenReturn(false);
+        stubSaveReturnsArgument();
+
+        CourseResponse updated = service.updateCourse(
+                coInstructor, 10, new UpdateCourseRequest("Co-Updated Title", "Co-Updated Description"));
+
+        assertEquals("Co-Updated Title", updated.getTitle());
+        assertThrows(AccessDeniedException.class,
+                () -> service.updateCourse(stranger, 10, new UpdateCourseRequest("Hack", "Desc")));
+    }
+
+    @Test
+    void testArchiveCourse_OwnerAllowed_CoInstructorDenied() {
+        User owner = instructor(1);
+        User coInstructor = instructor(2);
+        Course c = givenOwnedCourse(10, owner);
+        when(courseInstructorRepository.existsByCourseIdAndInstructorIdAndRole(10, 2, CourseInstructorRole.OWNER))
+                .thenReturn(false);
+        stubSaveReturnsArgument();
+
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> service.archiveCourse(coInstructor, 10));
+        assertTrue(ex.getMessage().contains("OWNER"));
+        assertEquals(CourseStatus.DRAFT, c.getStatus());
+
+        CourseResponse archived = service.archiveCourse(owner, 10);
+        assertEquals(CourseStatus.ARCHIVED, archived.getStatus());
+    }
+
+    @Test
+    void testUpdateCourseStatus_ArchiveAndUnarchiveByCoInstructorDenied() {
+        User owner = instructor(1);
+        User coInstructor = instructor(2);
+        Course c = givenOwnedCourse(10, owner);
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(10, 2)).thenReturn(true);
+        when(courseInstructorRepository.existsByCourseIdAndInstructorIdAndRole(10, 2, CourseInstructorRole.OWNER))
+                .thenReturn(false);
+
+        assertThrows(AccessDeniedException.class,
+                () -> service.updateCourseStatus(coInstructor, 10, new UpdateCourseStatusRequest("ARCHIVED")));
+
+        c.setStatus(CourseStatus.ARCHIVED);
+        assertThrows(AccessDeniedException.class,
+                () -> service.updateCourseStatus(coInstructor, 10, new UpdateCourseStatusRequest("DRAFT")));
+        assertEquals(CourseStatus.ARCHIVED, c.getStatus());
+    }
+
+    @Test
+    void testDeleteCourse_OwnerAllowed_CoInstructorDenied() {
+        User owner = instructor(1);
+        User coInstructor = instructor(2);
+        Course c = givenOwnedCourse(10, owner);
+        when(courseInstructorRepository.existsByCourseIdAndInstructorIdAndRole(10, 2, CourseInstructorRole.OWNER))
+                .thenReturn(false);
+
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> service.deleteCourse(coInstructor, 10));
+        assertTrue(ex.getMessage().contains("OWNER"));
+        verify(courseRepository, never()).delete(any());
+
+        service.deleteCourse(owner, 10);
+        verify(courseRepository, times(1)).delete(c);
+    }
+
+    @Test
+    void testGetCourseInstructors_ReturnsOwnerAndCoInstructorsWithProfilesAndDeduplicates() {
+        User owner = instructor(1);
+        User co1 = instructor(2);
+        User co2 = instructor(3);
+        User stranger = instructor(4);
+        Course c = givenOwnedCourse(10, owner);
+
+        CourseInstructor mOwner = new CourseInstructor(c, owner, CourseInstructorRole.OWNER);
+        CourseInstructor mCo1 = new CourseInstructor(c, co1, CourseInstructorRole.CO_INSTRUCTOR);
+        CourseInstructor mCo1Dup = new CourseInstructor(c, co1, CourseInstructorRole.CO_INSTRUCTOR);
+        CourseInstructor mCo2 = new CourseInstructor(c, co2, CourseInstructorRole.CO_INSTRUCTOR);
+
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(10, 2)).thenReturn(true);
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(10, 4)).thenReturn(false);
+        when(courseInstructorRepository.findByCourseIdWithInstructor(10))
+                .thenReturn(List.of(mCo1, mOwner, mCo1Dup, mCo2));
+
+        InstructorProfile p1 = new InstructorProfile(owner, "Ph.D. CS", "Algorithms", "Lead prof");
+        InstructorProfile p2 = new InstructorProfile(co1, "M.Sc. SE", "Databases", "Lab lead");
+        when(instructorProfileRepository.findByInstructorIdIn(anyList())).thenReturn(List.of(p1, p2));
+
+        List<CourseInstructorResponse> list = service.getCourseInstructors(co1, 10);
+
+        assertEquals(3, list.size());
+        assertEquals(CourseInstructorRole.OWNER, list.get(0).getRole());
+        assertEquals(1, list.get(0).getInstructorId());
+        assertEquals("Ph.D. CS", list.get(0).getQualifications());
+
+        assertEquals(CourseInstructorRole.CO_INSTRUCTOR, list.get(1).getRole());
+        assertEquals(2, list.get(1).getInstructorId());
+        assertEquals("Databases", list.get(1).getExpertiseAreas());
+
+        assertEquals(CourseInstructorRole.CO_INSTRUCTOR, list.get(2).getRole());
+        assertEquals(3, list.get(2).getInstructorId());
+
+        assertThrows(AccessDeniedException.class, () -> service.getCourseInstructors(stranger, 10));
+        assertThrows(AccessDeniedException.class, () -> service.getCourseInstructors(student(5), 10));
+    }
+
+    @Test
+    void testRemoveCourseInstructor_OwnerCanRemoveCoInstructor_CoInstructorAndSelfOwnerDenied() {
+        User owner = instructor(1);
+        User co1 = instructor(2);
+        Course c = givenOwnedCourse(10, owner);
+        CourseInstructor coMapping = new CourseInstructor(c, co1, CourseInstructorRole.CO_INSTRUCTOR);
+
+        when(courseInstructorRepository.existsByCourseIdAndInstructorIdAndRole(10, 2, CourseInstructorRole.OWNER))
+                .thenReturn(false);
+        when(courseInstructorRepository.findByCourseIdAndInstructorId(10, 2))
+                .thenReturn(Optional.of(coMapping));
+
+        assertThrows(AccessDeniedException.class, () -> service.removeCourseInstructor(co1, 10, 2));
+        assertThrows(IllegalStateException.class, () -> service.removeCourseInstructor(owner, 10, 1));
+
+        service.removeCourseInstructor(owner, 10, 2);
+        verify(courseInstructorRepository).delete(coMapping);
     }
 }

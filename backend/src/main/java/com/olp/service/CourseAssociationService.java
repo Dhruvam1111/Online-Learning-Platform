@@ -4,12 +4,14 @@ import com.olp.dto.AvailableCourseAssociationResponse;
 import com.olp.dto.CourseAssociationRequestDto;
 import com.olp.dto.CourseAssociationRequestResponse;
 import com.olp.dto.CourseAssociationReviewRequest;
+import com.olp.dto.CourseInstructorResponse;
 import com.olp.entity.*;
 import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.CourseAssociationRequestRepository;
 import com.olp.repository.CourseInstructorRepository;
 import com.olp.repository.CourseRepository;
+import com.olp.repository.InstructorProfileRepository;
 import com.olp.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
@@ -28,13 +30,23 @@ public class CourseAssociationService {
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
+    private final InstructorProfileRepository instructorProfileRepository;
 
     public CourseAssociationService(
             CourseAssociationRequestRepository requestRepository,
             CourseInstructorRepository courseInstructorRepository,
             CourseRepository courseRepository,
             UserRepository userRepository) {
-        this(requestRepository, courseInstructorRepository, courseRepository, userRepository, null);
+        this(requestRepository, courseInstructorRepository, courseRepository, userRepository, null, null);
+    }
+
+    public CourseAssociationService(
+            CourseAssociationRequestRepository requestRepository,
+            CourseInstructorRepository courseInstructorRepository,
+            CourseRepository courseRepository,
+            UserRepository userRepository,
+            EmailService emailService) {
+        this(requestRepository, courseInstructorRepository, courseRepository, userRepository, emailService, null);
     }
 
     @Autowired
@@ -43,12 +55,14 @@ public class CourseAssociationService {
             CourseInstructorRepository courseInstructorRepository,
             CourseRepository courseRepository,
             UserRepository userRepository,
-            @Autowired(required = false) EmailService emailService) {
+            @Autowired(required = false) EmailService emailService,
+            @Autowired(required = false) InstructorProfileRepository instructorProfileRepository) {
         this.requestRepository = requestRepository;
         this.courseInstructorRepository = courseInstructorRepository;
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.emailService = emailService;
+        this.instructorProfileRepository = instructorProfileRepository;
     }
 
     /**
@@ -171,11 +185,11 @@ public class CourseAssociationService {
         String requestedRole = "co-instructor";
         if (requestDto != null && requestDto.getRequestedRole() != null
                 && !requestDto.getRequestedRole().trim().isEmpty()) {
-            String normalizedRole = requestDto.getRequestedRole().trim().toLowerCase();
-            if (!"co-instructor".equals(normalizedRole)) {
-                throw new IllegalArgumentException("Requested role must be 'co-instructor'");
+            CourseInstructorRole parsedRole = CourseInstructorRole.fromString(requestDto.getRequestedRole());
+            if (parsedRole != CourseInstructorRole.CO_INSTRUCTOR) {
+                throw new IllegalArgumentException("Requested role must be 'co-instructor' (CO_INSTRUCTOR)");
             }
-            requestedRole = normalizedRole;
+            requestedRole = parsedRole.toDatabaseValue();
         }
 
         String cleanMessage = null;
@@ -303,7 +317,10 @@ public class CourseAssociationService {
         boolean alreadyOwner = course.getInstructor() != null
                 && instructor.getId().equals(course.getInstructor().getId());
         if (!alreadyOwner && !courseInstructorRepository.existsByCourseIdAndInstructorId(course.getId(), instructor.getId())) {
-            CourseInstructor association = new CourseInstructor(course, instructor, req.getRequestedRole());
+            CourseInstructorRole assignedRole = (req.getRequestedRole() != null && !req.getRequestedRole().isBlank())
+                    ? CourseInstructorRole.fromString(req.getRequestedRole())
+                    : CourseInstructorRole.CO_INSTRUCTOR;
+            CourseInstructor association = new CourseInstructor(course, instructor, assignedRole);
             courseInstructorRepository.save(association);
         }
 
@@ -343,6 +360,22 @@ public class CourseAssociationService {
 
         notifyInstructor(req.getInstructor(), req.getCourse(), AssociationRequestStatus.REJECTED, saved.getAdminNotes());
         return CourseAssociationRequestResponse.fromEntity(saved);
+    }
+
+    /**
+     * FR-I59 — Admin retrieves all instructors associated with a course, including roles and basic profile info.
+     */
+    @Transactional(readOnly = true)
+    public List<CourseInstructorResponse> getCourseInstructorsForAdmin(User adminUser, Integer courseId) {
+        validateAdmin(adminUser);
+        if (courseId == null) {
+            throw new IllegalArgumentException("Course ID cannot be null");
+        }
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
+
+        return CourseInstructorResponse.resolveInstructorsForCourse(
+                course, courseInstructorRepository, instructorProfileRepository);
     }
 
     private void notifyInstructor(User instructor, Course course, AssociationRequestStatus decision, String notes) {

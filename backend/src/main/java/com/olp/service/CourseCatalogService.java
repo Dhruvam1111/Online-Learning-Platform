@@ -1,6 +1,7 @@
 package com.olp.service;
 
 import com.olp.dto.CourseDetailResponse;
+import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.EnrollmentResponse;
 import com.olp.dto.LectureResponse;
 import com.olp.dto.PublicCourseResponse;
@@ -30,6 +31,7 @@ public class CourseCatalogService {
     private final EnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
     private final CourseInstructorRepository courseInstructorRepository;
+    private final InstructorProfileRepository instructorProfileRepository;
 
     public CourseCatalogService(CourseRepository courseRepository,
                                 LectureRepository lectureRepository,
@@ -38,7 +40,18 @@ public class CourseCatalogService {
                                 EnrollmentRepository enrollmentRepository,
                                 UserRepository userRepository) {
         this(courseRepository, lectureRepository, reviewRepository, bookmarkRepository,
-                enrollmentRepository, userRepository, null);
+                enrollmentRepository, userRepository, null, null);
+    }
+
+    public CourseCatalogService(CourseRepository courseRepository,
+                                LectureRepository lectureRepository,
+                                ReviewRepository reviewRepository,
+                                BookmarkRepository bookmarkRepository,
+                                EnrollmentRepository enrollmentRepository,
+                                UserRepository userRepository,
+                                CourseInstructorRepository courseInstructorRepository) {
+        this(courseRepository, lectureRepository, reviewRepository, bookmarkRepository,
+                enrollmentRepository, userRepository, courseInstructorRepository, null);
     }
 
     @Autowired
@@ -48,7 +61,8 @@ public class CourseCatalogService {
                                 BookmarkRepository bookmarkRepository,
                                 EnrollmentRepository enrollmentRepository,
                                 UserRepository userRepository,
-                                @Autowired(required = false) CourseInstructorRepository courseInstructorRepository) {
+                                @Autowired(required = false) CourseInstructorRepository courseInstructorRepository,
+                                @Autowired(required = false) InstructorProfileRepository instructorProfileRepository) {
         this.courseRepository = courseRepository;
         this.lectureRepository = lectureRepository;
         this.reviewRepository = reviewRepository;
@@ -56,6 +70,7 @@ public class CourseCatalogService {
         this.enrollmentRepository = enrollmentRepository;
         this.userRepository = userRepository;
         this.courseInstructorRepository = courseInstructorRepository;
+        this.instructorProfileRepository = instructorProfileRepository;
     }
 
     /**
@@ -117,7 +132,7 @@ public class CourseCatalogService {
             boolean bookmarked = currentUserId != null &&
                     bookmarkRepository.existsByStudentIdAndCourseId(currentUserId, c.getId());
 
-            return new PublicCourseResponse(
+            PublicCourseResponse item = new PublicCourseResponse(
                     c.getId(),
                     c.getTitle(),
                     c.getDescription(),
@@ -131,6 +146,9 @@ public class CourseCatalogService {
                     enrolled,
                     bookmarked
             );
+            item.setInstructors(CourseInstructorResponse.resolveInstructorsForCourse(
+                    c, courseInstructorRepository, instructorProfileRepository));
+            return item;
         }).toList();
     }
 
@@ -159,7 +177,7 @@ public class CourseCatalogService {
         boolean bookmarked = currentUserId != null &&
                 bookmarkRepository.existsByStudentIdAndCourseId(currentUserId, courseId);
 
-        return new CourseDetailResponse(
+        CourseDetailResponse detail = new CourseDetailResponse(
                 course.getId(),
                 course.getTitle(),
                 course.getDescription(),
@@ -174,6 +192,24 @@ public class CourseCatalogService {
                 bookmarked,
                 lectureResponses
         );
+        detail.setInstructors(CourseInstructorResponse.resolveInstructorsForCourse(
+                course, courseInstructorRepository, instructorProfileRepository));
+        return detail;
+    }
+
+    /**
+     * FR-I59 — Retrieve all instructors associated with a course, including roles and basic profile info.
+     * Respects draft privacy: non-published courses require associated instructor or admin access.
+     */
+    @Transactional(readOnly = true)
+    public List<CourseInstructorResponse> getCourseInstructors(Integer courseId, User currentUser) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
+
+        verifyCourseVisibleToUser(course, currentUser);
+
+        return CourseInstructorResponse.resolveInstructorsForCourse(
+                course, courseInstructorRepository, instructorProfileRepository);
     }
 
     /**

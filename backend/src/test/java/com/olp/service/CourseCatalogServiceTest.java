@@ -1,10 +1,14 @@
 package com.olp.service;
 
 import com.olp.dto.CourseDetailResponse;
+import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.LectureResponse;
 import com.olp.dto.PublicCourseResponse;
 import com.olp.entity.Course;
+import com.olp.entity.CourseInstructor;
+import com.olp.entity.CourseInstructorRole;
 import com.olp.entity.CourseStatus;
+import com.olp.entity.InstructorProfile;
 import com.olp.entity.Lecture;
 import com.olp.entity.User;
 import com.olp.repository.*;
@@ -32,6 +36,7 @@ class CourseCatalogServiceTest {
     @Mock private EnrollmentRepository enrollmentRepository;
     @Mock private UserRepository userRepository;
     @Mock private CourseInstructorRepository courseInstructorRepository;
+    @Mock private InstructorProfileRepository instructorProfileRepository;
 
     @InjectMocks
     private CourseCatalogService service;
@@ -175,5 +180,46 @@ class CourseCatalogServiceTest {
         assertEquals("DRAFT", coDetail.getStatus());
         assertEquals("DRAFT", adminDetail.getStatus());
         assertFalse(service.getCourseLectures(1, coInstructor).get(0).isLocked());
+    }
+
+    // ===== FR-I59: Multiple Instructors on Public / Course Detail Endpoints =====
+
+    @Test
+    void publishedCourse_InstructorsVisibleToPublicAndDetailIncludesTeam() {
+        User coInstructor = new User("Dr. Ada", "ada@olp.com", "hash", "instructor", "active");
+        coInstructor.setId(30);
+
+        when(courseInstructorRepository.findByCourseIdWithInstructor(1)).thenReturn(List.of(
+                new CourseInstructor(course, coInstructor, CourseInstructorRole.CO_INSTRUCTOR),
+                new CourseInstructor(course, instructor, CourseInstructorRole.OWNER)
+        ));
+        when(instructorProfileRepository.findByInstructorIdIn(anyList())).thenReturn(List.of(
+                new InstructorProfile(instructor, "Ph.D. CS", "Java", "Course creator"),
+                new InstructorProfile(coInstructor, "M.Sc. SE", "Testing", "Co-instructor")
+        ));
+
+        List<CourseInstructorResponse> publicList = service.getCourseInstructors(1, null);
+        CourseDetailResponse detail = service.getCourseDetail(1, null);
+
+        assertEquals(2, publicList.size());
+        assertEquals(CourseInstructorRole.OWNER, publicList.get(0).getRole());
+        assertEquals(10, publicList.get(0).getInstructorId());
+        assertEquals("Ph.D. CS", publicList.get(0).getQualifications());
+
+        assertEquals(CourseInstructorRole.CO_INSTRUCTOR, publicList.get(1).getRole());
+        assertEquals(30, publicList.get(1).getInstructorId());
+        assertEquals("Testing", publicList.get(1).getExpertiseAreas());
+
+        assertEquals(2, detail.getInstructors().size());
+    }
+
+    @Test
+    void draftCourse_InstructorsDeniedToStudentAndAnonymous() {
+        course.setStatus(CourseStatus.DRAFT);
+        User student = new User("Sam", "sam@olp.com", "hash", "student", "active");
+        student.setId(20);
+
+        assertThrows(AccessDeniedException.class, () -> service.getCourseInstructors(1, null));
+        assertThrows(AccessDeniedException.class, () -> service.getCourseInstructors(1, student));
     }
 }
