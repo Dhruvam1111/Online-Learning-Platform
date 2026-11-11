@@ -1,0 +1,10 @@
+backups/
+*.enc
+*.p12
+*.key
+*.pem
+*.local
+availability*.jsonl
+*-restore-report.json
+
+__pycache__/
