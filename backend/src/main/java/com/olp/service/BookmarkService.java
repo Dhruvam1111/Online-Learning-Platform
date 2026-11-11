@@ -58,6 +58,7 @@ public class BookmarkService {
             JOIN courses c ON b.course_id = c.id
             JOIN users u ON c.instructor_id = u.id
             WHERE b.student_id = ?
+              AND c.status <> 'draft'
             ORDER BY b.created_at DESC
         """;
 

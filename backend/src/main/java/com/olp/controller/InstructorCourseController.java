@@ -1,5 +1,6 @@
 package com.olp.controller;
 
+import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseResponse;
 import com.olp.dto.CreateCourseRequest;
 import com.olp.dto.UpdateCourseRequest;
@@ -60,6 +61,59 @@ public class InstructorCourseController {
 
         List<CourseResponse> courses = instructorCourseService.getInstructorCourses(currentUser);
         return ResponseEntity.ok(courses);
+    }
+
+    /**
+     * GET /api/instructor/courses/drafts
+     * FR-I07: List only DRAFT courses associated with the authenticated instructor.
+     */
+    @GetMapping("/drafts")
+    public ResponseEntity<List<CourseResponse>> getDrafts(Authentication authentication) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        List<CourseResponse> drafts = instructorCourseService.getInstructorDrafts(currentUser);
+        return ResponseEntity.ok(drafts);
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}
+     * FR-I07: Retrieve a specific course (including DRAFT) for an associated instructor.
+     */
+    @GetMapping("/{courseId:\\d+}")
+    public ResponseEntity<CourseResponse> getCourseById(
+            Authentication authentication,
+            @PathVariable Integer courseId) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        CourseResponse response = instructorCourseService.getInstructorCourseById(currentUser, courseId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/instructor/courses/draft
+     * FR-I07: Save a new course draft (or update an existing draft if id is provided)
+     * without requiring all mandatory course fields.
+     */
+    @PostMapping("/draft")
+    public ResponseEntity<CourseResponse> saveDraft(
+            Authentication authentication,
+            @Valid @RequestBody(required = false) CourseDraftRequest request) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        boolean isNew = request == null || request.getId() == null;
+        CourseResponse response = instructorCourseService.saveDraft(currentUser, request);
+        return ResponseEntity.status(isNew ? HttpStatus.CREATED : HttpStatus.OK).body(response);
+    }
+
+    /**
+     * PUT / PATCH /api/instructor/courses/{courseId}/draft
+     * FR-I07: Partially update an existing course and save it as a draft.
+     */
+    @RequestMapping(value = "/{courseId}/draft", method = {RequestMethod.PUT, RequestMethod.PATCH})
+    public ResponseEntity<CourseResponse> updateDraft(
+            Authentication authentication,
+            @PathVariable Integer courseId,
+            @Valid @RequestBody(required = false) CourseDraftRequest request) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        CourseResponse response = instructorCourseService.saveDraft(currentUser, courseId, request);
+        return ResponseEntity.ok(response);
     }
 
     /**

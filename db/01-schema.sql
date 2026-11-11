@@ -54,9 +54,11 @@ CREATE TABLE users (
 -- TABLE: courses
 -- =========================
 -- Each course belongs to exactly one instructor.
--- Status: 'draft' means only the instructor sees it.
+-- Status: 'draft' means only associated instructors and admins see it.
+--         'pending_review' means submitted for admin approval.
 --         'published' means students can see it in the catalog.
--- There is NO 'pending_review' status this sprint (no admin approval).
+--         'archived' means hidden from catalog while preserving data.
+--         'rejected' means returned by admin with feedback.
 
 CREATE TABLE courses (
     id              SERIAL PRIMARY KEY,
@@ -74,7 +76,7 @@ CREATE TABLE courses (
         REFERENCES users(id)
         ON DELETE CASCADE,
 
-    CONSTRAINT chk_courses_status CHECK (status IN ('draft', 'pending_review', 'published', 'rejected'))
+    CONSTRAINT chk_courses_status CHECK (status IN ('draft', 'pending_review', 'published', 'archived', 'rejected'))
 );
 
 -- ON DELETE CASCADE: If an instructor account is deleted, their courses

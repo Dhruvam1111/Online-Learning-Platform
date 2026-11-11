@@ -1,5 +1,6 @@
 package com.olp.controller;
 
+import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseResponse;
 import com.olp.dto.CreateCourseRequest;
 import com.olp.dto.UpdateCourseRequest;
@@ -195,5 +196,73 @@ class InstructorCourseControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertEquals(CourseStatus.PUBLISHED, response.getBody().getStatus());
         verify(instructorCourseService, times(1)).updateCourseStatus(currentUser, 10, request);
+    }
+
+    @Test
+    void testSaveDraft_NewDraft_Returns201() {
+        givenResolvedUser();
+        CourseDraftRequest request = new CourseDraftRequest(null, "WIP description");
+        CourseResponse draft = courseResponse(15, "Untitled Draft");
+        when(instructorCourseService.saveDraft(currentUser, request)).thenReturn(draft);
+
+        ResponseEntity<CourseResponse> response = controller.saveDraft(authentication, request);
+
+        assertEquals(201, response.getStatusCode().value());
+        assertEquals(CourseStatus.DRAFT, response.getBody().getStatus());
+        verify(instructorCourseService).saveDraft(currentUser, request);
+    }
+
+    @Test
+    void testSaveDraft_WithExistingIdInBody_Returns200() {
+        givenResolvedUser();
+        CourseDraftRequest request = new CourseDraftRequest("Updated Draft Title", null);
+        request.setId(15);
+        CourseResponse draft = courseResponse(15, "Updated Draft Title");
+        when(instructorCourseService.saveDraft(currentUser, request)).thenReturn(draft);
+
+        ResponseEntity<CourseResponse> response = controller.saveDraft(authentication, request);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("Updated Draft Title", response.getBody().getTitle());
+    }
+
+    @Test
+    void testUpdateDraft_Returns200() {
+        givenResolvedUser();
+        CourseDraftRequest request = new CourseDraftRequest(null, "Partial description");
+        CourseResponse updated = courseResponse(10, "Original Title");
+        when(instructorCourseService.saveDraft(currentUser, 10, request)).thenReturn(updated);
+
+        ResponseEntity<CourseResponse> response = controller.updateDraft(authentication, 10, request);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertSame(updated, response.getBody());
+        verify(instructorCourseService).saveDraft(currentUser, 10, request);
+    }
+
+    @Test
+    void testGetDrafts_Returns200WithDraftList() {
+        givenResolvedUser();
+        List<CourseResponse> drafts = List.of(courseResponse(10, "Draft 1"));
+        when(instructorCourseService.getInstructorDrafts(currentUser)).thenReturn(drafts);
+
+        ResponseEntity<List<CourseResponse>> response = controller.getDrafts(authentication);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(1, response.getBody().size());
+        verify(instructorCourseService).getInstructorDrafts(currentUser);
+    }
+
+    @Test
+    void testGetCourseById_Returns200WithCourse() {
+        givenResolvedUser();
+        CourseResponse course = courseResponse(10, "Draft Course");
+        when(instructorCourseService.getInstructorCourseById(currentUser, 10)).thenReturn(course);
+
+        ResponseEntity<CourseResponse> response = controller.getCourseById(authentication, 10);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertSame(course, response.getBody());
+        verify(instructorCourseService).getInstructorCourseById(currentUser, 10);
     }
 }
