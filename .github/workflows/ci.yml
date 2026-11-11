@@ -139,11 +139,15 @@ jobs:
       - name: Initialize PostgreSQL Test Database with Schema, Indexes and Seed
         run: |
           echo "Applying 01-schema.sql..."
-          PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d olp_test -f db/01-schema.sql
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/01-schema.sql
           echo "Applying 02-indexes.sql..."
-          PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d olp_test -f db/02-indexes.sql
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/02-indexes.sql
           echo "Applying 03-seed.sql..."
-          PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d olp_test -f db/03-seed.sql
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/03-seed.sql
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/04-payment-schema.sql
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/migrations/20261110-payment-claims.sql
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/migrations/20261110-payment-hardening.sql
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/migrations/20261111-payment-completion.sql
           echo "PostgreSQL schema successfully initialized."
 
       - name: Run Maven Tests against PostgreSQL
@@ -154,7 +158,14 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: postgres
           JWT_SECRET: dGVzdC1qd3Qtc2VjcmV0LWZvci1jaS1waXBlbGluZS12YWxpZGF0aW9uMTIzNDU2
           JWT_EXPIRATION_MS: '86400000'
-        run: mvn test -B
+        run: |
+          mvn test -B
+          if [ -f ../ops/payments/deployment.example.yaml ]; then
+            python3 scripts/check-payment-coverage.py
+            python3 -m unittest discover -s ../ops/payments -p 'test_*.py'
+          else
+            echo "Full payment coverage checks run after the feature layer is added."
+          fi
 
   # ============================================================================
   # 3. Docker Container Build Validation

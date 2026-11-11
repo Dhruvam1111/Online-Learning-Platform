@@ -45,6 +45,11 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
+        <!-- Simulated UPI QR code generation -->
+        <dependency><groupId>com.google.zxing</groupId><artifactId>core</artifactId><version>3.5.3</version></dependency>
+        <dependency><groupId>com.google.zxing</groupId><artifactId>javase</artifactId><version>3.5.3</version></dependency>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>
+
         <!-- PostgreSQL -->
         <dependency>
             <groupId>org.postgresql</groupId>
@@ -111,10 +116,9 @@
                 <version>0.8.12</version>
                 <configuration>
                     <excludes>
-                        <!-- Exclude DTOs, Entities, and Configs to measure real business logic -->
+                        <!-- Exclude DTOs and Entities from line coverage -->
                         <exclude>com/olp/dto/**</exclude>
                         <exclude>com/olp/entity/**</exclude>
-                        <exclude>com/olp/config/**</exclude>
                         <exclude>com/olp/BackendApplication.class</exclude>
                     </excludes>
                 </configuration>
