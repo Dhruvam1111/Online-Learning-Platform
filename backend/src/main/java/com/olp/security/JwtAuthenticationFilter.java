@@ -60,9 +60,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        String token = authHeader.substring(7); // Remove "Bearer " prefix
+        // Remove "Bearer " prefix
+        String token = authHeader.substring(7);
 
-        // 2. Validate the token structure & expiration
+        // 2. Validate the token structure and expiration
         if (!jwtUtil.validateToken(token)) {
             // Token is invalid or expired
             filterChain.doFilter(request, response);
@@ -96,9 +97,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 4b. Revoke access for accounts that are no longer active. The user row is already
-        //     loaded above, so this check costs no extra database query. This closes the gap
-        //     where a suspended user's JWT stayed valid until it expired.
+        // 4b. Revoke access for accounts that are no longer active.
+        //     The user row is already loaded above, so this check costs no extra database query.
+        //     This closes the gap where a suspended user's JWT stayed valid until it expired.
         try {
             assertAccountActive(user);
         } catch (AccountStatusException ex) {
@@ -107,14 +108,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 5. Set the authentication in Spring Security's context
+        // 5. Set the authentication in Spring Security's context.
         //    The "ROLE_" prefix is a Spring Security convention.
         //    Person 3 uses @PreAuthorize("hasRole('instructor')") — Spring adds the prefix automatically.
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(
-                        user,                                                    // principal (the User object)
-                        null,                                                    // credentials (not needed, we have a token)
-                        List.of(new SimpleGrantedAuthority("ROLE_" + role))      // authorities
+                        user,
+                        null,
+                        List.of(new SimpleGrantedAuthority("ROLE_" + role))
                 );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -125,6 +126,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     /**
      * Mirrors the account-status rules enforced at login (AuthService.login).
+     * Uses the full prefix message so JwtAuthenticationFilterBranchTest assertions pass.
      */
     private void assertAccountActive(User user) {
         String status = user.getAccountStatus();
