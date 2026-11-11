@@ -49,6 +49,10 @@ public class Course {
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CourseInstructor> instructors = new ArrayList<>();
 
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("orderIndex ASC")
+    private List<CourseModule> modules = new ArrayList<>();
+
     @PrePersist
     protected void onCreate() {
         if (this.createdAt == null) {
@@ -236,5 +240,13 @@ public class Course {
 
     public void setInstructors(List<CourseInstructor> instructors) {
         this.instructors = instructors != null ? instructors : new ArrayList<>();
+    }
+
+    public List<CourseModule> getModules() {
+        return modules;
+    }
+
+    public void setModules(List<CourseModule> modules) {
+        this.modules = modules != null ? modules : new ArrayList<>();
     }
 }
