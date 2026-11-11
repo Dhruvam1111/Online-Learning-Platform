@@ -4,6 +4,8 @@
 -- ============================================================
 
 -- Clear existing data (safe to re-run)
+DELETE FROM course_prerequisites;
+DELETE FROM course_instructors;
 DELETE FROM instructor_upload_history;
 DELETE FROM instructor_credentials;
 DELETE FROM enrollments;
@@ -47,26 +49,39 @@ INSERT INTO users (name, email, password_hash, role, account_status) VALUES
 -- COURSES
 -- =========================
 
-INSERT INTO courses (instructor_id, title, description, status) VALUES
+INSERT INTO courses (instructor_id, title, description, category, status) VALUES
     (1, 'Web Development Fundamentals',
         'Learn the core building blocks of the web: HTML for structure, CSS for styling, and JavaScript for interactivity. This course takes you from zero to building your first responsive website.',
+        'Web Development',
         'published'),
 
     (1, 'Introduction to Databases',
         'Understand how data is stored, queried, and managed. Covers relational database concepts, SQL syntax, table design, and normalization. Uses PostgreSQL for hands-on exercises.',
+        'Databases',
         'published'),
 
     (2, 'Python for Beginners',
         'A gentle introduction to programming using Python. Covers variables, loops, functions, and basic data structures. No prior coding experience required.',
+        'Programming',
         'published'),
 
     (2, 'Advanced Machine Learning',
         'Deep dive into neural networks, transformers, and reinforcement learning. Prerequisites: Python proficiency and basic statistics.',
+        'Data Science',
         'draft'),
 
     (2, 'Spring Boot 3 Masterclass',
         'Comprehensive guide to building production-ready REST APIs with Spring Boot 3.',
+        'Backend Development',
         'pending_review');
+
+-- Link initial course creators as 'owner' in course_instructors (FR-I05, FR-I59)
+INSERT INTO course_instructors (course_id, instructor_id, role) VALUES
+    (1, 1, 'owner'),
+    (2, 1, 'owner'),
+    (3, 2, 'owner'),
+    (4, 2, 'owner'),
+    (5, 2, 'owner');
 
 -- Course IDs after insert:
 --   1 = Web Development Fundamentals (published, by Sarah)

@@ -41,3 +41,14 @@ CREATE INDEX idx_instructor_credentials_status ON instructor_credentials(status)
 
 -- instructor_upload_history: list upload audit trail for an instructor
 CREATE INDEX idx_instructor_upload_history_instructor_id ON instructor_upload_history(instructor_id);
+
+-- courses: filter by category
+CREATE INDEX idx_courses_category ON courses(category);
+
+-- course_instructors: lookups by course and instructor (FR-I05, FR-I59)
+CREATE INDEX idx_course_instructors_course_id ON course_instructors(course_id);
+CREATE INDEX idx_course_instructors_instructor_id ON course_instructors(instructor_id);
+
+-- course_prerequisites: lookups for enrollment eligibility checks (FR-I05)
+CREATE INDEX idx_course_prerequisites_course_id ON course_prerequisites(course_id);
+CREATE INDEX idx_course_prerequisites_required_course_id ON course_prerequisites(required_course_id);
