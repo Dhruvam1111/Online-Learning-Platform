@@ -1,5 +1,7 @@
 package com.olp.dto;
 
+import java.time.LocalDateTime;
+
 public class InstructorProfileResponse {
 
     private Integer id;
@@ -9,11 +11,19 @@ public class InstructorProfileResponse {
     private String qualifications;
     private String expertiseAreas;
     private String bio;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     public InstructorProfileResponse() {}
 
     public InstructorProfileResponse(Integer id, String name, String email, String role,
                                      String qualifications, String expertiseAreas, String bio) {
+        this(id, name, email, role, qualifications, expertiseAreas, bio, null, null);
+    }
+
+    public InstructorProfileResponse(Integer id, String name, String email, String role,
+                                     String qualifications, String expertiseAreas, String bio,
+                                     LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.name = name;
         this.email = email;
@@ -21,6 +31,8 @@ public class InstructorProfileResponse {
         this.qualifications = qualifications;
         this.expertiseAreas = expertiseAreas;
         this.bio = bio;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
     }
 
     // ===== Getters and Setters =====
@@ -31,6 +43,14 @@ public class InstructorProfileResponse {
 
     public void setId(Integer id) {
         this.id = id;
+    }
+
+    public Integer getInstructorId() {
+        return id;
+    }
+
+    public void setInstructorId(Integer instructorId) {
+        this.id = instructorId;
     }
 
     public String getName() {
@@ -79,5 +99,21 @@ public class InstructorProfileResponse {
 
     public void setBio(String bio) {
         this.bio = bio;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }
