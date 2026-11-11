@@ -1,5 +1,6 @@
 package com.olp.service;
 
+import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CoursePrerequisiteRequest;
 import com.olp.dto.CourseResponse;
 import com.olp.dto.CreateCourseRequest;
@@ -23,7 +24,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 @Service
@@ -81,16 +84,38 @@ public class InstructorCourseService {
     }
 
     /**
-     * FR-I60 — List only courses owned by the authenticated instructor.
+     * FR-I60 — List courses associated with the authenticated instructor.
      */
     @Transactional(readOnly = true)
     public List<CourseResponse> getInstructorCourses(User currentUser) {
         validateInstructor(currentUser);
 
-        List<Course> courses = courseRepository.findByInstructorIdOrderByIdAsc(currentUser.getId());
-        return courses.stream()
+        return findAllAssociatedCourses(currentUser).stream()
                 .map(CourseResponse::fromEntity)
                 .toList();
+    }
+
+    /**
+     * FR-I07 — List only DRAFT courses associated with the authenticated instructor.
+     */
+    @Transactional(readOnly = true)
+    public List<CourseResponse> getInstructorDrafts(User currentUser) {
+        validateInstructor(currentUser);
+
+        return findAllAssociatedCourses(currentUser).stream()
+                .filter(c -> c.getStatus() == CourseStatus.DRAFT)
+                .map(CourseResponse::fromEntity)
+                .toList();
+    }
+
+    /**
+     * FR-I07 — Retrieve a single course (including DRAFT) for an associated instructor.
+     */
+    @Transactional(readOnly = true)
+    public CourseResponse getInstructorCourseById(User currentUser, Integer courseId) {
+        validateInstructor(currentUser);
+        Course course = findCourseAndVerifyOwnership(courseId, currentUser);
+        return CourseResponse.fromEntity(course);
     }
 
     /**
@@ -140,55 +165,9 @@ public class InstructorCourseService {
             validateContentPolicy("category", category);
         }
 
-        // Validate learning outcomes
-        List<String> cleanOutcomes = new ArrayList<>();
-        if (request.getLearningOutcomes() != null) {
-            for (String outcome : request.getLearningOutcomes()) {
-                if (outcome == null || outcome.trim().isEmpty()) {
-                    throw new IllegalArgumentException("Learning outcome cannot be blank");
-                }
-                String trimmedOutcome = outcome.trim();
-                validateContentPolicy("learning outcome", trimmedOutcome);
-                cleanOutcomes.add(trimmedOutcome);
-            }
-        }
-
-        // Validate prerequisites
+        List<String> cleanOutcomes = validateAndCleanOutcomes(request.getLearningOutcomes(), false);
         List<CoursePrerequisiteRequest> prereqRequests = request.getPrerequisites();
-        if (prereqRequests != null) {
-            for (CoursePrerequisiteRequest prereq : prereqRequests) {
-                if (prereq == null) continue;
-
-                String type = prereq.getType() != null ? prereq.getType().trim().toUpperCase() : null;
-                if (type == null || type.isEmpty()) {
-                    type = prereq.getRequiredCourseId() != null ? "COURSE" : "SKILL";
-                }
-                if (!"COURSE".equals(type) && !"SKILL".equals(type)) {
-                    throw new IllegalArgumentException("Invalid prerequisite type: must be COURSE or SKILL");
-                }
-
-                if (prereq.getTitle() != null) {
-                    validateContentPolicy("prerequisite title", prereq.getTitle());
-                }
-                if (prereq.getDescription() != null) {
-                    validateContentPolicy("prerequisite description", prereq.getDescription());
-                }
-
-                if ("COURSE".equals(type)) {
-                    if (prereq.getRequiredCourseId() == null && (prereq.getTitle() == null || prereq.getTitle().trim().isEmpty())) {
-                        throw new IllegalArgumentException("Course prerequisite must specify either requiredCourseId or title");
-                    }
-                    if (prereq.getRequiredCourseId() != null) {
-                        courseRepository.findById(prereq.getRequiredCourseId())
-                                .orElseThrow(() -> new ResourceNotFoundException("Prerequisite course not found with id: " + prereq.getRequiredCourseId()));
-                    }
-                } else {
-                    if (prereq.getTitle() == null || prereq.getTitle().trim().isEmpty()) {
-                        throw new IllegalArgumentException("Prerequisite skill title cannot be blank");
-                    }
-                }
-            }
-        }
+        validatePrerequisites(prereqRequests, null);
 
         // FR-I05: Every newly created course must automatically have DRAFT status
         Course course = new Course(
@@ -213,31 +192,168 @@ public class InstructorCourseService {
 
         // FR-I05: Store structured prerequisites for future enrollment eligibility checks
         if (saved != null && prereqRequests != null && coursePrerequisiteRepository != null) {
-            for (CoursePrerequisiteRequest prereq : prereqRequests) {
-                if (prereq == null) continue;
+            persistPrerequisites(saved, prereqRequests);
+        }
 
-                String type = prereq.getType() != null ? prereq.getType().trim().toUpperCase() : null;
-                if (type == null || type.isEmpty()) {
-                    type = prereq.getRequiredCourseId() != null ? "COURSE" : "SKILL";
-                }
+        return CourseResponse.fromEntity(saved);
+    }
 
-                Course requiredCourseEntity = null;
-                String title = prereq.getTitle() != null ? prereq.getTitle().trim() : null;
+    /**
+     * FR-I07 — Save a new or existing course as DRAFT without requiring all mandatory fields.
+     */
+    @Transactional
+    public CourseResponse saveDraft(User currentUser, CourseDraftRequest request) {
+        Integer targetCourseId = request != null ? request.getId() : null;
+        return saveDraft(currentUser, targetCourseId, request);
+    }
 
-                if ("COURSE".equals(type) && prereq.getRequiredCourseId() != null) {
-                    requiredCourseEntity = courseRepository.findById(prereq.getRequiredCourseId()).orElse(null);
-                    if (title == null || title.isEmpty()) {
-                        title = requiredCourseEntity != null ? requiredCourseEntity.getTitle() : "Course #" + prereq.getRequiredCourseId();
-                    }
-                }
+    /**
+     * FR-I07 — Save a new (courseId == null) or partially update an existing course as DRAFT.
+     * Skips course-completeness validation while validating data types/bounds and content policy.
+     * Preserves existing fields when omitted and protects published/submitted/archived courses.
+     */
+    @Transactional
+    public CourseResponse saveDraft(User currentUser, Integer courseId, CourseDraftRequest request) {
+        validateInstructor(currentUser);
 
-                String desc = prereq.getDescription() != null ? prereq.getDescription().trim() : null;
-                CoursePrerequisite cp = new CoursePrerequisite(saved, type, requiredCourseEntity, title, desc);
-                CoursePrerequisite savedCp = coursePrerequisiteRepository.save(cp);
-                saved.getPrerequisites().add(savedCp);
+        if (request != null && request.getInstructorId() != null
+                && !request.getInstructorId().equals(currentUser.getId())) {
+            throw new AccessDeniedException("Cannot save a draft for another instructor");
+        }
+        if (courseId != null && request != null && request.getId() != null && !request.getId().equals(courseId)) {
+            throw new IllegalArgumentException("Course ID in path and body do not match");
+        }
+
+        if (courseId == null) {
+            return createNewDraft(currentUser, request);
+        }
+        return updateExistingDraft(currentUser, courseId, request);
+    }
+
+    private CourseResponse createNewDraft(User currentUser, CourseDraftRequest request) {
+        String title = "Untitled Draft";
+        if (request != null && request.getTitle() != null) {
+            String trimmedTitle = request.getTitle().trim();
+            if (trimmedTitle.length() > 200) {
+                throw new IllegalArgumentException("Title must be 200 characters or fewer");
+            }
+            if (!trimmedTitle.isEmpty()) {
+                validateContentPolicy("title", trimmedTitle);
+                title = trimmedTitle;
             }
         }
 
+        String description = null;
+        if (request != null && request.getDescription() != null) {
+            String trimmedDescription = request.getDescription().trim();
+            validateContentPolicy("description", trimmedDescription);
+            description = trimmedDescription.isEmpty() ? null : trimmedDescription;
+        }
+
+        String category = "General";
+        if (request != null && request.getCategory() != null) {
+            String trimmedCategory = request.getCategory().trim();
+            if (trimmedCategory.length() > 100) {
+                throw new IllegalArgumentException("Category must be 100 characters or fewer");
+            }
+            if (!trimmedCategory.isEmpty()) {
+                validateContentPolicy("category", trimmedCategory);
+                category = trimmedCategory;
+            }
+        }
+
+        List<String> cleanOutcomes = request != null
+                ? validateAndCleanOutcomes(request.getLearningOutcomes(), true)
+                : new ArrayList<>();
+
+        List<CoursePrerequisiteRequest> prereqRequests = request != null ? request.getPrerequisites() : null;
+        validatePrerequisites(prereqRequests, null);
+
+        Course course = new Course(currentUser, title, description, category, CourseStatus.DRAFT);
+        if (!cleanOutcomes.isEmpty()) {
+            course.setLearningOutcomesList(cleanOutcomes);
+        }
+
+        Course saved = courseRepository.save(course);
+
+        if (saved != null && courseInstructorRepository != null) {
+            CourseInstructor ownerMapping = new CourseInstructor(saved, currentUser, "owner");
+            courseInstructorRepository.save(ownerMapping);
+            saved.getInstructors().add(ownerMapping);
+        }
+
+        if (saved != null && prereqRequests != null && coursePrerequisiteRepository != null) {
+            persistPrerequisites(saved, prereqRequests);
+        }
+
+        return CourseResponse.fromEntity(saved);
+    }
+
+    private CourseResponse updateExistingDraft(User currentUser, Integer courseId, CourseDraftRequest request) {
+        Course existing = findCourseAndVerifyOwnership(courseId, currentUser);
+
+        // FR-I07: Preserve existing data and never change status of published, submitted, or archived courses to DRAFT
+        CourseStatus currentStatus = existing.getStatus();
+        if (currentStatus == CourseStatus.PUBLISHED
+                || currentStatus == CourseStatus.PENDING_REVIEW
+                || currentStatus == CourseStatus.ARCHIVED) {
+            throw new IllegalStateException(
+                    "Cannot save course as draft when status is " + currentStatus.name()
+                            + ". Existing course data and status are preserved.");
+        }
+
+        if (currentStatus == null || currentStatus == CourseStatus.REJECTED) {
+            existing.setStatus(CourseStatus.DRAFT);
+        }
+
+        if (request != null) {
+            if (request.getTitle() != null) {
+                String trimmedTitle = request.getTitle().trim();
+                if (trimmedTitle.length() > 200) {
+                    throw new IllegalArgumentException("Title must be 200 characters or fewer");
+                }
+                if (!trimmedTitle.isEmpty()) {
+                    validateContentPolicy("title", trimmedTitle);
+                    existing.setTitle(trimmedTitle);
+                } else if (existing.getTitle() == null || existing.getTitle().trim().isEmpty()) {
+                    existing.setTitle("Untitled Draft");
+                }
+            }
+
+            if (request.getDescription() != null) {
+                String trimmedDescription = request.getDescription().trim();
+                validateContentPolicy("description", trimmedDescription);
+                existing.setDescription(trimmedDescription.isEmpty() ? null : trimmedDescription);
+            }
+
+            if (request.getCategory() != null) {
+                String trimmedCategory = request.getCategory().trim();
+                if (trimmedCategory.length() > 100) {
+                    throw new IllegalArgumentException("Category must be 100 characters or fewer");
+                }
+                if (!trimmedCategory.isEmpty()) {
+                    validateContentPolicy("category", trimmedCategory);
+                    existing.setCategory(trimmedCategory);
+                }
+            }
+
+            if (request.getLearningOutcomes() != null) {
+                List<String> cleanOutcomes = validateAndCleanOutcomes(request.getLearningOutcomes(), true);
+                existing.setLearningOutcomesList(cleanOutcomes);
+            }
+
+            if (request.getPrerequisites() != null) {
+                validatePrerequisites(request.getPrerequisites(), courseId);
+                if (existing.getPrerequisites() != null) {
+                    existing.getPrerequisites().clear();
+                }
+                if (coursePrerequisiteRepository != null) {
+                    persistPrerequisites(existing, request.getPrerequisites());
+                }
+            }
+        }
+
+        Course saved = courseRepository.save(existing);
         return CourseResponse.fromEntity(saved);
     }
 
@@ -273,7 +389,7 @@ public class InstructorCourseService {
     }
 
     /**
-     * FR-I09 — Change status between DRAFT and PUBLISHED for an owned course.
+     * FR-I09 — Change course status for an owned course.
      */
     @Transactional
     public CourseResponse updateCourseStatus(User currentUser, Integer courseId, UpdateCourseStatusRequest request) {
@@ -307,6 +423,128 @@ public class InstructorCourseService {
         }
     }
 
+    private List<Course> findAllAssociatedCourses(User currentUser) {
+        Map<Integer, Course> uniqueCourses = new LinkedHashMap<>();
+        List<Course> primaryCourses = courseRepository.findByInstructorIdOrderByIdAsc(currentUser.getId());
+        if (primaryCourses != null) {
+            for (Course c : primaryCourses) {
+                if (c != null && c.getId() != null) {
+                    uniqueCourses.put(c.getId(), c);
+                }
+            }
+        }
+        if (courseInstructorRepository != null) {
+            List<CourseInstructor> associations = courseInstructorRepository.findByInstructorId(currentUser.getId());
+            if (associations != null) {
+                for (CourseInstructor ci : associations) {
+                    if (ci != null && ci.getCourse() != null && ci.getCourse().getId() != null) {
+                        uniqueCourses.putIfAbsent(ci.getCourse().getId(), ci.getCourse());
+                    }
+                }
+            }
+        }
+        return new ArrayList<>(uniqueCourses.values());
+    }
+
+    private List<String> validateAndCleanOutcomes(List<String> outcomes, boolean skipBlankItems) {
+        List<String> cleanOutcomes = new ArrayList<>();
+        if (outcomes == null) {
+            return cleanOutcomes;
+        }
+        for (String outcome : outcomes) {
+            if (outcome == null || outcome.trim().isEmpty()) {
+                if (skipBlankItems) {
+                    continue;
+                }
+                throw new IllegalArgumentException("Learning outcome cannot be blank");
+            }
+            String trimmedOutcome = outcome.trim();
+            validateContentPolicy("learning outcome", trimmedOutcome);
+            cleanOutcomes.add(trimmedOutcome);
+        }
+        return cleanOutcomes;
+    }
+
+    private void validatePrerequisites(List<CoursePrerequisiteRequest> prereqRequests, Integer selfCourseId) {
+        if (prereqRequests == null) {
+            return;
+        }
+        for (CoursePrerequisiteRequest prereq : prereqRequests) {
+            if (prereq == null) {
+                continue;
+            }
+
+            String type = prereq.getType() != null ? prereq.getType().trim().toUpperCase() : null;
+            if (type == null || type.isEmpty()) {
+                type = prereq.getRequiredCourseId() != null ? "COURSE" : "SKILL";
+            }
+            if (!"COURSE".equals(type) && !"SKILL".equals(type)) {
+                throw new IllegalArgumentException("Invalid prerequisite type: must be COURSE or SKILL");
+            }
+
+            if (prereq.getTitle() != null) {
+                if (prereq.getTitle().trim().length() > 200) {
+                    throw new IllegalArgumentException("Prerequisite title must be 200 characters or fewer");
+                }
+                validateContentPolicy("prerequisite title", prereq.getTitle());
+            }
+            if (prereq.getDescription() != null) {
+                if (prereq.getDescription().trim().length() > 500) {
+                    throw new IllegalArgumentException("Prerequisite description must be 500 characters or fewer");
+                }
+                validateContentPolicy("prerequisite description", prereq.getDescription());
+            }
+
+            if ("COURSE".equals(type)) {
+                if (prereq.getRequiredCourseId() == null && (prereq.getTitle() == null || prereq.getTitle().trim().isEmpty())) {
+                    throw new IllegalArgumentException("Course prerequisite must specify either requiredCourseId or title");
+                }
+                if (prereq.getRequiredCourseId() != null) {
+                    if (prereq.getRequiredCourseId() <= 0) {
+                        throw new IllegalArgumentException("Prerequisite course ID must be positive");
+                    }
+                    if (selfCourseId != null && selfCourseId.equals(prereq.getRequiredCourseId())) {
+                        throw new IllegalArgumentException("A course cannot be a prerequisite of itself");
+                    }
+                    courseRepository.findById(prereq.getRequiredCourseId())
+                            .orElseThrow(() -> new ResourceNotFoundException("Prerequisite course not found with id: " + prereq.getRequiredCourseId()));
+                }
+            } else {
+                if (prereq.getTitle() == null || prereq.getTitle().trim().isEmpty()) {
+                    throw new IllegalArgumentException("Prerequisite skill title cannot be blank");
+                }
+            }
+        }
+    }
+
+    private void persistPrerequisites(Course course, List<CoursePrerequisiteRequest> prereqRequests) {
+        for (CoursePrerequisiteRequest prereq : prereqRequests) {
+            if (prereq == null) {
+                continue;
+            }
+
+            String type = prereq.getType() != null ? prereq.getType().trim().toUpperCase() : null;
+            if (type == null || type.isEmpty()) {
+                type = prereq.getRequiredCourseId() != null ? "COURSE" : "SKILL";
+            }
+
+            Course requiredCourseEntity = null;
+            String title = prereq.getTitle() != null ? prereq.getTitle().trim() : null;
+
+            if ("COURSE".equals(type) && prereq.getRequiredCourseId() != null) {
+                requiredCourseEntity = courseRepository.findById(prereq.getRequiredCourseId()).orElse(null);
+                if (title == null || title.isEmpty()) {
+                    title = requiredCourseEntity != null ? requiredCourseEntity.getTitle() : "Course #" + prereq.getRequiredCourseId();
+                }
+            }
+
+            String desc = prereq.getDescription() != null ? prereq.getDescription().trim() : null;
+            CoursePrerequisite cp = new CoursePrerequisite(course, type, requiredCourseEntity, title, desc);
+            CoursePrerequisite savedCp = coursePrerequisiteRepository.save(cp);
+            course.getPrerequisites().add(savedCp);
+        }
+    }
+
     private Course findCourseAndVerifyOwnership(Integer courseId, User currentUser) {
         if (courseId == null) {
             throw new IllegalArgumentException("Course ID cannot be null");
@@ -315,7 +553,10 @@ public class InstructorCourseService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
 
-        if (course.getInstructor() == null || !currentUser.getId().equals(course.getInstructor().getId())) {
+        boolean isOwner = course.getInstructor() != null && currentUser.getId().equals(course.getInstructor().getId());
+        boolean isCoInstructor = courseInstructorRepository != null
+                && courseInstructorRepository.existsByCourseIdAndInstructorId(courseId, currentUser.getId());
+        if (!isOwner && !isCoInstructor) {
             throw new AccessDeniedException("Cannot modify another instructor's course");
         }
 

@@ -1,5 +1,6 @@
 package com.olp.service;
 
+import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CoursePrerequisiteRequest;
 import com.olp.dto.CourseResponse;
 import com.olp.dto.CreateCourseRequest;
@@ -556,10 +557,15 @@ class InstructorCourseServiceTest {
         givenOwnedCourse(10, instructor(1));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.updateCourseStatus(instructor(1), 10, new UpdateCourseStatusRequest("archived")));
+                () -> service.updateCourseStatus(instructor(1), 10, new UpdateCourseStatusRequest("unknown_status")));
 
         assertTrue(ex.getMessage().contains("Invalid course status"));
         verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testUpdateCourseStatus_Archived_Supported() {
+        assertStatusChange("archived", CourseStatus.ARCHIVED);
     }
 
     private void assertStatusChange(String input, CourseStatus expected) {
@@ -602,5 +608,234 @@ class InstructorCourseServiceTest {
         CourseResponse response = service.updateCourseStatus(instructor(1), 10, new UpdateCourseStatusRequest("draft"));
 
         assertEquals(CourseStatus.DRAFT, response.getStatus());
+    }
+
+    // ===== FR-I07: Save Course as Draft & Statuses =====
+
+    @Test
+    void testCourseEntity_SupportsAllRequiredStatusesWithDraftDefault() {
+        Course defaultCourse = new Course();
+        assertEquals(CourseStatus.DRAFT, defaultCourse.getStatus());
+
+        assertEquals(CourseStatus.DRAFT, CourseStatus.fromString("DRAFT"));
+        assertEquals(CourseStatus.PENDING_REVIEW, CourseStatus.fromString("PENDING_REVIEW"));
+        assertEquals(CourseStatus.PUBLISHED, CourseStatus.fromString("PUBLISHED"));
+        assertEquals(CourseStatus.ARCHIVED, CourseStatus.fromString("ARCHIVED"));
+    }
+
+    @Test
+    void testSaveDraft_NewCourseWithMinimalEmptyPayload_CreatesUntitledDraft() {
+        User owner = instructor(1);
+        stubSaveReturnsArgument();
+
+        CourseResponse response = service.saveDraft(owner, new CourseDraftRequest());
+
+        ArgumentCaptor<Course> captor = ArgumentCaptor.forClass(Course.class);
+        verify(courseRepository).save(captor.capture());
+        Course saved = captor.getValue();
+        assertEquals("Untitled Draft", saved.getTitle());
+        assertNull(saved.getDescription());
+        assertEquals("General", saved.getCategory());
+        assertEquals(CourseStatus.DRAFT, saved.getStatus());
+        assertEquals("Untitled Draft", response.getTitle());
+        assertEquals(CourseStatus.DRAFT, response.getStatus());
+        verify(courseInstructorRepository, times(1)).save(any(CourseInstructor.class));
+    }
+
+    @Test
+    void testSaveDraft_NewCourseWithPartialData_SkipsCompletenessValidation() {
+        User owner = instructor(1);
+        stubSaveReturnsArgument();
+
+        CourseDraftRequest request = new CourseDraftRequest(null, "Work in progress description");
+        request.setLearningOutcomes(List.of("Understand draft flow", "   "));
+
+        CourseResponse response = service.saveDraft(owner, request);
+
+        assertEquals("Untitled Draft", response.getTitle());
+        assertEquals("Work in progress description", response.getDescription());
+        assertEquals(CourseStatus.DRAFT, response.getStatus());
+        assertEquals(List.of("Understand draft flow"), response.getLearningOutcomes());
+    }
+
+    @Test
+    void testSaveDraft_ExistingDraft_PartialUpdatePreservesOmittedFields() {
+        User owner = instructor(1);
+        Course existing = givenOwnedCourse(10, owner);
+        existing.setCategory("Data Science");
+        existing.setLearningOutcomesList(List.of("Existing outcome"));
+        stubSaveReturnsArgument();
+
+        CourseDraftRequest request = new CourseDraftRequest();
+        request.setDescription("Updated partial description");
+
+        CourseResponse response = service.saveDraft(owner, 10, request);
+
+        assertEquals("Original Title", response.getTitle());
+        assertEquals("Data Science", response.getCategory());
+        assertEquals(List.of("Existing outcome"), response.getLearningOutcomes());
+        assertEquals("Updated partial description", response.getDescription());
+        assertEquals(CourseStatus.DRAFT, response.getStatus());
+    }
+
+    @Test
+    void testSaveDraft_ExistingDraft_CoInstructorAllowed() {
+        User owner = instructor(1);
+        User coInstructor = instructor(2);
+        Course existing = givenOwnedCourse(10, owner);
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(10, 2)).thenReturn(true);
+        stubSaveReturnsArgument();
+
+        CourseDraftRequest request = new CourseDraftRequest("Co-edited Draft", null);
+
+        CourseResponse response = service.saveDraft(coInstructor, 10, request);
+
+        assertEquals("Co-edited Draft", response.getTitle());
+        assertEquals("Original Description", response.getDescription());
+        assertEquals(CourseStatus.DRAFT, response.getStatus());
+    }
+
+    @Test
+    void testSaveDraft_PublishedCourse_RejectedAndPreservesStatusAndData() {
+        User owner = instructor(1);
+        Course published = givenOwnedCourse(10, owner);
+        published.setStatus(CourseStatus.PUBLISHED);
+
+        CourseDraftRequest request = new CourseDraftRequest("Changed Title", "Changed Desc");
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> service.saveDraft(owner, 10, request));
+
+        assertTrue(ex.getMessage().contains("PUBLISHED"));
+        assertEquals(CourseStatus.PUBLISHED, published.getStatus());
+        assertEquals("Original Title", published.getTitle());
+        assertEquals("Original Description", published.getDescription());
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testSaveDraft_PendingReviewCourse_RejectedAndPreservesStatusAndData() {
+        User owner = instructor(1);
+        Course submitted = givenOwnedCourse(10, owner);
+        submitted.setStatus(CourseStatus.PENDING_REVIEW);
+
+        CourseDraftRequest request = new CourseDraftRequest("Tampered Title", null);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> service.saveDraft(owner, 10, request));
+
+        assertTrue(ex.getMessage().contains("PENDING_REVIEW"));
+        assertEquals(CourseStatus.PENDING_REVIEW, submitted.getStatus());
+        assertEquals("Original Title", submitted.getTitle());
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testSaveDraft_ArchivedCourse_RejectedAndPreservesStatus() {
+        User owner = instructor(1);
+        Course archived = givenOwnedCourse(10, owner);
+        archived.setStatus(CourseStatus.ARCHIVED);
+
+        assertThrows(IllegalStateException.class,
+                () -> service.saveDraft(owner, 10, new CourseDraftRequest("Title", null)));
+        assertEquals(CourseStatus.ARCHIVED, archived.getStatus());
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testSaveDraft_RejectedCourse_AllowsRevisionBackToDraft() {
+        User owner = instructor(1);
+        Course rejected = givenOwnedCourse(10, owner);
+        rejected.setStatus(CourseStatus.REJECTED);
+        stubSaveReturnsArgument();
+
+        CourseResponse response = service.saveDraft(owner, 10, new CourseDraftRequest("Revised Draft", null));
+
+        assertEquals(CourseStatus.DRAFT, response.getStatus());
+        assertEquals("Revised Draft", response.getTitle());
+    }
+
+    @Test
+    void testSaveDraft_StudentOrPendingInstructor_ThrowsAccessDenied() {
+        User pending = instructor(3);
+        pending.setAccountStatus("pending");
+
+        assertThrows(AccessDeniedException.class, () -> service.saveDraft(student(2), new CourseDraftRequest()));
+        assertThrows(AccessDeniedException.class, () -> service.saveDraft(pending, new CourseDraftRequest()));
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testSaveDraft_OtherInstructorCannotModifyDraft() {
+        givenOwnedCourse(10, instructor(1));
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(10, 2)).thenReturn(false);
+
+        assertThrows(AccessDeniedException.class,
+                () -> service.saveDraft(instructor(2), 10, new CourseDraftRequest("Hijack", null)));
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testSaveDraft_ForeignInstructorIdInBody_ThrowsAccessDenied() {
+        CourseDraftRequest request = new CourseDraftRequest("Title", "Desc");
+        request.setInstructorId(99);
+
+        assertThrows(AccessDeniedException.class, () -> service.saveDraft(instructor(1), request));
+    }
+
+    @Test
+    void testSaveDraft_InvalidTitleLengthAndMisleadingClaim_Rejected() {
+        User owner = instructor(1);
+
+        CourseDraftRequest tooLong = new CourseDraftRequest("A".repeat(201), null);
+        assertThrows(IllegalArgumentException.class, () -> service.saveDraft(owner, tooLong));
+
+        CourseDraftRequest misleading = new CourseDraftRequest("Draft", "Official government accreditation included");
+        assertThrows(IllegalArgumentException.class, () -> service.saveDraft(owner, misleading));
+    }
+
+    @Test
+    void testSaveDraft_SelfPrerequisite_ThrowsIllegalArgument() {
+        User owner = instructor(1);
+        givenOwnedCourse(10, owner);
+
+        CourseDraftRequest request = new CourseDraftRequest();
+        request.setPrerequisites(List.of(new CoursePrerequisiteRequest("COURSE", 10, null, null)));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.saveDraft(owner, 10, request));
+        assertTrue(ex.getMessage().contains("prerequisite of itself"));
+    }
+
+    @Test
+    void testGetInstructorDrafts_ReturnsOnlyDraftCoursesIncludingCoInstructor() {
+        User owner = instructor(1);
+        Course draft1 = course(10, owner);
+        Course published = course(11, owner);
+        published.setStatus(CourseStatus.PUBLISHED);
+        Course coDraft = course(12, instructor(9));
+
+        when(courseRepository.findByInstructorIdOrderByIdAsc(1)).thenReturn(List.of(draft1, published));
+        when(courseInstructorRepository.findByInstructorId(1))
+                .thenReturn(List.of(new CourseInstructor(coDraft, owner, "co-instructor")));
+
+        List<CourseResponse> drafts = service.getInstructorDrafts(owner);
+
+        assertEquals(2, drafts.size());
+        assertEquals(10, drafts.get(0).getId());
+        assertEquals(12, drafts.get(1).getId());
+    }
+
+    @Test
+    void testGetInstructorCourseById_AllowsOwnerAndDeniesStranger() {
+        User owner = instructor(1);
+        givenOwnedCourse(10, owner);
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(10, 2)).thenReturn(false);
+
+        CourseResponse found = service.getInstructorCourseById(owner, 10);
+        assertEquals(10, found.getId());
+        assertEquals(CourseStatus.DRAFT, found.getStatus());
+
+        assertThrows(AccessDeniedException.class, () -> service.getInstructorCourseById(instructor(2), 10));
     }
 }
