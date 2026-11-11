@@ -160,7 +160,7 @@ jobs:
           JWT_EXPIRATION_MS: '86400000'
         run: |
           mvn test -B
-          if [ -f ../ops/payments/deployment.example.yaml ]; then
+          if ls ../ops/payments/test_*.py >/dev/null 2>&1 && [ -f src/test/java/com/olp/service/PaymentServiceTest.java ]; then
             python3 scripts/check-payment-coverage.py
             python3 -m unittest discover -s ../ops/payments -p 'test_*.py'
           else
@@ -239,4 +239,3 @@ jobs:
             exit 1
           fi
           echo "CI Quality Gate PASSED: All triggered validation jobs succeeded."
-
