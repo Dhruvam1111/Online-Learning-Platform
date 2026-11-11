@@ -1,14 +1,19 @@
 package com.olp.service;
 
+import com.olp.dto.CoursePrerequisiteRequest;
 import com.olp.dto.CourseResponse;
 import com.olp.dto.CreateCourseRequest;
 import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
 import com.olp.entity.Course;
+import com.olp.entity.CourseInstructor;
+import com.olp.entity.CoursePrerequisite;
 import com.olp.entity.CourseStatus;
 import com.olp.entity.User;
 import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.ResourceNotFoundException;
+import com.olp.repository.CourseInstructorRepository;
+import com.olp.repository.CoursePrerequisiteRepository;
 import com.olp.repository.CourseRepository;
 import com.olp.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -35,6 +40,10 @@ class InstructorCourseServiceTest {
     private CourseRepository courseRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private CourseInstructorRepository courseInstructorRepository;
+    @Mock
+    private CoursePrerequisiteRepository coursePrerequisiteRepository;
 
     @InjectMocks
     private InstructorCourseService service;
@@ -215,6 +224,144 @@ class InstructorCourseServiceTest {
         ArgumentCaptor<Course> captor = ArgumentCaptor.forClass(Course.class);
         verify(courseRepository).save(captor.capture());
         assertNull(captor.getValue().getDescription());
+    }
+
+    @Test
+    void testCreateCourse_WithCategoryOutcomesAndPrerequisites_Success() {
+        User owner = instructor(1);
+        stubSaveReturnsArgument();
+
+        Course reqCourse = course(5, owner);
+        reqCourse.setTitle("Prerequisite Course Title");
+        when(courseRepository.findById(5)).thenReturn(Optional.of(reqCourse));
+
+        when(coursePrerequisiteRepository.save(any(CoursePrerequisite.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(courseInstructorRepository.save(any(CourseInstructor.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        CoursePrerequisiteRequest p1 = new CoursePrerequisiteRequest("COURSE", 5, null, "Must complete course 5");
+        CoursePrerequisiteRequest p2 = new CoursePrerequisiteRequest("SKILL", null, "Basic Java", "Familiarity with syntax");
+        List<String> outcomes = List.of("Master Spring Boot", "Build microservices");
+
+        CreateCourseRequest request = new CreateCourseRequest(
+                "Advanced Spring Boot",
+                "Deep dive into production engineering",
+                "Software Engineering",
+                List.of(p1, p2),
+                outcomes
+        );
+
+        CourseResponse response = service.createCourse(owner, request);
+
+        assertNotNull(response);
+        assertEquals("Advanced Spring Boot", response.getTitle());
+        assertEquals("Software Engineering", response.getCategory());
+        assertEquals(CourseStatus.DRAFT, response.getStatus());
+        assertEquals(2, response.getLearningOutcomes().size());
+        assertEquals("Master Spring Boot", response.getLearningOutcomes().get(0));
+        assertEquals(2, response.getPrerequisites().size());
+
+        ArgumentCaptor<CourseInstructor> instCaptor = ArgumentCaptor.forClass(CourseInstructor.class);
+        verify(courseInstructorRepository, times(1)).save(instCaptor.capture());
+        assertEquals("owner", instCaptor.getValue().getRole());
+        assertSame(owner, instCaptor.getValue().getInstructor());
+
+        verify(coursePrerequisiteRepository, times(2)).save(any(CoursePrerequisite.class));
+    }
+
+    @Test
+    void testCreateCourse_MisleadingAccreditationClaim_Throws() {
+        User owner = instructor(1);
+
+        CreateCourseRequest request = new CreateCourseRequest(
+                "Earn an Accredited Degree in 3 Months",
+                "Valid description"
+        );
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.createCourse(owner, request));
+        assertTrue(ex.getMessage().contains("misleading claims regarding accreditation"));
+    }
+
+    @Test
+    void testCreateCourse_MisleadingDegreeEquivalenceInDescription_Throws() {
+        User owner = instructor(1);
+
+        CreateCourseRequest request = new CreateCourseRequest(
+                "Full Stack Web Development",
+                "This course offers university degree equivalence for tech jobs."
+        );
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.createCourse(owner, request));
+        assertTrue(ex.getMessage().contains("misleading claims regarding accreditation"));
+    }
+
+    @Test
+    void testCreateCourse_BlankCategory_Throws() {
+        User owner = instructor(1);
+
+        CreateCourseRequest request = new CreateCourseRequest("Valid Title", "Description", "   ");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.createCourse(owner, request));
+        assertTrue(ex.getMessage().contains("Course category cannot be blank"));
+    }
+
+    @Test
+    void testCreateCourse_BlankLearningOutcome_Throws() {
+        User owner = instructor(1);
+
+        CreateCourseRequest request = new CreateCourseRequest(
+                "Valid Title", "Desc", "Category",
+                null, List.of("Valid Outcome", "   ")
+        );
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.createCourse(owner, request));
+        assertTrue(ex.getMessage().contains("Learning outcome cannot be blank"));
+    }
+
+    @Test
+    void testCreateCourse_InvalidPrerequisiteType_Throws() {
+        User owner = instructor(1);
+
+        CoursePrerequisiteRequest badPrereq = new CoursePrerequisiteRequest("UNKNOWN", "Some requirement");
+        CreateCourseRequest request = new CreateCourseRequest(
+                "Valid Title", "Desc", "Category",
+                List.of(badPrereq), null
+        );
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.createCourse(owner, request));
+        assertTrue(ex.getMessage().contains("Invalid prerequisite type"));
+    }
+
+    @Test
+    void testCreateCourse_MissingPrerequisiteCourse_ThrowsResourceNotFound() {
+        User owner = instructor(1);
+        when(courseRepository.findById(999)).thenReturn(Optional.empty());
+
+        CoursePrerequisiteRequest p = new CoursePrerequisiteRequest("COURSE", 999, null, null);
+        CreateCourseRequest request = new CreateCourseRequest(
+                "Valid Title", "Desc", "Category",
+                List.of(p), null
+        );
+
+        assertThrows(ResourceNotFoundException.class, () -> service.createCourse(owner, request));
+    }
+
+    @Test
+    void testCreateCourse_DifferentInstructorIdInBody_ThrowsAccessDenied() {
+        User owner = instructor(1);
+
+        CreateCourseRequest request = new CreateCourseRequest("Valid Title", "Desc");
+        request.setInstructorId(999); // foreign instructor ID
+
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> service.createCourse(owner, request));
+        assertTrue(ex.getMessage().contains("Cannot create a course for another instructor"));
     }
 
     // ===== updateCourse =====

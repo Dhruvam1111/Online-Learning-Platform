@@ -4,6 +4,8 @@
 -- ============================================================
 
 -- Clean slate (safe to re-run during development)
+DROP TABLE IF EXISTS course_prerequisites CASCADE;
+DROP TABLE IF EXISTS course_instructors CASCADE;
 DROP TABLE IF EXISTS lecture_progress CASCADE;
 DROP TABLE IF EXISTS bookmarks CASCADE;
 DROP TABLE IF EXISTS reviews CASCADE;
@@ -58,6 +60,8 @@ CREATE TABLE courses (
     instructor_id   INTEGER      NOT NULL,
     title           VARCHAR(200) NOT NULL,
     description     TEXT,
+    category        VARCHAR(100) NOT NULL DEFAULT 'General',
+    learning_outcomes TEXT,
     status          VARCHAR(20)  NOT NULL DEFAULT 'draft',
     rejection_reason TEXT,
     created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
@@ -73,6 +77,64 @@ CREATE TABLE courses (
 -- ON DELETE CASCADE: If an instructor account is deleted, their courses
 -- are also deleted. This is acceptable for Sprint 1. In production you
 -- might want RESTRICT or soft-delete instead.
+
+
+-- =========================
+-- TABLE: course_instructors
+-- =========================
+-- Many-to-many relationship supporting co-instructors and ownership (FR-I05, FR-I59)
+CREATE TABLE course_instructors (
+    id            SERIAL PRIMARY KEY,
+    course_id     INTEGER NOT NULL,
+    instructor_id INTEGER NOT NULL,
+    role          VARCHAR(50) NOT NULL DEFAULT 'owner',
+    created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_course_instructors_course
+        FOREIGN KEY (course_id)
+        REFERENCES courses(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_course_instructors_user
+        FOREIGN KEY (instructor_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_course_instructor
+        UNIQUE (course_id, instructor_id),
+
+    CONSTRAINT chk_course_instructor_role
+        CHECK (role IN ('owner', 'co-instructor'))
+);
+
+
+-- =========================
+-- TABLE: course_prerequisites
+-- =========================
+-- Structured prerequisite requirements for courses and skills (FR-I05)
+-- Reusable for student enrollment eligibility verification.
+CREATE TABLE course_prerequisites (
+    id                  SERIAL PRIMARY KEY,
+    course_id           INTEGER NOT NULL,
+    prerequisite_type   VARCHAR(20) NOT NULL DEFAULT 'SKILL',
+    required_course_id  INTEGER,
+    title               VARCHAR(200) NOT NULL,
+    description         VARCHAR(500),
+    created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_course_prerequisites_course
+        FOREIGN KEY (course_id)
+        REFERENCES courses(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_course_prerequisites_required_course
+        FOREIGN KEY (required_course_id)
+        REFERENCES courses(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT chk_course_prerequisite_type
+        CHECK (prerequisite_type IN ('COURSE', 'SKILL'))
+);
 
 
 -- =========================

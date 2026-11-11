@@ -2,6 +2,8 @@ package com.olp.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.util.ArrayList;
+import java.util.List;
 
 public class CreateCourseRequest {
 
@@ -11,11 +13,38 @@ public class CreateCourseRequest {
 
     private String description;
 
+    @Size(max = 100, message = "Category must be 100 characters or fewer")
+    private String category = "General";
+
+    private List<String> learningOutcomes = new ArrayList<>();
+
+    private List<CoursePrerequisiteRequest> prerequisites = new ArrayList<>();
+
+    // Optional field: if provided, must match the authenticated instructor ID
+    private Integer instructorId;
+
     public CreateCourseRequest() {}
 
     public CreateCourseRequest(String title, String description) {
         this.title = title;
         this.description = description;
+        this.category = "General";
+    }
+
+    public CreateCourseRequest(String title, String description, String category) {
+        this.title = title;
+        this.description = description;
+        this.category = category;
+    }
+
+    public CreateCourseRequest(String title, String description, String category,
+                               List<CoursePrerequisiteRequest> prerequisites,
+                               List<String> learningOutcomes) {
+        this.title = title;
+        this.description = description;
+        this.category = category;
+        this.prerequisites = prerequisites != null ? prerequisites : new ArrayList<>();
+        this.learningOutcomes = learningOutcomes != null ? learningOutcomes : new ArrayList<>();
     }
 
     public String getTitle() {
@@ -32,5 +61,37 @@ public class CreateCourseRequest {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
+    }
+
+    public List<String> getLearningOutcomes() {
+        return learningOutcomes;
+    }
+
+    public void setLearningOutcomes(List<String> learningOutcomes) {
+        this.learningOutcomes = learningOutcomes != null ? learningOutcomes : new ArrayList<>();
+    }
+
+    public List<CoursePrerequisiteRequest> getPrerequisites() {
+        return prerequisites;
+    }
+
+    public void setPrerequisites(List<CoursePrerequisiteRequest> prerequisites) {
+        this.prerequisites = prerequisites != null ? prerequisites : new ArrayList<>();
+    }
+
+    public Integer getInstructorId() {
+        return instructorId;
+    }
+
+    public void setInstructorId(Integer instructorId) {
+        this.instructorId = instructorId;
     }
 }
