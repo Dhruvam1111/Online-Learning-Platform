@@ -1,5 +1,6 @@
 package com.olp.service;
 
+import com.olp.entity.AssociationRequestStatus;
 import jakarta.mail.Address;
 import jakarta.mail.MessagingException;
 import jakarta.mail.Multipart;
@@ -161,5 +162,34 @@ class EmailServiceTest {
 
         assertTrue(ex.getMessage().contains("Failed to format or send email to user@example.com"));
         verify(mailSender, never()).send(any(MimeMessage.class));
+    }
+
+    @Test
+    void testSendCourseAssociationDecisionEmail_Approved_SendsNotification() throws Exception {
+        MimeMessage message = new MimeMessage((Session) null);
+        when(mailSender.createMimeMessage()).thenReturn(message);
+
+        emailService.sendCourseAssociationDecisionEmail(
+                "inst@olp.com", "Prof. James", "Databases 101",
+                AssociationRequestStatus.APPROVED, "Welcome to the teaching team!");
+
+        verify(mailSender).send(message);
+        assertEquals("Course Association Request Approved: Databases 101", message.getSubject());
+        String html = htmlOf(message);
+        assertTrue(html.contains("Prof. James"));
+        assertTrue(html.contains("Databases 101"));
+        assertTrue(html.contains("Approved"));
+        assertTrue(html.contains("Welcome to the teaching team!"));
+    }
+
+    @Test
+    void testSendCourseAssociationDecisionEmail_BlankSender_SkipsSilently() {
+        ReflectionTestUtils.setField(emailService, "senderEmail", "");
+
+        assertDoesNotThrow(() -> emailService.sendCourseAssociationDecisionEmail(
+                "inst@olp.com", "Prof. James", "Databases 101",
+                AssociationRequestStatus.REJECTED, "Full team"));
+
+        verifyNoInteractions(mailSender);
     }
 }
