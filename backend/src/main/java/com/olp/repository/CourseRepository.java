@@ -70,4 +70,87 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
         @Param("status") CourseStatus status,
         @Param("search") String search
     );
+
+    // FR-I60: Paginated retrieval of courses associated with an instructor (OWNER or CO_INSTRUCTOR)
+    @Query(
+        value = "SELECT c FROM Course c JOIN FETCH c.instructor " +
+                "WHERE (c.instructor.id = :instructorId OR EXISTS (" +
+                "  SELECT ci.id FROM CourseInstructor ci " +
+                "  WHERE ci.course.id = c.id AND ci.instructor.id = :instructorId" +
+                "))",
+        countQuery = "SELECT COUNT(c) FROM Course c " +
+                     "WHERE (c.instructor.id = :instructorId OR EXISTS (" +
+                     "  SELECT ci.id FROM CourseInstructor ci " +
+                     "  WHERE ci.course.id = c.id AND ci.instructor.id = :instructorId" +
+                     "))"
+    )
+    Page<Course> findAssociatedCoursesByInstructor(
+        @Param("instructorId") Integer instructorId,
+        Pageable pageable
+    );
+
+    @Query(
+        value = "SELECT c FROM Course c JOIN FETCH c.instructor " +
+                "WHERE (c.instructor.id = :instructorId OR EXISTS (" +
+                "  SELECT ci.id FROM CourseInstructor ci " +
+                "  WHERE ci.course.id = c.id AND ci.instructor.id = :instructorId" +
+                ")) AND c.status = :status",
+        countQuery = "SELECT COUNT(c) FROM Course c " +
+                     "WHERE (c.instructor.id = :instructorId OR EXISTS (" +
+                     "  SELECT ci.id FROM CourseInstructor ci " +
+                     "  WHERE ci.course.id = c.id AND ci.instructor.id = :instructorId" +
+                     ")) AND c.status = :status"
+    )
+    Page<Course> findAssociatedCoursesByInstructorAndStatus(
+        @Param("instructorId") Integer instructorId,
+        @Param("status") CourseStatus status,
+        Pageable pageable
+    );
+
+    @Query(
+        value = "SELECT c FROM Course c JOIN FETCH c.instructor " +
+                "WHERE (c.instructor.id = :instructorId OR EXISTS (" +
+                "  SELECT ci.id FROM CourseInstructor ci " +
+                "  WHERE ci.course.id = c.id AND ci.instructor.id = :instructorId" +
+                ")) AND (LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%')) " +
+                "       OR LOWER(COALESCE(c.description, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+                "       OR LOWER(COALESCE(c.category, '')) LIKE LOWER(CONCAT('%', :search, '%')))",
+        countQuery = "SELECT COUNT(c) FROM Course c " +
+                     "WHERE (c.instructor.id = :instructorId OR EXISTS (" +
+                     "  SELECT ci.id FROM CourseInstructor ci " +
+                     "  WHERE ci.course.id = c.id AND ci.instructor.id = :instructorId" +
+                     ")) AND (LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%')) " +
+                     "       OR LOWER(COALESCE(c.description, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+                     "       OR LOWER(COALESCE(c.category, '')) LIKE LOWER(CONCAT('%', :search, '%')))"
+    )
+    Page<Course> searchAssociatedCoursesByInstructor(
+        @Param("instructorId") Integer instructorId,
+        @Param("search") String search,
+        Pageable pageable
+    );
+
+    @Query(
+        value = "SELECT c FROM Course c JOIN FETCH c.instructor " +
+                "WHERE (c.instructor.id = :instructorId OR EXISTS (" +
+                "  SELECT ci.id FROM CourseInstructor ci " +
+                "  WHERE ci.course.id = c.id AND ci.instructor.id = :instructorId" +
+                ")) AND c.status = :status " +
+                "AND (LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%')) " +
+                "     OR LOWER(COALESCE(c.description, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+                "     OR LOWER(COALESCE(c.category, '')) LIKE LOWER(CONCAT('%', :search, '%')))",
+        countQuery = "SELECT COUNT(c) FROM Course c " +
+                     "WHERE (c.instructor.id = :instructorId OR EXISTS (" +
+                     "  SELECT ci.id FROM CourseInstructor ci " +
+                     "  WHERE ci.course.id = c.id AND ci.instructor.id = :instructorId" +
+                     ")) AND c.status = :status " +
+                     "AND (LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%')) " +
+                     "     OR LOWER(COALESCE(c.description, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+                     "     OR LOWER(COALESCE(c.category, '')) LIKE LOWER(CONCAT('%', :search, '%')))"
+    )
+    Page<Course> searchAssociatedCoursesByInstructorAndStatus(
+        @Param("instructorId") Integer instructorId,
+        @Param("status") CourseStatus status,
+        @Param("search") String search,
+        Pageable pageable
+    );
 }

@@ -19,6 +19,9 @@ public interface CourseInstructorRepository extends JpaRepository<CourseInstruct
     @Query("SELECT ci FROM CourseInstructor ci JOIN FETCH ci.instructor WHERE ci.course.id = :courseId ORDER BY ci.id ASC")
     List<CourseInstructor> findByCourseIdWithInstructor(@Param("courseId") Integer courseId);
 
+    @Query("SELECT ci FROM CourseInstructor ci JOIN FETCH ci.instructor WHERE ci.course.id IN :courseIds ORDER BY ci.course.id ASC, ci.id ASC")
+    List<CourseInstructor> findByCourseIdInWithInstructor(@Param("courseIds") List<Integer> courseIds);
+
     @Query("SELECT ci FROM CourseInstructor ci JOIN FETCH ci.course c JOIN FETCH c.instructor WHERE ci.instructor.id = :instructorId ORDER BY c.id ASC")
     List<CourseInstructor> findByInstructorId(@Param("instructorId") Integer instructorId);
 
