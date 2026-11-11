@@ -87,6 +87,7 @@ public class InstructorProfileService {
                 profile != null ? profile.getQualifications() : null,
                 profile != null ? profile.getExpertiseAreas() : null,
                 profile != null ? profile.getBio() : null,
+                profile != null ? profile.getProfilePictureUrl() : null,
                 profile != null ? profile.getCreatedAt() : null,
                 profile != null ? profile.getUpdatedAt() : null
         );
@@ -183,6 +184,7 @@ public class InstructorProfileService {
                 profile.getQualifications(),
                 profile.getExpertiseAreas(),
                 profile.getBio(),
+                profile.getProfilePictureUrl(),
                 profile.getCreatedAt(),
                 profile.getUpdatedAt()
         );
@@ -215,6 +217,7 @@ public class InstructorProfileService {
                 profile != null ? profile.getQualifications() : null,
                 profile != null ? profile.getExpertiseAreas() : null,
                 profile != null ? profile.getBio() : null,
+                profile != null ? profile.getProfilePictureUrl() : null,
                 profile != null ? profile.getCreatedAt() : null,
                 profile != null ? profile.getUpdatedAt() : null
         );
