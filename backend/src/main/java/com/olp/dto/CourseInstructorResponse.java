@@ -96,49 +96,98 @@ public class CourseInstructorResponse {
         if (course == null) {
             return List.of();
         }
-
-        List<CourseInstructor> mappings = null;
-        if (courseInstructorRepository != null && course.getId() != null) {
-            mappings = courseInstructorRepository.findByCourseIdWithInstructor(course.getId());
+        Map<Integer, List<CourseInstructorResponse>> batch = resolveInstructorsForCourses(
+                List.of(course), courseInstructorRepository, instructorProfileRepository);
+        if (course.getId() != null && batch.containsKey(course.getId())) {
+            return batch.get(course.getId());
         }
-        if ((mappings == null || mappings.isEmpty()) && course.getInstructors() != null) {
-            mappings = course.getInstructors();
+        return batch.values().stream().findFirst().orElse(List.of());
+    }
+
+    /**
+     * Batch-resolves deduplicated instructors for a list of courses in constant queries
+     * (OWNER first, then CO_INSTRUCTORs), avoiding N+1 queries.
+     */
+    public static Map<Integer, List<CourseInstructorResponse>> resolveInstructorsForCourses(
+            List<Course> courses,
+            CourseInstructorRepository courseInstructorRepository,
+            InstructorProfileRepository instructorProfileRepository) {
+        if (courses == null || courses.isEmpty()) {
+            return Map.of();
         }
 
-        Map<Integer, CourseInstructor> byInstructorId = new LinkedHashMap<>();
-        if (course.getInstructor() != null && course.getInstructor().getId() != null) {
-            User primary = course.getInstructor();
-            CourseInstructor ownerEntry = new CourseInstructor(course, primary, CourseInstructorRole.OWNER);
-            ownerEntry.setCreatedAt(course.getCreatedAt());
-            byInstructorId.put(primary.getId(), ownerEntry);
+        List<Integer> courseIds = new ArrayList<>();
+        for (Course c : courses) {
+            if (c != null && c.getId() != null) {
+                courseIds.add(c.getId());
+            }
         }
 
-        if (mappings != null) {
-            for (CourseInstructor ci : mappings) {
-                if (ci == null || ci.getInstructor() == null || ci.getInstructor().getId() == null) {
-                    continue;
-                }
-                Integer instId = ci.getInstructor().getId();
-                // Preserve OWNER timestamp/details if mapping row exists for creator, otherwise append co-instructor
-                if (!byInstructorId.containsKey(instId)) {
-                    byInstructorId.put(instId, ci);
-                } else if (ci.getRole() != null) {
-                    CourseInstructor existing = byInstructorId.get(instId);
-                    if (existing.getCreatedAt() == null && ci.getCreatedAt() != null) {
-                        existing.setCreatedAt(ci.getCreatedAt());
+        Map<Integer, List<CourseInstructor>> mappingsByCourse = new HashMap<>();
+        if (courseInstructorRepository != null && !courseIds.isEmpty()) {
+            List<CourseInstructor> fetchedMappings = courseIds.size() == 1
+                    ? courseInstructorRepository.findByCourseIdWithInstructor(courseIds.get(0))
+                    : courseInstructorRepository.findByCourseIdInWithInstructor(courseIds);
+            if (fetchedMappings != null) {
+                for (CourseInstructor ci : fetchedMappings) {
+                    if (ci != null && ci.getCourse() != null && ci.getCourse().getId() != null) {
+                        mappingsByCourse
+                                .computeIfAbsent(ci.getCourse().getId(), k -> new ArrayList<>())
+                                .add(ci);
                     }
                 }
             }
         }
 
-        if (byInstructorId.isEmpty()) {
-            return List.of();
+        Map<Integer, Map<Integer, CourseInstructor>> mergedByCourse = new LinkedHashMap<>();
+        LinkedHashMap<Integer, Integer> distinctInstructorIds = new LinkedHashMap<>();
+
+        for (int idx = 0; idx < courses.size(); idx++) {
+            Course course = courses.get(idx);
+            if (course == null) {
+                continue;
+            }
+            Integer courseKey = course.getId() != null ? course.getId() : -(idx + 1);
+            Map<Integer, CourseInstructor> byInstructorId = new LinkedHashMap<>();
+
+            if (course.getInstructor() != null && course.getInstructor().getId() != null) {
+                User primary = course.getInstructor();
+                CourseInstructor ownerEntry = new CourseInstructor(course, primary, CourseInstructorRole.OWNER);
+                ownerEntry.setCreatedAt(course.getCreatedAt());
+                byInstructorId.put(primary.getId(), ownerEntry);
+                distinctInstructorIds.putIfAbsent(primary.getId(), primary.getId());
+            }
+
+            List<CourseInstructor> mappings = course.getId() != null ? mappingsByCourse.get(course.getId()) : null;
+            if ((mappings == null || mappings.isEmpty()) && course.getInstructors() != null) {
+                mappings = course.getInstructors();
+            }
+
+            if (mappings != null) {
+                for (CourseInstructor ci : mappings) {
+                    if (ci == null || ci.getInstructor() == null || ci.getInstructor().getId() == null) {
+                        continue;
+                    }
+                    Integer instId = ci.getInstructor().getId();
+                    distinctInstructorIds.putIfAbsent(instId, instId);
+                    if (!byInstructorId.containsKey(instId)) {
+                        byInstructorId.put(instId, ci);
+                    } else if (ci.getRole() != null) {
+                        CourseInstructor existing = byInstructorId.get(instId);
+                        if (existing.getCreatedAt() == null && ci.getCreatedAt() != null) {
+                            existing.setCreatedAt(ci.getCreatedAt());
+                        }
+                    }
+                }
+            }
+
+            mergedByCourse.put(courseKey, byInstructorId);
         }
 
         Map<Integer, InstructorProfile> profileMap = new HashMap<>();
-        if (instructorProfileRepository != null) {
-            List<Integer> ids = new ArrayList<>(byInstructorId.keySet());
-            List<InstructorProfile> profiles = instructorProfileRepository.findByInstructorIdIn(ids);
+        if (instructorProfileRepository != null && !distinctInstructorIds.isEmpty()) {
+            List<InstructorProfile> profiles = instructorProfileRepository
+                    .findByInstructorIdIn(new ArrayList<>(distinctInstructorIds.keySet()));
             if (profiles != null) {
                 for (InstructorProfile profile : profiles) {
                     if (profile != null && profile.getInstructor() != null && profile.getInstructor().getId() != null) {
@@ -148,23 +197,28 @@ public class CourseInstructorResponse {
             }
         }
 
-        List<CourseInstructorResponse> owners = new ArrayList<>();
-        List<CourseInstructorResponse> coInstructors = new ArrayList<>();
-        for (Map.Entry<Integer, CourseInstructor> entry : byInstructorId.entrySet()) {
-            CourseInstructor ci = entry.getValue();
-            InstructorProfile profile = profileMap.get(entry.getKey());
-            CourseInstructorResponse dto = from(ci, profile);
-            if (dto.getRole() == CourseInstructorRole.OWNER) {
-                owners.add(dto);
-            } else {
-                coInstructors.add(dto);
+        Map<Integer, List<CourseInstructorResponse>> result = new LinkedHashMap<>();
+        for (Map.Entry<Integer, Map<Integer, CourseInstructor>> courseEntry : mergedByCourse.entrySet()) {
+            List<CourseInstructorResponse> owners = new ArrayList<>();
+            List<CourseInstructorResponse> coInstructors = new ArrayList<>();
+
+            for (Map.Entry<Integer, CourseInstructor> instEntry : courseEntry.getValue().entrySet()) {
+                InstructorProfile profile = profileMap.get(instEntry.getKey());
+                CourseInstructorResponse dto = from(instEntry.getValue(), profile);
+                if (dto.getRole() == CourseInstructorRole.OWNER) {
+                    owners.add(dto);
+                } else {
+                    coInstructors.add(dto);
+                }
             }
+
+            List<CourseInstructorResponse> ordered = new ArrayList<>(owners.size() + coInstructors.size());
+            ordered.addAll(owners);
+            ordered.addAll(coInstructors);
+            result.put(courseEntry.getKey(), ordered);
         }
 
-        List<CourseInstructorResponse> ordered = new ArrayList<>(owners.size() + coInstructors.size());
-        ordered.addAll(owners);
-        ordered.addAll(coInstructors);
-        return ordered;
+        return result;
     }
 
     public Integer getId() {

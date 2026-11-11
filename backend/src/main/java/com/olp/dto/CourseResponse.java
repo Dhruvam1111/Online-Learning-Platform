@@ -21,6 +21,7 @@ public class CourseResponse {
     private List<CoursePrerequisiteResponse> prerequisites = new ArrayList<>();
     private List<CourseInstructorResponse> instructors = new ArrayList<>();
     private CourseStatus status;
+    private long enrollmentCount = 0L;
     private LocalDateTime createdAt;
 
     public CourseResponse() {}
@@ -161,6 +162,14 @@ public class CourseResponse {
 
     public void setStatus(CourseStatus status) {
         this.status = status;
+    }
+
+    public long getEnrollmentCount() {
+        return enrollmentCount;
+    }
+
+    public void setEnrollmentCount(long enrollmentCount) {
+        this.enrollmentCount = enrollmentCount;
     }
 
     public LocalDateTime getCreatedAt() {
