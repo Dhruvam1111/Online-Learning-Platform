@@ -57,6 +57,11 @@ public class SecurityConfig {
 
 
                         .requestMatchers(HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
+                        .requestMatchers("/api/payments/webhook").permitAll()
+                        .requestMatchers("/api/payments/simulator/**", "/api/payments/wallet/add-reward").hasRole("admin")
+                        .requestMatchers("/api/payments/**").authenticated()
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/actuator/**").hasRole("admin")
                         // Admin endpoints require ROLE_admin
                         .requestMatchers("/api/admin/**").hasRole("admin")
 
@@ -99,6 +104,7 @@ public class SecurityConfig {
         config.setAllowedOriginPatterns(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
+        config.setExposedHeaders(List.of("Content-Disposition"));
         config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

@@ -143,6 +143,9 @@ export const instructorAPI = {
     api.patch(`/instructor/courses/${courseId}/lectures/reorder`, data),
   getProfile: () => api.get('/instructor/profile'),
   updateProfile: (data) => api.put('/instructor/profile', data),
+  getEarnings: () => api.get('/payments/instructor/earnings'),
+  withdrawEarnings: (bank) => api.post('/payments/instructor/payouts/withdraw-all', bank),
+  getPayoutHistory: () => api.get('/payments/instructor/payouts/history'),
 };
 
 // ─── Admin API ──────────────────────────────────────────────────────────────
@@ -160,4 +163,54 @@ export const adminAPI = {
   rejectCourse: (id, data) => api.put(`/admin/courses/${id}/reject`, data),
   unpublishCourse: (id) => api.put(`/admin/courses/${id}/unpublish`),
   deleteCourse: (id) => api.delete(`/admin/courses/${id}`),
+  getAllTransactions: () => api.get('/payments/admin/all'),
+  getAllRefunds: () => api.get('/payments/refunds/all'),
+  getAllInstructorPayouts: () => api.get('/payments/instructor/admin/all'),
+  settlePayout: (earningId) => api.post(`/payments/instructor/payouts/${earningId}/settle`),
+  haltPayout: (earningId, reason) => api.post(`/payments/instructor/payouts/${earningId}/halt`, { reason }),
+  unhaltPayout: (earningId, reason) => api.post(`/payments/instructor/payouts/${earningId}/unhalt`, { reason }),
+  getAllCoupons: () => api.get('/payments/coupons/admin/all'),
+  createCoupon: (coupon) => api.post('/payments/coupons/create', coupon),
+  toggleCoupon: (couponId) => api.patch(`/payments/coupons/${couponId}/toggle`),
+  processExceptionalRefund: (paymentId, reason) =>
+    api.post('/payments/refunds/exceptions', { paymentId, reason }),
+  getRefundExceptions: () => api.get('/payments/refunds/exceptions'),
+  decideRefundException: (id, decision, reason) => api.post(`/payments/refunds/exceptions/${id}/decision`, {decision, reason}),
+  getReconciliation: () => api.get('/payments/reconciliation/report'),
+};
+
+// ─── Payment Gateway API (QR Code Flow) ────────────────────────────────────
+export const paymentAPI = {
+  requestException: (paymentId, reason) => api.post('/payments/refunds/exceptions', {paymentId, reason}),
+  createOrder: (courseId, amount, currency = 'INR', couponCode = null, useWallet = false, paymentMethod = null, policyAcceptedVersion = null, settlementCurrency = 'INR') =>
+    api.post('/payments/create-order', { courseId, amount, currency, couponCode, useWallet, paymentMethod, policyAcceptedVersion, settlementCurrency }),
+  confirmPayment: (orderId, paymentMethod) =>
+    api.post(`/payments/confirm/${orderId}`, paymentMethod ? { paymentMethod } : {}),
+  failPayment: (orderId) => api.post(`/payments/fail/${orderId}`),
+  getUpiQr: (orderId) => api.get(`/payments/upi-qr/${orderId}`),
+  getOrderStatus: (orderId) => api.get(`/payments/status/${orderId}`),
+  simulatePay: (orderId) => api.post(`/payments/confirm/${orderId}`),
+  verify: (orderId, paymentId, signature, paymentMethod) =>
+    api.post('/payments/verify', { orderId, paymentId, signature, paymentMethod }),
+  sandboxSign: (orderId, paymentId) =>
+    Promise.resolve({ data: { orderId, paymentId, signature: 'sig_ok' } }),
+  applyCoupon: (code, orderAmount) =>
+    api.post('/payments/coupons/apply', { code, orderAmount }),
+  getWallet: () =>
+    api.get('/payments/wallet'),
+  getMyTransactions: () => api.get('/payments/my-transactions'),
+  getInvoice: (orderId) => api.get(`/payments/invoices/${orderId}`),
+  requestRefund: (paymentId, reason = 'Student requested course refund', amount = null) =>
+    api.post('/payments/refunds/initiate', { paymentId, reason, amount }),
+  createStripeSession: (courseId, amount) => api.post('/payments/stripe/create-session', { courseId, amount }),
+  verifyStripeSession: (sessionId) => api.post('/payments/stripe/verify-session', { sessionId }),
+};
+
+export const paymentSimulationAPI = {
+  methods: () => api.get('/payments/methods'),
+  saveMethod: (method, consent) => api.post('/payments/methods', {method, consent}),
+  revokeMethod: token => api.delete(`/payments/methods/${token}`),
+  pay: (token, orderId) => api.post(`/payments/methods/${token}/pay`, {orderId}),
+  requestRefund: (paymentId, amount, reason) => api.post('/payments/refunds/request', {paymentId, amount, reason}),
+  event: body => api.post('/payments/simulator/events', body),
 };

@@ -34,3 +34,16 @@ CREATE INDEX idx_bookmarks_student_id ON bookmarks(student_id);
 
 CREATE INDEX idx_lecture_progress_student_id ON lecture_progress(student_id);
 CREATE INDEX idx_lecture_progress_lecture_id ON lecture_progress(lecture_id);
+
+-- Payment simulator lookup and journal indexes.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_invoice_number ON payments(invoice_number);
+CREATE INDEX IF NOT EXISTS idx_payment_student_created ON payments(student_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_payment_events_type ON webhook_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_payment_refund_payment ON refunds(payment_id);
+
+CREATE INDEX IF NOT EXISTS idx_webhook_event_type_id ON webhook_events(event_type,id);
+
+-- Stable finance pagination under equal timestamps.
+CREATE INDEX IF NOT EXISTS idx_payment_created_id ON payments(created_at DESC,id DESC);
+CREATE INDEX IF NOT EXISTS idx_refund_created_id ON refunds(created_at DESC,id DESC);
+CREATE INDEX IF NOT EXISTS idx_earning_owner_created_id ON instructor_earnings(instructor_id,created_at DESC,id DESC);
