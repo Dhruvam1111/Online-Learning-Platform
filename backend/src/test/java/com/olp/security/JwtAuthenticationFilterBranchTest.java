@@ -24,7 +24,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-/** Header/token/status branches of JwtAuthenticationFilter not covered by JwtAuthenticationFilterTest. */
+/**
+ * Header/token/status branches of JwtAuthenticationFilter not covered by
+ * JwtAuthenticationFilterTest.
+ */
 @ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterBranchTest {
 
@@ -167,7 +170,8 @@ class JwtAuthenticationFilterBranchTest {
 
     @Test
     void testPendingUser_Gets403AndChainIsNotContinued() throws Exception {
-        assertBlockedWith("pending", "Your instructor account is pending administrator approval");
+        assertBlockedWith("pending",
+                "Awaiting admin approval: Your instructor account is pending administrator approval");
     }
 
     @Test

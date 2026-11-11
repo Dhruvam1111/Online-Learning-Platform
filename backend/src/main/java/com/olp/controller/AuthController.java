@@ -3,6 +3,7 @@ package com.olp.controller;
 import com.olp.dto.*;
 import com.olp.entity.User;
 import com.olp.service.AuthService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -67,11 +68,52 @@ public class AuthController {
     }
 
     /**
+     * POST /api/auth/password-reset/request
+     * Public — request a single-use password reset link sent to email.
+     */
+    @PostMapping("/password-reset/request")
+    public ResponseEntity<Map<String, String>> requestPasswordReset(@Valid @RequestBody ForgotPasswordRequest request) {
+        Map<String, String> response = authService.forgotPassword(request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/auth/forgot-password
+     * Public — alias for password reset request.
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        Map<String, String> response = authService.forgotPassword(request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/auth/password-reset/confirm
+     * Public — confirm password reset with single-use token and invalidate all previous sessions.
+     */
+    @PostMapping("/password-reset/confirm")
+    public ResponseEntity<Map<String, String>> confirmPasswordReset(@Valid @RequestBody ResetPasswordTokenRequest request) {
+        Map<String, String> response = authService.resetPasswordWithToken(request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/auth/reset-password
+     * Public — alias for password reset confirmation.
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, String>> resetPassword(@Valid @RequestBody ResetPasswordTokenRequest request) {
+        Map<String, String> response = authService.resetPasswordWithToken(request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * POST /api/auth/logout
-     * Authenticated — terminates user session.
+     * Authenticated — terminates user session, blacklists token, and clears SecurityContext.
      */
     @PostMapping("/logout")
-    public ResponseEntity<Map<String, String>> logout() {
+    public ResponseEntity<Map<String, String>> logout(HttpServletRequest request) {
+        authService.logout(request);
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 

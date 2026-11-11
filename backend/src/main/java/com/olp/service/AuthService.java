@@ -3,18 +3,23 @@ package com.olp.service;
 import com.olp.dto.*;
 import com.olp.entity.InstructorProfile;
 import com.olp.entity.User;
+import com.olp.exception.AccountStatusException;
 import com.olp.exception.DuplicateEmailException;
 import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.InstructorProfileRepository;
 import com.olp.repository.UserRepository;
 import com.olp.security.JwtUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,15 +32,31 @@ public class AuthService {
     private final InstructorProfileRepository instructorProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final TokenBlacklistService tokenBlacklistService;
+    private final EmailService emailService;
 
-    public AuthService(UserRepository userRepository,
+    @Autowired
+    public AuthService(
+            UserRepository userRepository,
             InstructorProfileRepository instructorProfileRepository,
             PasswordEncoder passwordEncoder,
-            JwtUtil jwtUtil) {
+            JwtUtil jwtUtil,
+            TokenBlacklistService tokenBlacklistService,
+            EmailService emailService) {
         this.userRepository = userRepository;
         this.instructorProfileRepository = instructorProfileRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.tokenBlacklistService = tokenBlacklistService != null ? tokenBlacklistService : new TokenBlacklistService();
+        this.emailService = emailService;
+    }
+
+    public AuthService(
+            UserRepository userRepository,
+            InstructorProfileRepository instructorProfileRepository,
+            PasswordEncoder passwordEncoder,
+            JwtUtil jwtUtil) {
+        this(userRepository, instructorProfileRepository, passwordEncoder, jwtUtil, new TokenBlacklistService(), null);
     }
 
     /**
@@ -229,5 +250,107 @@ public class AuthService {
                 user.getRole());
 
         return new AuthResponse("Authenticated successfully via Google", token, userResponse);
+    }
+
+    /**
+     * FR-I02: Request a password reset link sent to the user's email.
+     * Generates a single-use JWT reset token with 15-minute expiration.
+     */
+    public Map<String, String> forgotPassword(ForgotPasswordRequest request) {
+        String cleanEmail = request.getEmail().toLowerCase().trim();
+        User user = userRepository.findByEmail(cleanEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("No account found with this email address"));
+
+        String status = user.getAccountStatus();
+        if ("suspended".equalsIgnoreCase(status)) {
+            throw new AccountStatusException("Your account has been suspended. Please contact support");
+        } else if ("rejected".equalsIgnoreCase(status)) {
+            throw new AccountStatusException("Your instructor application was rejected");
+        }
+
+        // Generate a single-use password reset token with 15-minute TTL
+        String resetToken = jwtUtil.generatePasswordResetToken(user.getId(), 15 * 60 * 1000L);
+        String resetLink = "http://localhost:8080/api/auth/password-reset/confirm?token=" + resetToken;
+
+        if (emailService != null) {
+            emailService.sendPasswordResetLinkEmail(user.getEmail(), user.getName(), resetLink, 15);
+        }
+
+        logger.info("================================================================================");
+        logger.info("[EMAIL DISPATCH] Password reset link sent to {}: {}", user.getEmail(), resetLink);
+        logger.info("================================================================================");
+        System.out.println("[EMAIL DISPATCH] Password reset link sent to " + user.getEmail() + ": " + resetLink);
+
+        return Map.of(
+                "message", "Password reset link sent to your registered email address.",
+                "resetLink", resetLink
+        );
+    }
+
+    /**
+     * FR-I02: Confirm password reset using single-use token.
+     * Enforces single-use token validation, updates password with BCrypt,
+     * and invalidates all existing active sessions/tokens for this user.
+     */
+    @Transactional
+    public Map<String, String> resetPasswordWithToken(ResetPasswordTokenRequest request) {
+        String token = request.getToken();
+        if (token == null || !jwtUtil.validatePasswordResetToken(token)) {
+            throw new InvalidCredentialsException("Invalid or expired password reset token");
+        }
+
+        if (tokenBlacklistService != null && tokenBlacklistService.isTokenBlacklisted(token)) {
+            throw new InvalidCredentialsException("Password reset token has already been used");
+        }
+
+        if (request.getConfirmPassword() != null && !request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new IllegalArgumentException("New password and confirm password do not match");
+        }
+
+        if (request.getNewPassword().length() < 8) {
+            throw new IllegalArgumentException("Password must be at least 8 characters");
+        }
+
+        Integer userId = jwtUtil.getUserIdFromToken(token);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        // Encode password with BCrypt
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        // Mark single-use token as consumed
+        if (tokenBlacklistService != null) {
+            tokenBlacklistService.blacklistToken(token);
+            // Invalidate all existing tokens/sessions for this user
+            tokenBlacklistService.revokeAllUserTokens(user.getId());
+        }
+
+        logger.info("[Password Reset] Password reset successful for user id {}. Previous sessions invalidated.", user.getId());
+
+        return Map.of("message", "Password has been successfully reset. All previous sessions have been invalidated. Please log in with your new password.");
+    }
+
+    /**
+     * FR-I02: Logout user, blacklist their current JWT, and clear SecurityContext.
+     */
+    public void logout(String token) {
+        if (token != null && !token.isBlank()) {
+            if (tokenBlacklistService != null) {
+                tokenBlacklistService.blacklistToken(token);
+            }
+        }
+        SecurityContextHolder.clearContext();
+    }
+
+    public void logout(HttpServletRequest request) {
+        if (request != null) {
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                logout(authHeader.substring(7));
+                return;
+            }
+        }
+        SecurityContextHolder.clearContext();
     }
 }
