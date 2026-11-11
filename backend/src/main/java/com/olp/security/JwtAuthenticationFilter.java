@@ -131,7 +131,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if ("suspended".equalsIgnoreCase(status)) {
             throw new AccountStatusException("Your account has been suspended. Please contact support");
         } else if ("pending".equalsIgnoreCase(status)) {
-            throw new AccountStatusException("Your instructor account is pending administrator approval");
+            throw new AccountStatusException("Awaiting admin approval: Your instructor account is pending administrator approval");
         } else if ("rejected".equalsIgnoreCase(status)) {
             throw new AccountStatusException("Your instructor application was rejected");
         }
