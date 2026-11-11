@@ -11,6 +11,7 @@ public class InstructorProfileResponse {
     private String qualifications;
     private String expertiseAreas;
     private String bio;
+    private String profilePictureUrl;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -18,11 +19,18 @@ public class InstructorProfileResponse {
 
     public InstructorProfileResponse(Integer id, String name, String email, String role,
                                      String qualifications, String expertiseAreas, String bio) {
-        this(id, name, email, role, qualifications, expertiseAreas, bio, null, null);
+        this(id, name, email, role, qualifications, expertiseAreas, bio, null, null, null);
     }
 
     public InstructorProfileResponse(Integer id, String name, String email, String role,
                                      String qualifications, String expertiseAreas, String bio,
+                                     LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this(id, name, email, role, qualifications, expertiseAreas, bio, null, createdAt, updatedAt);
+    }
+
+    public InstructorProfileResponse(Integer id, String name, String email, String role,
+                                     String qualifications, String expertiseAreas, String bio,
+                                     String profilePictureUrl,
                                      LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.name = name;
@@ -31,6 +39,7 @@ public class InstructorProfileResponse {
         this.qualifications = qualifications;
         this.expertiseAreas = expertiseAreas;
         this.bio = bio;
+        this.profilePictureUrl = profilePictureUrl;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -99,6 +108,14 @@ public class InstructorProfileResponse {
 
     public void setBio(String bio) {
         this.bio = bio;
+    }
+
+    public String getProfilePictureUrl() {
+        return profilePictureUrl;
+    }
+
+    public void setProfilePictureUrl(String profilePictureUrl) {
+        this.profilePictureUrl = profilePictureUrl;
     }
 
     public LocalDateTime getCreatedAt() {
