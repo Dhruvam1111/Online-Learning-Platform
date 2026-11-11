@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping({"/api/instructor/courses", "/api/instructors/courses"})
+@RequestMapping({ "/api/instructor/courses", "/api/instructors/courses" })
 @PreAuthorize("hasRole('instructor')")
 public class InstructorCourseController {
 
@@ -57,7 +57,7 @@ public class InstructorCourseController {
         User currentUser = instructorCourseService.resolveUser(authentication);
 
         if ((queryInstructorId != null && !queryInstructorId.equals(currentUser.getId())) ||
-            (queryUserId != null && !queryUserId.equals(currentUser.getId()))) {
+                (queryUserId != null && !queryUserId.equals(currentUser.getId()))) {
             throw new AccessDeniedException("Cannot access another instructor's courses");
         }
 
@@ -78,7 +78,8 @@ public class InstructorCourseController {
 
     /**
      * GET /api/instructor/courses/{courseId}
-     * FR-I07: Retrieve a specific course (including DRAFT) for an associated instructor.
+     * FR-I07: Retrieve a specific course (including DRAFT) for an associated
+     * instructor.
      */
     @GetMapping("/{courseId:\\d+}")
     public ResponseEntity<CourseResponse> getCourseById(
@@ -91,7 +92,8 @@ public class InstructorCourseController {
 
     /**
      * POST /api/instructor/courses/draft
-     * FR-I07: Save a new course draft (or update an existing draft if id is provided)
+     * FR-I07: Save a new course draft (or update an existing draft if id is
+     * provided)
      * without requiring all mandatory course fields.
      */
     @PostMapping("/draft")
@@ -108,7 +110,7 @@ public class InstructorCourseController {
      * PUT / PATCH /api/instructor/courses/{courseId}/draft
      * FR-I07: Partially update an existing course and save it as a draft.
      */
-    @RequestMapping(value = "/{courseId}/draft", method = {RequestMethod.PUT, RequestMethod.PATCH})
+    @RequestMapping(value = "/{courseId}/draft", method = { RequestMethod.PUT, RequestMethod.PATCH })
     public ResponseEntity<CourseResponse> updateDraft(
             Authentication authentication,
             @PathVariable Integer courseId,
@@ -135,7 +137,8 @@ public class InstructorCourseController {
 
     /**
      * PATCH /api/instructor/courses/{courseId}/status
-     * FR-I09 & FR-I59: Change course status for an associated course (ARCHIVED restricted to OWNER).
+     * FR-I09 & FR-I59: Change course status for an associated course (ARCHIVED
+     * restricted to OWNER).
      */
     @PatchMapping("/{courseId}/status")
     public ResponseEntity<CourseResponse> updateCourseStatus(
@@ -150,7 +153,8 @@ public class InstructorCourseController {
 
     /**
      * GET /api/instructor/courses/{courseId}/instructors
-     * FR-I59: Retrieve all instructors associated with a course, including roles and basic profile info.
+     * FR-I59: Retrieve all instructors associated with a course, including roles
+     * and basic profile info.
      */
     @GetMapping("/{courseId:\\d+}/instructors")
     @PreAuthorize("hasRole('instructor') or hasRole('admin')")
@@ -159,7 +163,8 @@ public class InstructorCourseController {
             @PathVariable Integer courseId) {
 
         User currentUser = instructorCourseService.resolveUser(authentication);
-        List<CourseInstructorResponse> instructors = instructorCourseService.getCourseInstructors(currentUser, courseId);
+        List<CourseInstructorResponse> instructors = instructorCourseService.getCourseInstructors(currentUser,
+                courseId);
         return ResponseEntity.ok(instructors);
     }
 
@@ -183,8 +188,7 @@ public class InstructorCourseController {
      * FR-I59: Archive a course (restricted to OWNER only).
      */
     @RequestMapping(value = "/{courseId:\\d+}/archive", method = {RequestMethod.PATCH, RequestMethod.POST})
-    public ResponseEntity<CourseResponse> archiveCourse(
-            Authentication authentication,
+    public ResponseEntity<CourseResponse> archiveCourse(    Authentication authentication,
             @PathVariable Integer courseId) {
 
         User currentUser = instructorCourseService.resolveUser(authentication);
