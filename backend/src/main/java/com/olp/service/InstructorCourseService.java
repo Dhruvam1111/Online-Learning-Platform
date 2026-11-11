@@ -554,9 +554,8 @@ public class InstructorCourseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
 
         boolean isOwner = course.getInstructor() != null && currentUser.getId().equals(course.getInstructor().getId());
-        boolean isCoInstructor = courseInstructorRepository != null
-                && courseInstructorRepository.existsByCourseIdAndInstructorId(courseId, currentUser.getId());
-        if (!isOwner && !isCoInstructor) {
+        if (!isOwner && (courseInstructorRepository == null
+                || !courseInstructorRepository.existsByCourseIdAndInstructorId(courseId, currentUser.getId()))) {
             throw new AccessDeniedException("Cannot modify another instructor's course");
         }
 
