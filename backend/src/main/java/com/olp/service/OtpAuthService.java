@@ -415,7 +415,7 @@ public class OtpAuthService {
     private void validateAccountStatus(User user) {
         String status = user.getAccountStatus();
         if ("pending".equalsIgnoreCase(status)) {
-            throw new AccountStatusException("Awaiting admin approval: Your instructor account is pending administrator approval");
+            throw new AccountStatusException("Your instructor account is pending administrator approval");
         } else if ("suspended".equalsIgnoreCase(status)) {
             throw new AccountStatusException("Your account has been suspended. Please contact support");
         } else if ("rejected".equalsIgnoreCase(status)) {
