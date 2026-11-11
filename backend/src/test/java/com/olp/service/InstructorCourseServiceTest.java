@@ -5,6 +5,7 @@ import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CoursePrerequisiteRequest;
 import com.olp.dto.CourseResponse;
 import com.olp.dto.CreateCourseRequest;
+import com.olp.dto.PageResponse;
 import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
 import com.olp.entity.Course;
@@ -19,6 +20,7 @@ import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.CourseInstructorRepository;
 import com.olp.repository.CoursePrerequisiteRepository;
 import com.olp.repository.CourseRepository;
+import com.olp.repository.EnrollmentRepository;
 import com.olp.repository.InstructorProfileRepository;
 import com.olp.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -27,6 +29,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -51,6 +57,8 @@ class InstructorCourseServiceTest {
     private CoursePrerequisiteRepository coursePrerequisiteRepository;
     @Mock
     private InstructorProfileRepository instructorProfileRepository;
+    @Mock
+    private EnrollmentRepository enrollmentRepository;
 
     @InjectMocks
     private InstructorCourseService service;
@@ -987,5 +995,133 @@ class InstructorCourseServiceTest {
 
         service.removeCourseInstructor(owner, 10, 2);
         verify(courseInstructorRepository).delete(coMapping);
+    }
+
+    // ===== FR-I60: My Courses List (Pagination, Status Filtering, Batch Enrollment Counts) =====
+
+    @Test
+    void testGetMyCourses_Unfiltered_ReturnsPagedOwnerAndCoInstructorCoursesWithBatchEnrollmentCounts() {
+        User owner = instructor(1);
+        User otherOwner = instructor(2);
+
+        Course ownedPublished = new Course(owner, "Java Fundamentals", "Learn core Java", "Programming", CourseStatus.PUBLISHED);
+        ownedPublished.setId(10);
+        Course coInstructorDraft = new Course(otherOwner, "System Design", "Scalable systems", "Architecture", CourseStatus.DRAFT);
+        coInstructorDraft.setId(11);
+
+        Page<Course> page = new PageImpl<>(
+                List.of(ownedPublished, coInstructorDraft),
+                PageRequest.of(0, 10),
+                2);
+        when(courseRepository.findAssociatedCoursesByInstructor(eq(1), any(Pageable.class))).thenReturn(page);
+        when(enrollmentRepository.countEnrollmentsByCourseIds(List.of(10, 11)))
+                .thenReturn(List.<Object[]>of(new Object[] { 10, 42L }));
+
+        PageResponse<CourseResponse> result = service.getMyCourses(owner, null, 0, 10);
+
+        assertEquals(2, result.getContent().size());
+        assertEquals(0, result.getPageNumber());
+        assertEquals(10, result.getPageSize());
+        assertEquals(2, result.getTotalElements());
+        assertEquals(1, result.getTotalPages());
+        assertTrue(result.isLast());
+
+        CourseResponse first = result.getContent().get(0);
+        assertEquals(10, first.getId());
+        assertEquals("Java Fundamentals", first.getTitle());
+        assertEquals("Learn core Java", first.getDescription());
+        assertEquals("Programming", first.getCategory());
+        assertEquals(CourseStatus.PUBLISHED, first.getStatus());
+        assertEquals(42L, first.getEnrollmentCount());
+
+        CourseResponse second = result.getContent().get(1);
+        assertEquals(11, second.getId());
+        assertEquals("Architecture", second.getCategory());
+        assertEquals(CourseStatus.DRAFT, second.getStatus());
+        assertEquals(0L, second.getEnrollmentCount());
+
+        // Single batch query used — no N+1 per-course count queries
+        verify(enrollmentRepository, times(1)).countEnrollmentsByCourseIds(List.of(10, 11));
+        verify(enrollmentRepository, never()).countByCourseId(any());
+    }
+
+    @Test
+    void testGetMyCourses_StatusFilter_SupportsDraftPendingReviewPublishedArchived() {
+        User owner = instructor(1);
+        List<CourseStatus> supportedStatuses = List.of(
+                CourseStatus.DRAFT,
+                CourseStatus.PENDING_REVIEW,
+                CourseStatus.PUBLISHED,
+                CourseStatus.ARCHIVED);
+
+        for (CourseStatus expectedStatus : supportedStatuses) {
+            Course c = new Course(owner, "Course " + expectedStatus.name(), "Desc", "Tech", expectedStatus);
+            c.setId(100);
+            when(courseRepository.findAssociatedCoursesByInstructorAndStatus(eq(1), eq(expectedStatus), any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(c), PageRequest.of(0, 5), 1));
+            when(enrollmentRepository.countByCourseId(100)).thenReturn(7L);
+
+            PageResponse<CourseResponse> result = service.getMyCourses(owner, expectedStatus.name().toLowerCase(), 0, 5);
+
+            assertEquals(1, result.getContent().size());
+            assertEquals(expectedStatus, result.getContent().get(0).getStatus());
+            assertEquals(7L, result.getContent().get(0).getEnrollmentCount());
+        }
+    }
+
+    @Test
+    void testGetMyCourses_WithSearchAndStatusFilter_DelegatesProperly() {
+        User owner = instructor(1);
+        Course c = new Course(owner, "Spring Boot 3", "Microservices", "Backend", CourseStatus.PUBLISHED);
+        c.setId(20);
+        when(courseRepository.searchAssociatedCoursesByInstructorAndStatus(
+                eq(1), eq(CourseStatus.PUBLISHED), eq("Spring"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(c), PageRequest.of(1, 1), 3));
+        when(enrollmentRepository.countByCourseId(20)).thenReturn(15L);
+
+        PageResponse<CourseResponse> page = service.getMyCourses(owner, "PUBLISHED", "  Spring  ", 1, 1);
+
+        assertEquals(1, page.getContent().size());
+        assertEquals(1, page.getPageNumber());
+        assertEquals(1, page.getPageSize());
+        assertEquals(3, page.getTotalElements());
+        assertEquals(3, page.getTotalPages());
+        assertFalse(page.isLast());
+        assertEquals(15L, page.getContent().get(0).getEnrollmentCount());
+    }
+
+    @Test
+    void testGetMyCourses_EmptyResult_SkipsBatchQueries() {
+        User owner = instructor(1);
+        when(courseRepository.findAssociatedCoursesByInstructor(eq(1), any(Pageable.class)))
+                .thenReturn(Page.empty(PageRequest.of(0, 10)));
+
+        PageResponse<CourseResponse> result = service.getMyCourses(owner, null, 0, 10);
+
+        assertTrue(result.getContent().isEmpty());
+        assertEquals(0, result.getTotalElements());
+        verifyNoInteractions(enrollmentRepository);
+    }
+
+    @Test
+    void testGetMyCourses_InvalidPaginationOrStatus_ThrowsIllegalArgument() {
+        User owner = instructor(1);
+
+        assertThrows(IllegalArgumentException.class, () -> service.getMyCourses(owner, null, -1, 10));
+        assertThrows(IllegalArgumentException.class, () -> service.getMyCourses(owner, null, 0, 0));
+        assertThrows(IllegalArgumentException.class, () -> service.getMyCourses(owner, null, 0, 101));
+        assertThrows(IllegalArgumentException.class, () -> service.getMyCourses(owner, "UNKNOWN_STATUS", 0, 10));
+        verifyNoInteractions(courseRepository);
+    }
+
+    @Test
+    void testGetMyCourses_StudentPendingAndUnauthenticatedDenied() {
+        User pending = instructor(3);
+        pending.setAccountStatus("pending");
+
+        assertThrows(InvalidCredentialsException.class, () -> service.getMyCourses(null, null, 0, 10));
+        assertThrows(AccessDeniedException.class, () -> service.getMyCourses(student(2), null, 0, 10));
+        assertThrows(AccessDeniedException.class, () -> service.getMyCourses(pending, null, 0, 10));
+        verifyNoInteractions(courseRepository, enrollmentRepository);
     }
 }

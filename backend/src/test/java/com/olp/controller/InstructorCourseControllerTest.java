@@ -5,11 +5,13 @@ import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CourseResponse;
 import com.olp.dto.CreateCourseRequest;
+import com.olp.dto.PageResponse;
 import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
 import com.olp.entity.CourseInstructorRole;
 import com.olp.entity.CourseStatus;
 import com.olp.entity.User;
+import com.olp.exception.GlobalExceptionHandler;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.service.InstructorCourseService;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +25,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,6 +34,9 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
 class InstructorCourseControllerTest {
@@ -322,5 +329,74 @@ class InstructorCourseControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertTrue(response.getBody().isSuccess());
         verify(instructorCourseService).deleteCourse(currentUser, 10);
+    }
+
+    @Test
+    void testGetMyCourses_PagedAndFiltered_Returns200() {
+        givenResolvedUser();
+        CourseResponse c = courseResponse(10, "Published Course");
+        c.setStatus(CourseStatus.PUBLISHED);
+        c.setEnrollmentCount(12L);
+        PageResponse<CourseResponse> paged = new PageResponse<>(List.of(c), 0, 5, 1, 1, true);
+        when(instructorCourseService.getMyCourses(currentUser, "PUBLISHED", "Pub", 0, 5)).thenReturn(paged);
+
+        ResponseEntity<PageResponse<CourseResponse>> response =
+                controller.getMyCourses(authentication, "PUBLISHED", "Pub", 0, 5, null, null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(1, response.getBody().getContent().size());
+        assertEquals(12L, response.getBody().getContent().get(0).getEnrollmentCount());
+        verify(instructorCourseService).getMyCourses(currentUser, "PUBLISHED", "Pub", 0, 5);
+    }
+
+    @Test
+    void testGetMyCourses_OtherInstructorId_ThrowsAccessDenied() {
+        givenResolvedUser();
+
+        assertThrows(AccessDeniedException.class,
+                () -> controller.getMyCourses(authentication, null, null, 0, 10, 99, null));
+        verify(instructorCourseService, never()).getMyCourses(any(), any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    void testMyCoursesRoutes_MockMvcDisambiguatesListVsPagedVsStatusFilters() throws Exception {
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
+
+        when(instructorCourseService.resolveUser(any(Authentication.class))).thenReturn(currentUser);
+
+        CourseResponse course = courseResponse(10, "Spring API");
+        course.setStatus(CourseStatus.PUBLISHED);
+        course.setEnrollmentCount(25L);
+        PageResponse<CourseResponse> paged = new PageResponse<>(List.of(course), 0, 5, 1, 1, true);
+
+        when(instructorCourseService.getMyCourses(currentUser, "PUBLISHED", null, 0, 5)).thenReturn(paged);
+        when(instructorCourseService.getMyCourses(currentUser, "DRAFT", null, 0, 10))
+                .thenReturn(new PageResponse<>(List.of(), 0, 10, 0, 0, true));
+
+        mockMvc.perform(get("/api/instructor/courses/my-courses")
+                        .param("status", "PUBLISHED")
+                        .param("page", "0")
+                        .param("size", "5")
+                        .principal(authentication))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(10))
+                .andExpect(jsonPath("$.content[0].enrollmentCount").value(25))
+                .andExpect(jsonPath("$.totalElements").value(1));
+
+        mockMvc.perform(get("/api/instructors/courses")
+                        .param("page", "0")
+                        .param("size", "5")
+                        .param("status", "PUBLISHED")
+                        .principal(authentication))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].title").value("Spring API"));
+
+        mockMvc.perform(get("/api/instructor/courses")
+                        .param("status", "DRAFT")
+                        .principal(authentication))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
     }
 }

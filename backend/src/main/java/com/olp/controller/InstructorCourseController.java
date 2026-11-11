@@ -5,6 +5,7 @@ import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CourseResponse;
 import com.olp.dto.CreateCourseRequest;
+import com.olp.dto.PageResponse;
 import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
 import com.olp.entity.User;
@@ -46,7 +47,7 @@ public class InstructorCourseController {
 
     /**
      * GET /api/instructor/courses
-     * FR-I60: List courses owned by the authenticated instructor.
+     * FR-I60: List courses associated with the authenticated instructor.
      */
     @GetMapping
     public ResponseEntity<List<CourseResponse>> getCourses(
@@ -63,6 +64,63 @@ public class InstructorCourseController {
 
         List<CourseResponse> courses = instructorCourseService.getInstructorCourses(currentUser);
         return ResponseEntity.ok(courses);
+    }
+
+    /**
+     * GET /api/instructor/courses/my-courses (or /my, or /api/instructor/courses?page=0&size=10&status=...)
+     * FR-I60: Paginated and status-filtered My Courses list (owner + co-instructor) with enrollment counts.
+     */
+    @GetMapping({ "/my-courses", "/my" })
+    public ResponseEntity<PageResponse<CourseResponse>> getMyCourses(
+            Authentication authentication,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(name = "instructorId", required = false) Integer queryInstructorId,
+            @RequestParam(name = "userId", required = false) Integer queryUserId) {
+
+        User currentUser = instructorCourseService.resolveUser(authentication);
+
+        if ((queryInstructorId != null && !queryInstructorId.equals(currentUser.getId())) ||
+                (queryUserId != null && !queryUserId.equals(currentUser.getId()))) {
+            throw new AccessDeniedException("Cannot access another instructor's courses");
+        }
+
+        PageResponse<CourseResponse> response = instructorCourseService.getMyCourses(
+                currentUser, status, search, page, size);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/instructor/courses?page=0&size=10&status=...
+     * FR-I60: Paginated My Courses query support directly on the /courses endpoint.
+     */
+    @GetMapping(params = "page")
+    public ResponseEntity<PageResponse<CourseResponse>> getCoursesPaged(
+            Authentication authentication,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(name = "instructorId", required = false) Integer queryInstructorId,
+            @RequestParam(name = "userId", required = false) Integer queryUserId) {
+        return getMyCourses(authentication, status, search, page, size, queryInstructorId, queryUserId);
+    }
+
+    /**
+     * GET /api/instructor/courses?status=PUBLISHED
+     * FR-I60: Status-filtered My Courses query on /courses when page parameter is omitted.
+     */
+    @GetMapping(params = { "status", "!page" })
+    public ResponseEntity<PageResponse<CourseResponse>> getCoursesByStatus(
+            Authentication authentication,
+            @RequestParam String status,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(name = "instructorId", required = false) Integer queryInstructorId,
+            @RequestParam(name = "userId", required = false) Integer queryUserId) {
+        return getMyCourses(authentication, status, search, 0, size, queryInstructorId, queryUserId);
     }
 
     /**
@@ -187,8 +245,9 @@ public class InstructorCourseController {
      * PATCH / POST /api/instructor/courses/{courseId}/archive
      * FR-I59: Archive a course (restricted to OWNER only).
      */
-    @RequestMapping(value = "/{courseId:\\d+}/archive", method = {RequestMethod.PATCH, RequestMethod.POST})
-    public ResponseEntity<CourseResponse> archiveCourse(    Authentication authentication,
+    @RequestMapping(value = "/{courseId:\\d+}/archive", method = { RequestMethod.PATCH, RequestMethod.POST })
+    public ResponseEntity<CourseResponse> archiveCourse(
+            Authentication authentication,
             @PathVariable Integer courseId) {
 
         User currentUser = instructorCourseService.resolveUser(authentication);

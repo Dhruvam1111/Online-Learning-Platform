@@ -5,6 +5,7 @@ import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CoursePrerequisiteRequest;
 import com.olp.dto.CourseResponse;
 import com.olp.dto.CreateCourseRequest;
+import com.olp.dto.PageResponse;
 import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
 import com.olp.entity.Course;
@@ -18,15 +19,21 @@ import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.CourseInstructorRepository;
 import com.olp.repository.CoursePrerequisiteRepository;
 import com.olp.repository.CourseRepository;
+import com.olp.repository.EnrollmentRepository;
 import com.olp.repository.InstructorProfileRepository;
 import com.olp.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,9 +58,10 @@ public class InstructorCourseService {
     private final CourseInstructorRepository courseInstructorRepository;
     private final CoursePrerequisiteRepository coursePrerequisiteRepository;
     private final InstructorProfileRepository instructorProfileRepository;
+    private final EnrollmentRepository enrollmentRepository;
 
     public InstructorCourseService(CourseRepository courseRepository, UserRepository userRepository) {
-        this(courseRepository, userRepository, null, null, null);
+        this(courseRepository, userRepository, null, null, null, null);
     }
 
     public InstructorCourseService(
@@ -61,7 +69,17 @@ public class InstructorCourseService {
             UserRepository userRepository,
             CourseInstructorRepository courseInstructorRepository,
             CoursePrerequisiteRepository coursePrerequisiteRepository) {
-        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository, null);
+        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository, null, null);
+    }
+
+    public InstructorCourseService(
+            CourseRepository courseRepository,
+            UserRepository userRepository,
+            CourseInstructorRepository courseInstructorRepository,
+            CoursePrerequisiteRepository coursePrerequisiteRepository,
+            InstructorProfileRepository instructorProfileRepository) {
+        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
+                instructorProfileRepository, null);
     }
 
     @Autowired
@@ -70,12 +88,14 @@ public class InstructorCourseService {
             UserRepository userRepository,
             @Autowired(required = false) CourseInstructorRepository courseInstructorRepository,
             @Autowired(required = false) CoursePrerequisiteRepository coursePrerequisiteRepository,
-            @Autowired(required = false) InstructorProfileRepository instructorProfileRepository) {
+            @Autowired(required = false) InstructorProfileRepository instructorProfileRepository,
+            @Autowired(required = false) EnrollmentRepository enrollmentRepository) {
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.courseInstructorRepository = courseInstructorRepository;
         this.coursePrerequisiteRepository = coursePrerequisiteRepository;
         this.instructorProfileRepository = instructorProfileRepository;
+        this.enrollmentRepository = enrollmentRepository;
     }
 
     /**
@@ -98,15 +118,80 @@ public class InstructorCourseService {
     }
 
     /**
-     * FR-I60 — List courses associated with the authenticated instructor.
+     * FR-I60 — List courses associated with the authenticated instructor (unpaginated, batch-enriched).
      */
     @Transactional(readOnly = true)
     public List<CourseResponse> getInstructorCourses(User currentUser) {
         validateInstructor(currentUser);
 
-        return findAllAssociatedCourses(currentUser).stream()
-                .map(this::enrichCourseResponse)
-                .toList();
+        List<Course> courses = findAllAssociatedCourses(currentUser);
+        return enrichCourseResponses(courses);
+    }
+
+    /**
+     * FR-I60 — Retrieve paginated "My Courses" list for the authenticated instructor (owner or co-instructor),
+     * supporting status filtering (DRAFT, PENDING_REVIEW, PUBLISHED, ARCHIVED) and efficient batch enrollment counts.
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<CourseResponse> getMyCourses(
+            User currentUser,
+            String statusFilter,
+            int page,
+            int size) {
+        return getMyCourses(currentUser, statusFilter, null, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<CourseResponse> getMyCourses(
+            User currentUser,
+            String statusFilter,
+            String search,
+            int page,
+            int size) {
+        validateInstructor(currentUser);
+
+        if (page < 0) {
+            throw new IllegalArgumentException("Page index must be 0 or greater");
+        }
+        if (size <= 0 || size > 100) {
+            throw new IllegalArgumentException("Page size must be between 1 and 100");
+        }
+
+        CourseStatus parsedStatus = null;
+        if (statusFilter != null && !statusFilter.trim().isEmpty()) {
+            parsedStatus = CourseStatus.fromString(statusFilter);
+        }
+
+        String trimmedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").ascending());
+
+        Page<Course> coursePage;
+        if (parsedStatus == null && trimmedSearch == null) {
+            coursePage = courseRepository.findAssociatedCoursesByInstructor(currentUser.getId(), pageable);
+        } else if (parsedStatus != null && trimmedSearch == null) {
+            coursePage = courseRepository.findAssociatedCoursesByInstructorAndStatus(
+                    currentUser.getId(), parsedStatus, pageable);
+        } else if (parsedStatus == null) {
+            coursePage = courseRepository.searchAssociatedCoursesByInstructor(
+                    currentUser.getId(), trimmedSearch, pageable);
+        } else {
+            coursePage = courseRepository.searchAssociatedCoursesByInstructorAndStatus(
+                    currentUser.getId(), parsedStatus, trimmedSearch, pageable);
+        }
+
+        if (coursePage == null) {
+            coursePage = Page.empty(pageable);
+        }
+
+        List<CourseResponse> content = enrichCourseResponses(coursePage.getContent());
+        return new PageResponse<>(
+                content,
+                coursePage.getNumber(),
+                coursePage.getSize(),
+                coursePage.getTotalElements(),
+                coursePage.getTotalPages(),
+                coursePage.isLast()
+        );
     }
 
     /**
@@ -116,10 +201,10 @@ public class InstructorCourseService {
     public List<CourseResponse> getInstructorDrafts(User currentUser) {
         validateInstructor(currentUser);
 
-        return findAllAssociatedCourses(currentUser).stream()
+        List<Course> drafts = findAllAssociatedCourses(currentUser).stream()
                 .filter(c -> c.getStatus() == CourseStatus.DRAFT)
-                .map(this::enrichCourseResponse)
                 .toList();
+        return enrichCourseResponses(drafts);
     }
 
     /**
@@ -646,12 +731,65 @@ public class InstructorCourseService {
     }
 
     private CourseResponse enrichCourseResponse(Course course) {
-        CourseResponse response = CourseResponse.fromEntity(course);
-        if (response != null && course != null) {
-            response.setInstructors(CourseInstructorResponse.resolveInstructorsForCourse(
-                    course, courseInstructorRepository, instructorProfileRepository));
+        if (course == null) {
+            return null;
         }
-        return response;
+        List<CourseResponse> enriched = enrichCourseResponses(List.of(course));
+        return enriched.isEmpty() ? CourseResponse.fromEntity(course) : enriched.get(0);
+    }
+
+    private List<CourseResponse> enrichCourseResponses(List<Course> courses) {
+        if (courses == null || courses.isEmpty()) {
+            return List.of();
+        }
+
+        List<Integer> courseIds = new ArrayList<>();
+        for (Course c : courses) {
+            if (c != null && c.getId() != null) {
+                courseIds.add(c.getId());
+            }
+        }
+
+        Map<Integer, Long> enrollmentCounts = new HashMap<>();
+        if (enrollmentRepository != null && !courseIds.isEmpty()) {
+            if (courseIds.size() == 1) {
+                Integer cid = courseIds.get(0);
+                enrollmentCounts.put(cid, enrollmentRepository.countByCourseId(cid));
+            } else {
+                List<Object[]> rows = enrollmentRepository.countEnrollmentsByCourseIds(courseIds);
+                if (rows != null) {
+                    for (Object[] row : rows) {
+                        if (row != null && row.length >= 2
+                                && row[0] instanceof Number idNum && row[1] instanceof Number countNum) {
+                            enrollmentCounts.put(idNum.intValue(), countNum.longValue());
+                        }
+                    }
+                }
+            }
+        }
+
+        Map<Integer, List<CourseInstructorResponse>> instructorsByCourse =
+                CourseInstructorResponse.resolveInstructorsForCourses(
+                        courses, courseInstructorRepository, instructorProfileRepository);
+
+        List<CourseResponse> responses = new ArrayList<>(courses.size());
+        for (int idx = 0; idx < courses.size(); idx++) {
+            Course course = courses.get(idx);
+            if (course == null) {
+                continue;
+            }
+            CourseResponse dto = CourseResponse.fromEntity(course);
+            if (course.getId() != null) {
+                dto.setEnrollmentCount(enrollmentCounts.getOrDefault(course.getId(), 0L));
+            }
+            Integer key = course.getId() != null ? course.getId() : -(idx + 1);
+            List<CourseInstructorResponse> resolvedTeam = instructorsByCourse.get(key);
+            if (resolvedTeam != null) {
+                dto.setInstructors(resolvedTeam);
+            }
+            responses.add(dto);
+        }
+        return responses;
     }
 
     private boolean isCourseOwner(Course course, User currentUser) {
