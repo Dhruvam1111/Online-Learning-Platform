@@ -4,6 +4,9 @@
 -- ============================================================
 
 -- Clean slate (safe to re-run during development)
+DROP TABLE IF EXISTS quiz_questions CASCADE;
+DROP TABLE IF EXISTS questions CASCADE;
+DROP TABLE IF EXISTS quizzes CASCADE;
 DROP TABLE IF EXISTS course_association_requests CASCADE;
 DROP TABLE IF EXISTS lessons CASCADE;
 DROP TABLE IF EXISTS course_sections CASCADE;
@@ -506,3 +509,105 @@ CREATE TABLE IF NOT EXISTS content_declarations (
 );
 
 COMMIT;
+
+-- =========================
+-- FR-I19: QUIZZES, QUESTIONS & QUIZ_QUESTIONS
+-- =========================
+-- Quizzes linked to a Course or Module, with optional Lesson position.
+CREATE TABLE quizzes (
+    id                 SERIAL PRIMARY KEY,
+    course_id          INTEGER       NOT NULL,
+    module_id          INTEGER,
+    lesson_id          INTEGER,
+    created_by         INTEGER,
+    title              VARCHAR(200)  NOT NULL,
+    description        TEXT,
+    instructions       TEXT,
+    status             VARCHAR(20)   NOT NULL DEFAULT 'DRAFT',
+    total_marks        NUMERIC(8,2)  NOT NULL DEFAULT 0.00,
+    passing_marks      NUMERIC(8,2),
+    time_limit_minutes INTEGER,
+    max_attempts       INTEGER,
+    created_at         TIMESTAMP     NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMP     NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_quizzes_course
+        FOREIGN KEY (course_id)
+        REFERENCES courses(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_quizzes_module
+        FOREIGN KEY (module_id)
+        REFERENCES course_modules(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_quizzes_lesson
+        FOREIGN KEY (lesson_id)
+        REFERENCES lessons(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_quizzes_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT chk_quiz_status
+        CHECK (status IN ('DRAFT', 'PUBLISHED'))
+);
+
+-- Reusable Questions table (extensible for FR-I21 question types, FR-I22 marking schemes, FR-I24 question bank)
+CREATE TABLE questions (
+    id               SERIAL PRIMARY KEY,
+    course_id        INTEGER,
+    created_by       INTEGER,
+    question_text    TEXT          NOT NULL,
+    question_type    VARCHAR(30)   NOT NULL DEFAULT 'MULTIPLE_CHOICE',
+    options_json     TEXT,
+    correct_answer   TEXT,
+    default_marks    NUMERIC(8,2)  NOT NULL DEFAULT 1.00,
+    negative_marks   NUMERIC(8,2)  NOT NULL DEFAULT 0.00,
+    topic            VARCHAR(100),
+    difficulty       VARCHAR(30),
+    explanation      TEXT,
+    is_bank_question BOOLEAN       NOT NULL DEFAULT FALSE,
+    created_at       TIMESTAMP     NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMP     NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_questions_course
+        FOREIGN KEY (course_id)
+        REFERENCES courses(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_questions_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT chk_question_type
+        CHECK (question_type IN ('MULTIPLE_CHOICE', 'MULTIPLE_SELECT', 'TRUE_FALSE', 'NUMERICAL', 'DESCRIPTIVE', 'SHORT_ANSWER'))
+);
+
+-- Ordered mapping between Quizzes and Questions (FR-I19)
+CREATE TABLE quiz_questions (
+    id             SERIAL PRIMARY KEY,
+    quiz_id        INTEGER       NOT NULL,
+    question_id    INTEGER       NOT NULL,
+    order_index    INTEGER       NOT NULL DEFAULT 1,
+    marks          NUMERIC(8,2),
+    negative_marks NUMERIC(8,2),
+    is_required    BOOLEAN       NOT NULL DEFAULT TRUE,
+    created_at     TIMESTAMP     NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_quiz_questions_quiz
+        FOREIGN KEY (quiz_id)
+        REFERENCES quizzes(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_quiz_questions_question
+        FOREIGN KEY (question_id)
+        REFERENCES questions(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_quiz_questions_quiz_question
+        UNIQUE (quiz_id, question_id)
+);
