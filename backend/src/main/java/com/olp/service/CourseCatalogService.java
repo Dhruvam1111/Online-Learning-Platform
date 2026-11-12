@@ -1,6 +1,7 @@
 package com.olp.service;
 
 import com.olp.dto.CourseDetailResponse;
+import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.EnrollmentResponse;
 import com.olp.dto.LectureResponse;
 import com.olp.dto.PublicCourseResponse;
@@ -12,6 +13,7 @@ import com.olp.entity.User;
 import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,8 @@ public class CourseCatalogService {
     private final BookmarkRepository bookmarkRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
+    private final CourseInstructorRepository courseInstructorRepository;
+    private final InstructorProfileRepository instructorProfileRepository;
 
     public CourseCatalogService(CourseRepository courseRepository,
                                 LectureRepository lectureRepository,
@@ -35,12 +39,38 @@ public class CourseCatalogService {
                                 BookmarkRepository bookmarkRepository,
                                 EnrollmentRepository enrollmentRepository,
                                 UserRepository userRepository) {
+        this(courseRepository, lectureRepository, reviewRepository, bookmarkRepository,
+                enrollmentRepository, userRepository, null, null);
+    }
+
+    public CourseCatalogService(CourseRepository courseRepository,
+                                LectureRepository lectureRepository,
+                                ReviewRepository reviewRepository,
+                                BookmarkRepository bookmarkRepository,
+                                EnrollmentRepository enrollmentRepository,
+                                UserRepository userRepository,
+                                CourseInstructorRepository courseInstructorRepository) {
+        this(courseRepository, lectureRepository, reviewRepository, bookmarkRepository,
+                enrollmentRepository, userRepository, courseInstructorRepository, null);
+    }
+
+    @Autowired
+    public CourseCatalogService(CourseRepository courseRepository,
+                                LectureRepository lectureRepository,
+                                ReviewRepository reviewRepository,
+                                BookmarkRepository bookmarkRepository,
+                                EnrollmentRepository enrollmentRepository,
+                                UserRepository userRepository,
+                                @Autowired(required = false) CourseInstructorRepository courseInstructorRepository,
+                                @Autowired(required = false) InstructorProfileRepository instructorProfileRepository) {
         this.courseRepository = courseRepository;
         this.lectureRepository = lectureRepository;
         this.reviewRepository = reviewRepository;
         this.bookmarkRepository = bookmarkRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.userRepository = userRepository;
+        this.courseInstructorRepository = courseInstructorRepository;
+        this.instructorProfileRepository = instructorProfileRepository;
     }
 
     /**
@@ -102,7 +132,7 @@ public class CourseCatalogService {
             boolean bookmarked = currentUserId != null &&
                     bookmarkRepository.existsByStudentIdAndCourseId(currentUserId, c.getId());
 
-            return new PublicCourseResponse(
+            PublicCourseResponse item = new PublicCourseResponse(
                     c.getId(),
                     c.getTitle(),
                     c.getDescription(),
@@ -116,6 +146,9 @@ public class CourseCatalogService {
                     enrolled,
                     bookmarked
             );
+            item.setInstructors(CourseInstructorResponse.resolveInstructorsForCourse(
+                    c, courseInstructorRepository, instructorProfileRepository));
+            return item;
         }).toList();
     }
 
@@ -127,11 +160,14 @@ public class CourseCatalogService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
 
+        verifyCourseVisibleToUser(course, currentUser);
+
         Integer currentUserId = currentUser != null ? currentUser.getId() : null;
 
         List<Lecture> lectures = lectureRepository.findByCourseIdOrderByOrderIndexAsc(courseId);
+        boolean canViewContent = canViewContent(course, currentUser);
         List<LectureResponse> lectureResponses = lectures.stream()
-                .map(LectureResponse::fromEntity)
+                .map(l -> canViewContent ? LectureResponse.fromEntity(l) : LectureResponse.previewOf(l))
                 .toList();
 
         Double avgRating = reviewRepository.findAverageRatingByCourseId(courseId);
@@ -141,7 +177,7 @@ public class CourseCatalogService {
         boolean bookmarked = currentUserId != null &&
                 bookmarkRepository.existsByStudentIdAndCourseId(currentUserId, courseId);
 
-        return new CourseDetailResponse(
+        CourseDetailResponse detail = new CourseDetailResponse(
                 course.getId(),
                 course.getTitle(),
                 course.getDescription(),
@@ -156,6 +192,24 @@ public class CourseCatalogService {
                 bookmarked,
                 lectureResponses
         );
+        detail.setInstructors(CourseInstructorResponse.resolveInstructorsForCourse(
+                course, courseInstructorRepository, instructorProfileRepository));
+        return detail;
+    }
+
+    /**
+     * FR-I59 — Retrieve all instructors associated with a course, including roles and basic profile info.
+     * Respects draft privacy: non-published courses require associated instructor or admin access.
+     */
+    @Transactional(readOnly = true)
+    public List<CourseInstructorResponse> getCourseInstructors(Integer courseId, User currentUser) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
+
+        verifyCourseVisibleToUser(course, currentUser);
+
+        return CourseInstructorResponse.resolveInstructorsForCourse(
+                course, courseInstructorRepository, instructorProfileRepository);
     }
 
     /**
@@ -170,6 +224,10 @@ public class CourseCatalogService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
 
+        if (course.getStatus() != CourseStatus.PUBLISHED) {
+            throw new AccessDeniedException("Cannot enroll in a course that is not published");
+        }
+
         if (enrollmentRepository.existsByStudentIdAndCourseId(currentUser.getId(), courseId)) {
             return new EnrollmentResponse(true, "Already enrolled in this course", courseId, true);
         }
@@ -181,15 +239,65 @@ public class CourseCatalogService {
     }
 
     /**
-     * Returns lectures for an enrolled student or course preview.
+     * Returns lectures for a course. Video fields are only populated for the course's
+     * instructor or an enrolled student; everyone else receives the syllabus outline only.
      */
     @Transactional(readOnly = true)
     public List<LectureResponse> getCourseLectures(Integer courseId, User currentUser) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
 
+        verifyCourseVisibleToUser(course, currentUser);
+
+        boolean canViewContent = canViewContent(course, currentUser);
         return lectureRepository.findByCourseIdOrderByOrderIndexAsc(course.getId()).stream()
-                .map(LectureResponse::fromEntity)
+                .map(l -> canViewContent ? LectureResponse.fromEntity(l) : LectureResponse.previewOf(l))
                 .toList();
+    }
+
+    /**
+     * FR-I07: Non-published courses (especially DRAFT) are visible only to associated instructors
+     * and authorized admins. Students and anonymous users can never access draft courses.
+     */
+    private void verifyCourseVisibleToUser(Course course, User currentUser) {
+        if (course.getStatus() == CourseStatus.PUBLISHED) {
+            return;
+        }
+        if (isAssociatedInstructorOrAdmin(course, currentUser)) {
+            return;
+        }
+        throw new AccessDeniedException("Access denied: this course is not publicly available");
+    }
+
+    private boolean isAssociatedInstructorOrAdmin(Course course, User currentUser) {
+        if (currentUser == null) {
+            return false;
+        }
+        if ("admin".equalsIgnoreCase(currentUser.getRole())) {
+            return true;
+        }
+        if (course.getInstructor() != null
+                && course.getInstructor().getId().equals(currentUser.getId())) {
+            return true;
+        }
+        return courseInstructorRepository != null
+                && courseInstructorRepository.existsByCourseIdAndInstructorId(course.getId(), currentUser.getId());
+    }
+
+    /**
+     * True when the user may see lecture video data: an admin, an associated instructor,
+     * or a student enrolled in a published/non-draft course. Anonymous users never can.
+     */
+    private boolean canViewContent(Course course, User currentUser) {
+        if (currentUser == null) {
+            return false;
+        }
+        if (isAssociatedInstructorOrAdmin(course, currentUser)) {
+            return true;
+        }
+        if (course.getStatus() == CourseStatus.DRAFT) {
+            return false;
+        }
+        return enrollmentRepository.existsByStudentIdAndCourseId(currentUser.getId(), course.getId());
     }
 }

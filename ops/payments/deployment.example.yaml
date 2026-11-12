@@ -1,0 +1,167 @@
+# Review image names, storage, DNS and secret provisioning before deployment.
+# Secrets are references only; never put credentials into this file.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: olp-backend
+spec:
+  replicas: 2
+  strategy:
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  selector:
+    matchLabels: {app: olp-backend}
+  template:
+    metadata:
+      labels: {app: olp-backend}
+    spec:
+      containers:
+        - name: backend
+          image: olp-backend:reviewed
+          ports: [{containerPort: 8080}]
+          envFrom: [{secretRef: {name: olp-backend-secrets}}]
+          env:
+            - {name: PAYMENTS_JOBS_ENABLED, value: "true"}
+            - {name: PAYMENTS_REQUIRE_SHARED_SECRET, value: "true"}
+            - {name: MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED, value: "true"}
+            - {name: MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE, value: "readinessState,db"}
+            - {name: SERVER_FORWARD_HEADERS_STRATEGY, value: "framework"}
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: 8080}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: 8080}
+            periodSeconds: 20
+          startupProbe:
+            httpGet: {path: /actuator/health/liveness, port: 8080}
+            failureThreshold: 30
+            periodSeconds: 5
+          resources:
+            requests: {cpu: "500m", memory: "512Mi"}
+            limits: {cpu: "2", memory: "2Gi"}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: backend}
+spec:
+  selector: {app: olp-backend}
+  ports: [{port: 8080, targetPort: 8080}]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: olp-api
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [olp.example.invalid]
+      secretName: olp-reviewed-tls
+  rules:
+    - host: olp.example.invalid
+      http:
+        paths:
+          - path: /actuator/health
+            pathType: Prefix
+            backend: {service: {name: backend, port: {number: 8080}}}
+          - path: /api
+            pathType: Prefix
+            backend: {service: {name: backend, port: {number: 8080}}}
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: frontend, port: {number: 80}}}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata: {name: olp-daily-financial-backup}
+spec:
+  schedule: "0 0 * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: olp-finance-ops:reviewed
+              args: [backup, --directory, /backups, --assets, /assets, --retention-days, "2557"]
+              envFrom: [{secretRef: {name: olp-backup-secrets}}]
+              volumeMounts:
+                - {name: backups, mountPath: /backups}
+                - {name: course-assets, mountPath: /assets, readOnly: true}
+          volumes:
+            - name: backups
+              persistentVolumeClaim: {claimName: olp-encrypted-financial-backups}
+            - name: course-assets
+              persistentVolumeClaim: {claimName: olp-course-assets}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: olp-frontend}
+spec:
+  replicas: 2
+  strategy:
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  selector:
+    matchLabels: {app: olp-frontend}
+  template:
+    metadata:
+      labels: {app: olp-frontend}
+    spec:
+      containers:
+        - name: frontend
+          image: olp-frontend:reviewed
+          ports: [{containerPort: 80}]
+          readinessProbe:
+            httpGet: {path: /, port: 80}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 100m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: frontend}
+spec:
+  selector: {app: olp-frontend}
+  ports: [{port: 80, targetPort: 80}]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: olp-backend}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: olp-backend}
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 70}
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata: {name: olp-readiness-observation}
+spec:
+  schedule: "* * * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: probe
+              image: olp-finance-ops:reviewed
+              command: [python3, /opt/olp/availability_probe.py]
+              args: [--url, https://olp.example.invalid/actuator/health/readiness, --log, /monitoring/availability.jsonl]
+              volumeMounts:
+                - {name: monitoring, mountPath: /monitoring}
+          volumes:
+            - name: monitoring
+              persistentVolumeClaim: {claimName: olp-availability-observations}

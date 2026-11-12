@@ -81,4 +81,68 @@ public class JwtUtil {
                 .getPayload();
         return claims.get("role", String.class);
     }
+
+    /**
+     * Generate a dedicated, single-use password reset token with custom expiration.
+     */
+    public String generatePasswordResetToken(Integer userId, long customExpirationMs) {
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + customExpirationMs);
+
+        return Jwts.builder()
+                .subject(String.valueOf(userId))
+                .claim("purpose", "PASSWORD_RESET")
+                .issuedAt(now)
+                .expiration(expiry)
+                .signWith(signingKey)
+                .compact();
+    }
+
+    /**
+     * Validate that a token is signed, not expired, and carries purpose = 'PASSWORD_RESET'.
+     */
+    public boolean validatePasswordResetToken(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(signingKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return "PASSWORD_RESET".equals(claims.get("purpose", String.class));
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Extract the issue date (issuedAt) from a token.
+     */
+    public Date getIssuedAtFromToken(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(signingKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return claims.getIssuedAt();
+        } catch (JwtException | IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Extract purpose claim from token.
+     */
+    public String getPurposeFromToken(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(signingKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return claims.get("purpose", String.class);
+        } catch (JwtException | IllegalArgumentException e) {
+            return null;
+        }
+    }
 }

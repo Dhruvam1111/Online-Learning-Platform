@@ -41,29 +41,63 @@ api.interceptors.response.use(
   }
 );
 
-export default api;
-
-// ─── Health Check ───────────────────────────────────────────────────────────
-export const checkBackendHealth = async () => {
-  try {
-    const res = await api.get('/courses');
-    return { online: true, status: res.status };
-  } catch (err) {
-    if (err.response) {
-      // Backend responded with status code
-      return { online: true, status: err.response.status };
-    }
-    return { online: false, error: err.message };
-  }
-};
-
 // ─── Auth API ───────────────────────────────────────────────────────────────
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
+  sendRegistrationOtp: (data) => api.post('/auth/register/send-otp', data),
+  verifyRegistrationOtp: (data) => api.post('/auth/register/verify-otp', data),
+  resendRegistrationOtp: (data) => api.post('/auth/register/resend-otp', data),
   login: (data) => api.post('/auth/login', data),
+  loginWithGoogle: (data) => api.post('/auth/google', data),
+  sendPasswordResetOtp: (data) => api.post('/auth/password-reset/send-otp', data),
+  resetPasswordWithOtp: (data) => api.post('/auth/password-reset/reset', data),
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
+  verifyEmail: (token) => api.get(`/auth/verify-email?token=${token}`),
 };
+
+// ─── Convenience Helpers on api Object ──────────────────────────────────────
+api.login = async (email, password) => {
+  const res = await authAPI.login({ email, password });
+  return res.data;
+};
+
+api.sendRegistrationOtp = async (name, email, password, role = 'student') => {
+  const res = await authAPI.sendRegistrationOtp({ name, email, password, role });
+  return res.data;
+};
+
+api.verifyRegistrationOtp = async (email, otpCode) => {
+  const res = await authAPI.verifyRegistrationOtp({ email, otpCode });
+  return res.data;
+};
+
+api.resendRegistrationOtp = async (email) => {
+  const res = await authAPI.resendRegistrationOtp({ email });
+  return res.data;
+};
+
+api.loginWithGoogle = async (email, name = '', idToken = '') => {
+  const res = await authAPI.loginWithGoogle({ email, name, idToken });
+  return res.data;
+};
+
+api.sendPasswordResetOtp = async (email) => {
+  const res = await authAPI.sendPasswordResetOtp({ email });
+  return res.data;
+};
+
+api.resetPasswordWithOtp = async (email, otpCode, newPassword, confirmPassword) => {
+  const res = await authAPI.resetPasswordWithOtp({
+    email,
+    otpCode,
+    newPassword,
+    confirmPassword: confirmPassword || newPassword,
+  });
+  return res.data;
+};
+
+export default api;
 
 // ─── User / Profile API ─────────────────────────────────────────────────────
 export const userAPI = {
@@ -110,6 +144,9 @@ export const instructorAPI = {
     api.patch(`/instructor/courses/${courseId}/lectures/reorder`, data),
   getProfile: () => api.get('/instructor/profile'),
   updateProfile: (data) => api.put('/instructor/profile', data),
+  getEarnings: () => api.get('/payments/instructor/earnings'),
+  withdrawEarnings: (bank) => api.post('/payments/instructor/payouts/withdraw-all', bank),
+  getPayoutHistory: () => api.get('/payments/instructor/payouts/history'),
 };
 
 // ─── Admin API ──────────────────────────────────────────────────────────────
@@ -127,4 +164,54 @@ export const adminAPI = {
   rejectCourse: (id, data) => api.put(`/admin/courses/${id}/reject`, data),
   unpublishCourse: (id) => api.put(`/admin/courses/${id}/unpublish`),
   deleteCourse: (id) => api.delete(`/admin/courses/${id}`),
+  getAllTransactions: () => api.get('/payments/admin/all'),
+  getAllRefunds: () => api.get('/payments/refunds/all'),
+  getAllInstructorPayouts: () => api.get('/payments/instructor/admin/all'),
+  settlePayout: (earningId) => api.post(`/payments/instructor/payouts/${earningId}/settle`),
+  haltPayout: (earningId, reason) => api.post(`/payments/instructor/payouts/${earningId}/halt`, { reason }),
+  unhaltPayout: (earningId, reason) => api.post(`/payments/instructor/payouts/${earningId}/unhalt`, { reason }),
+  getAllCoupons: () => api.get('/payments/coupons/admin/all'),
+  createCoupon: (coupon) => api.post('/payments/coupons/create', coupon),
+  toggleCoupon: (couponId) => api.patch(`/payments/coupons/${couponId}/toggle`),
+  processExceptionalRefund: (paymentId, reason) =>
+    api.post('/payments/refunds/exceptions', { paymentId, reason }),
+  getRefundExceptions: () => api.get('/payments/refunds/exceptions'),
+  decideRefundException: (id, decision, reason) => api.post(`/payments/refunds/exceptions/${id}/decision`, {decision, reason}),
+  getReconciliation: () => api.get('/payments/reconciliation/report'),
+};
+
+// ─── Payment Gateway API (QR Code Flow) ────────────────────────────────────
+export const paymentAPI = {
+  requestException: (paymentId, reason) => api.post('/payments/refunds/exceptions', {paymentId, reason}),
+  createOrder: (courseId, amount, currency = 'INR', couponCode = null, useWallet = false, paymentMethod = null, policyAcceptedVersion = null, settlementCurrency = 'INR') =>
+    api.post('/payments/create-order', { courseId, amount, currency, couponCode, useWallet, paymentMethod, policyAcceptedVersion, settlementCurrency }),
+  confirmPayment: (orderId, paymentMethod) =>
+    api.post(`/payments/confirm/${orderId}`, paymentMethod ? { paymentMethod } : {}),
+  failPayment: (orderId) => api.post(`/payments/fail/${orderId}`),
+  getUpiQr: (orderId) => api.get(`/payments/upi-qr/${orderId}`),
+  getOrderStatus: (orderId) => api.get(`/payments/status/${orderId}`),
+  simulatePay: (orderId) => api.post(`/payments/confirm/${orderId}`),
+  verify: (orderId, paymentId, signature, paymentMethod) =>
+    api.post('/payments/verify', { orderId, paymentId, signature, paymentMethod }),
+  sandboxSign: (orderId, paymentId) =>
+    Promise.resolve({ data: { orderId, paymentId, signature: 'sig_ok' } }),
+  applyCoupon: (code, orderAmount) =>
+    api.post('/payments/coupons/apply', { code, orderAmount }),
+  getWallet: () =>
+    api.get('/payments/wallet'),
+  getMyTransactions: () => api.get('/payments/my-transactions'),
+  getInvoice: (orderId) => api.get(`/payments/invoices/${orderId}`),
+  requestRefund: (paymentId, reason = 'Student requested course refund', amount = null) =>
+    api.post('/payments/refunds/initiate', { paymentId, reason, amount }),
+  createStripeSession: (courseId, amount) => api.post('/payments/stripe/create-session', { courseId, amount }),
+  verifyStripeSession: (sessionId) => api.post('/payments/stripe/verify-session', { sessionId }),
+};
+
+export const paymentSimulationAPI = {
+  methods: () => api.get('/payments/methods'),
+  saveMethod: (method, consent) => api.post('/payments/methods', {method, consent}),
+  revokeMethod: token => api.delete(`/payments/methods/${token}`),
+  pay: (token, orderId) => api.post(`/payments/methods/${token}/pay`, {orderId}),
+  requestRefund: (paymentId, amount, reason) => api.post('/payments/refunds/request', {paymentId, amount, reason}),
+  event: body => api.post('/payments/simulator/events', body),
 };

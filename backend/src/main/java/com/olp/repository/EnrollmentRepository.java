@@ -23,6 +23,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Integer>
            "JOIN e.course c " +
            "JOIN c.instructor i " +
            "WHERE e.student.id = :studentId " +
+           "AND c.status <> com.olp.entity.CourseStatus.DRAFT " +
            "ORDER BY e.enrolledAt DESC")
     List<MyCourseResponse> findMyCourses(@Param("studentId") Integer studentId);
 
@@ -38,4 +39,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Integer>
 
     @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.course.id = :courseId")
     long countByCourseId(@Param("courseId") Integer courseId);
+
+    @Query("SELECT e.course.id, COUNT(e) FROM Enrollment e WHERE e.course.id IN :courseIds GROUP BY e.course.id")
+    List<Object[]> countEnrollmentsByCourseIds(@Param("courseIds") List<Integer> courseIds);
 }

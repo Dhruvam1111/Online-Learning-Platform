@@ -1,6 +1,8 @@
 package com.olp.dto;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 public class PublicCourseResponse {
 
@@ -16,6 +18,7 @@ public class PublicCourseResponse {
     private int totalReviews;
     private boolean enrolled;
     private boolean bookmarked;
+    private List<CourseInstructorResponse> instructors = new ArrayList<>();
 
     public PublicCourseResponse() {}
 
@@ -131,5 +134,13 @@ public class PublicCourseResponse {
 
     public void setBookmarked(boolean bookmarked) {
         this.bookmarked = bookmarked;
+    }
+
+    public List<CourseInstructorResponse> getInstructors() {
+        return instructors;
+    }
+
+    public void setInstructors(List<CourseInstructorResponse> instructors) {
+        this.instructors = instructors != null ? instructors : new ArrayList<>();
     }
 }
