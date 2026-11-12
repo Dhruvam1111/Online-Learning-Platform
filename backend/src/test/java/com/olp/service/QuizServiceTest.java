@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -495,6 +496,122 @@ class QuizServiceTest {
                 quizService.reorderQuizQuestions(owner, 32, new ReorderStructureRequest(List.of(101, 101))));
         assertThrows(IllegalArgumentException.class, () ->
                 quizService.reorderQuizQuestions(owner, 32, new ReorderStructureRequest(List.of(101, 999))));
+    }
+
+    // =========================================================================
+    // QUIZ SETTINGS & DR-ED03 MARKS VALIDATION (FR-I20)
+    // =========================================================================
+
+    @Test
+    void testConfigureQuizSettings_DrEd03ExactSum_Success() {
+        Quiz quiz = new Quiz(course, module, null, owner, "Settings Quiz", null, null, QuizStatus.DRAFT);
+        quiz.setId(40);
+
+        Question q1 = new Question(course, owner, "Q1", QuestionType.MULTIPLE_CHOICE, null, "A", new BigDecimal("4.00"), BigDecimal.ZERO);
+        q1.setId(1);
+        Question q2 = new Question(course, owner, "Q2", QuestionType.TRUE_FALSE, null, "TRUE", new BigDecimal("2.00"), BigDecimal.ZERO);
+        q2.setId(2);
+
+        QuizQuestion qq1 = new QuizQuestion(quiz, q1, 1, null, null, true); // uses defaultMarks 4.00
+        QuizQuestion qq2 = new QuizQuestion(quiz, q2, 2, new BigDecimal("6.00"), null, true); // override 6.00
+
+        when(quizRepository.findByIdWithDetails(40)).thenReturn(Optional.of(quiz));
+        when(courseRepository.findById(10)).thenReturn(Optional.of(course));
+        when(quizQuestionRepository.findByQuizIdOrderByOrderIndexAsc(40)).thenReturn(List.of(qq1, qq2));
+        when(quizRepository.save(any(Quiz.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        LocalDateTime start = LocalDateTime.of(2026, 11, 15, 9, 0);
+        LocalDateTime end = LocalDateTime.of(2026, 11, 20, 18, 0);
+
+        QuizSettingsRequest req = new QuizSettingsRequest();
+        req.setTimeLimitMinutes(45);
+        req.setNumberOfQuestions(2);
+        req.setTotalMarks(new BigDecimal("10.00"));
+        req.setPassingMarks(new BigDecimal("5.00"));
+        req.setMaxAttempts(3);
+        req.setAvailableFrom(start);
+        req.setAvailableUntil(end);
+
+        QuizSettingsResponse res = quizService.configureQuizSettings(owner, 40, req);
+
+        assertEquals(40, res.getQuizId());
+        assertEquals(45, res.getTimeLimitMinutes());
+        assertEquals(2, res.getNumberOfQuestions());
+        assertEquals(2, res.getLinkedQuestionCount());
+        assertEquals(3, res.getMaxAttempts());
+        assertEquals(start, res.getAvailableFrom());
+        assertEquals(end, res.getAvailableUntil());
+        assertEquals(0, new BigDecimal("10.00").compareTo(res.getTotalMarks()));
+        assertEquals(0, new BigDecimal("10.00").compareTo(res.getCalculatedQuestionMarksSum()));
+        assertTrue(res.isMarksConsistent());
+    }
+
+    @Test
+    void testConfigureQuizSettings_DrEd03MarksMismatch_ThrowsIllegalArgument() {
+        Quiz quiz = new Quiz(course, module, null, owner, "Quiz", null, null, QuizStatus.DRAFT);
+        quiz.setId(41);
+
+        Question q1 = new Question(course, owner, "Q1", QuestionType.MULTIPLE_CHOICE, null, "A", new BigDecimal("5.00"), BigDecimal.ZERO);
+        QuizQuestion qq1 = new QuizQuestion(quiz, q1, 1, null, null, true);
+
+        when(quizRepository.findByIdWithDetails(41)).thenReturn(Optional.of(quiz));
+        when(courseRepository.findById(10)).thenReturn(Optional.of(course));
+        when(quizQuestionRepository.findByQuizIdOrderByOrderIndexAsc(41)).thenReturn(List.of(qq1));
+
+        QuizSettingsRequest req = new QuizSettingsRequest();
+        req.setTotalMarks(new BigDecimal("10.00")); // mismatch vs 5.00
+        req.setMaxAttempts(1);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> quizService.configureQuizSettings(owner, 41, req));
+        assertTrue(ex.getMessage().contains("DR-ED03"));
+    }
+
+    @Test
+    void testConfigureQuizSettings_InvalidAttemptsDurationAndWindow_ThrowsIllegalArgument() {
+        Quiz quiz = new Quiz(course, module, null, owner, "Quiz", null, null, QuizStatus.DRAFT);
+        quiz.setId(42);
+
+        when(quizRepository.findByIdWithDetails(42)).thenReturn(Optional.of(quiz));
+        when(courseRepository.findById(10)).thenReturn(Optional.of(course));
+
+        QuizSettingsRequest zeroAttempts = new QuizSettingsRequest();
+        zeroAttempts.setMaxAttempts(0);
+        assertThrows(IllegalArgumentException.class, () -> quizService.configureQuizSettings(owner, 42, zeroAttempts));
+
+        QuizSettingsRequest zeroDuration = new QuizSettingsRequest();
+        zeroDuration.setTimeLimitMinutes(0);
+        assertThrows(IllegalArgumentException.class, () -> quizService.configureQuizSettings(owner, 42, zeroDuration));
+
+        QuizSettingsRequest zeroQuestions = new QuizSettingsRequest();
+        zeroQuestions.setNumberOfQuestions(0);
+        assertThrows(IllegalArgumentException.class, () -> quizService.configureQuizSettings(owner, 42, zeroQuestions));
+
+        QuizSettingsRequest invertedWindow = new QuizSettingsRequest();
+        invertedWindow.setAvailableFrom(LocalDateTime.of(2026, 11, 20, 12, 0));
+        invertedWindow.setAvailableUntil(LocalDateTime.of(2026, 11, 19, 12, 0));
+        assertThrows(IllegalArgumentException.class, () -> quizService.configureQuizSettings(owner, 42, invertedWindow));
+    }
+
+    @Test
+    void testGetQuizSettings_CoInstructorAllowed_StrangerDenied() {
+        Quiz quiz = new Quiz(course, module, null, owner, "Quiz", null, null, QuizStatus.PUBLISHED);
+        quiz.setId(43);
+        quiz.setMaxAttempts(2);
+        quiz.setTimeLimitMinutes(30);
+
+        when(quizRepository.findByIdWithDetails(43)).thenReturn(Optional.of(quiz));
+        when(courseRepository.findById(10)).thenReturn(Optional.of(course));
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(10, 2)).thenReturn(true);
+        when(quizQuestionRepository.findByQuizIdOrderByOrderIndexAsc(43)).thenReturn(List.of());
+
+        QuizSettingsResponse res = quizService.getQuizSettings(coInstructor, 43);
+        assertEquals(43, res.getQuizId());
+        assertEquals(2, res.getMaxAttempts());
+        assertEquals(30, res.getTimeLimitMinutes());
+
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(10, 3)).thenReturn(false);
+        assertThrows(AccessDeniedException.class, () -> quizService.getQuizSettings(stranger, 43));
     }
 }
 
