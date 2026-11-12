@@ -193,3 +193,28 @@ CREATE TABLE lecture_progress (
     completed_at TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (student_id, lecture_id)
 );
+
+
+-- =========================
+-- TABLE: lecture_materials (FR-S14)
+-- =========================
+CREATE TABLE IF NOT EXISTS lecture_materials (
+    id                SERIAL PRIMARY KEY,
+    lecture_id        INTEGER NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
+    title             VARCHAR(255) NOT NULL,
+    file_url          VARCHAR(500) NOT NULL,
+    file_type         VARCHAR(50) NOT NULL DEFAULT 'pdf',
+    is_downloadable   BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at        TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- =========================
+-- TABLE: lecture_bookmarks (FR-S17)
+-- =========================
+CREATE TABLE IF NOT EXISTS lecture_bookmarks (
+    id                SERIAL PRIMARY KEY,
+    student_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    lecture_id        INTEGER NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
+    created_at        TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_student_lecture_bookmark UNIQUE (student_id, lecture_id)
+);
