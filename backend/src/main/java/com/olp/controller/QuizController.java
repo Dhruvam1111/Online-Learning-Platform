@@ -102,6 +102,36 @@ public class QuizController {
     }
 
     // =========================================================================
+    // QUIZ SETTINGS ENDPOINTS (FR-I20)
+    // =========================================================================
+
+    @GetMapping("/quizzes/{quizId}/settings")
+    public ResponseEntity<QuizSettingsResponse> getQuizSettings(
+            @PathVariable Integer quizId,
+            Authentication authentication) {
+        User currentUser = quizService.resolveUser(authentication);
+        return ResponseEntity.ok(quizService.getQuizSettings(currentUser, quizId));
+    }
+
+    @PostMapping("/quizzes/{quizId}/settings")
+    public ResponseEntity<QuizSettingsResponse> createOrConfigureQuizSettings(
+            @PathVariable Integer quizId,
+            @Valid @RequestBody QuizSettingsRequest request,
+            Authentication authentication) {
+        User currentUser = quizService.resolveUser(authentication);
+        return ResponseEntity.ok(quizService.configureQuizSettings(currentUser, quizId, request));
+    }
+
+    @PutMapping("/quizzes/{quizId}/settings")
+    public ResponseEntity<QuizSettingsResponse> updateQuizSettings(
+            @PathVariable Integer quizId,
+            @Valid @RequestBody QuizSettingsRequest request,
+            Authentication authentication) {
+        User currentUser = quizService.resolveUser(authentication);
+        return ResponseEntity.ok(quizService.configureQuizSettings(currentUser, quizId, request));
+    }
+
+    // =========================================================================
     // QUIZ-QUESTION MAPPING & ORDERING ENDPOINTS
     // =========================================================================
 

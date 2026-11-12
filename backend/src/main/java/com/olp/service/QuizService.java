@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.*;
 
 /**
@@ -27,6 +29,7 @@ public class QuizService {
     private final LessonRepository lessonRepository;
     private final CourseInstructorRepository courseInstructorRepository;
     private final UserRepository userRepository;
+    private Clock clock = Clock.systemDefaultZone();
 
     public QuizService(QuizRepository quizRepository,
                        QuestionRepository questionRepository,
@@ -44,6 +47,10 @@ public class QuizService {
         this.lessonRepository = lessonRepository;
         this.courseInstructorRepository = courseInstructorRepository;
         this.userRepository = userRepository;
+    }
+
+    void setClock(Clock clock) {
+        this.clock = clock != null ? clock : Clock.systemDefaultZone();
     }
 
     public User resolveUser(Authentication authentication) {
@@ -82,6 +89,7 @@ public class QuizService {
                 : QuizStatus.DRAFT;
 
         validateQuizNumericFields(request);
+        validateAvailabilityWindowBounds(request.getAvailableFrom(), request.getAvailableUntil());
 
         Quiz quiz = new Quiz(
                 course,
@@ -94,7 +102,10 @@ public class QuizService {
                 status
         );
         quiz.setTimeLimitMinutes(request.getTimeLimitMinutes());
-        quiz.setMaxAttempts(request.getMaxAttempts());
+        quiz.setNumberOfQuestions(request.getNumberOfQuestions());
+        quiz.setMaxAttempts(request.getMaxAttempts() != null ? request.getMaxAttempts() : 1);
+        quiz.setAvailableFrom(request.getAvailableFrom());
+        quiz.setAvailableUntil(request.getAvailableUntil());
         quiz.setPassingMarks(request.getPassingMarks());
         quiz.setTotalMarks(request.getTotalMarks() != null ? request.getTotalMarks() : BigDecimal.ZERO);
 
@@ -103,10 +114,19 @@ public class QuizService {
         List<QuizQuestion> attachedQuestions = new ArrayList<>();
         if (request.getQuestions() != null && !request.getQuestions().isEmpty()) {
             attachedQuestions = attachQuestionsInternal(saved, currentUser, request.getQuestions());
+            BigDecimal sumOfMarks = calculateTotalMarks(attachedQuestions);
             if (request.getTotalMarks() == null) {
-                saved.setTotalMarks(calculateTotalMarks(attachedQuestions));
+                saved.setTotalMarks(sumOfMarks);
                 saved = quizRepository.save(saved);
+            } else if (request.getTotalMarks().compareTo(sumOfMarks) != 0) {
+                throw new IllegalArgumentException(
+                        "Total marks (" + request.getTotalMarks() + ") must equal the sum of linked question marks ("
+                                + sumOfMarks + ")");
             }
+        } else if (status == QuizStatus.PUBLISHED && request.getTotalMarks() != null
+                && request.getTotalMarks().compareTo(BigDecimal.ZERO) != 0) {
+            throw new IllegalArgumentException(
+                    "Total marks (" + request.getTotalMarks() + ") must equal the sum of linked question marks (0)");
         }
 
         validatePassingVsTotalMarks(saved.getPassingMarks(), saved.getTotalMarks());
@@ -212,14 +232,41 @@ public class QuizService {
         if (request.getTimeLimitMinutes() != null) {
             quiz.setTimeLimitMinutes(request.getTimeLimitMinutes());
         }
+        if (request.getNumberOfQuestions() != null) {
+            quiz.setNumberOfQuestions(request.getNumberOfQuestions());
+        }
         if (request.getMaxAttempts() != null) {
             quiz.setMaxAttempts(request.getMaxAttempts());
+        }
+        if (request.getAvailableFrom() != null) {
+            quiz.setAvailableFrom(request.getAvailableFrom());
+        }
+        if (request.getAvailableUntil() != null) {
+            quiz.setAvailableUntil(request.getAvailableUntil());
+        }
+        if (quiz.getMaxAttempts() == null) {
+            quiz.setMaxAttempts(1);
+        }
+
+        validateAvailabilityWindowBounds(quiz.getAvailableFrom(), quiz.getAvailableUntil());
+        List<QuizQuestion> questions = quizQuestionRepository.findByQuizIdOrderByOrderIndexAsc(quiz.getId());
+        BigDecimal sumOfMarks = calculateTotalMarks(questions);
+        if (quiz.getStatus() == QuizStatus.PUBLISHED || !questions.isEmpty()) {
+            if (quiz.getTotalMarks() == null || quiz.getTotalMarks().compareTo(sumOfMarks) != 0) {
+                throw new IllegalArgumentException(
+                        "Total marks (" + quiz.getTotalMarks() + ") must equal the sum of linked question marks ("
+                                + sumOfMarks + ")");
+            }
+        }
+        if (quiz.getStatus() == QuizStatus.PUBLISHED && quiz.getNumberOfQuestions() != null
+                && !questions.isEmpty() && quiz.getNumberOfQuestions() > questions.size()) {
+            throw new IllegalArgumentException(
+                    "Configured number of questions cannot exceed linked questions count (" + questions.size() + ")");
         }
 
         validatePassingVsTotalMarks(quiz.getPassingMarks(), quiz.getTotalMarks());
 
         Quiz saved = quizRepository.save(quiz);
-        List<QuizQuestion> questions = quizQuestionRepository.findByQuizIdOrderByOrderIndexAsc(saved.getId());
         return mapToQuizResponse(saved, questions);
     }
 
@@ -228,6 +275,74 @@ public class QuizService {
         Quiz quiz = findAndVerifyQuiz(quizId, currentUser);
         quizRepository.delete(quiz);
         return new ApiResponse(true, "Quiz deleted successfully");
+    }
+
+    // =========================================================================
+    // QUIZ SETTINGS (FR-I20, DR-ED03)
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public QuizSettingsResponse getQuizSettings(User currentUser, Integer quizId) {
+        Quiz quiz = findAndVerifyQuiz(quizId, currentUser);
+        List<QuizQuestion> linkedQuestions = quizQuestionRepository.findByQuizIdOrderByOrderIndexAsc(quiz.getId());
+        return buildQuizSettingsResponse(quiz, linkedQuestions, LocalDateTime.now(clock), null);
+    }
+
+    @Transactional
+    public QuizSettingsResponse configureQuizSettings(User currentUser, Integer quizId, QuizSettingsRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Quiz settings request cannot be null");
+        }
+        Quiz quiz = findAndVerifyQuiz(quizId, currentUser);
+        validateQuizSettingsFields(request);
+
+        if (request.getTimeLimitMinutes() != null) {
+            quiz.setTimeLimitMinutes(request.getTimeLimitMinutes());
+        }
+        if (request.getNumberOfQuestions() != null) {
+            quiz.setNumberOfQuestions(request.getNumberOfQuestions());
+        }
+        if (request.getMaxAttempts() != null) {
+            quiz.setMaxAttempts(request.getMaxAttempts());
+        } else if (quiz.getMaxAttempts() == null) {
+            quiz.setMaxAttempts(1);
+        }
+        if (request.getAvailableFrom() != null) {
+            quiz.setAvailableFrom(request.getAvailableFrom());
+        }
+        if (request.getAvailableUntil() != null) {
+            quiz.setAvailableUntil(request.getAvailableUntil());
+        }
+        if (request.getPassingMarks() != null) {
+            quiz.setPassingMarks(request.getPassingMarks());
+        }
+
+        validateAvailabilityWindowBounds(quiz.getAvailableFrom(), quiz.getAvailableUntil());
+
+        List<QuizQuestion> linkedQuestions = quizQuestionRepository.findByQuizIdOrderByOrderIndexAsc(quiz.getId());
+        BigDecimal questionMarksSum = calculateTotalMarks(linkedQuestions);
+
+        if (request.getTotalMarks() != null) {
+            if (request.getTotalMarks().compareTo(questionMarksSum) != 0) {
+                throw new IllegalArgumentException(
+                        "Total marks (" + request.getTotalMarks() + ") must equal the sum of linked question marks ("
+                                + questionMarksSum + ") per DR-ED03");
+            }
+            quiz.setTotalMarks(request.getTotalMarks());
+        } else {
+            quiz.setTotalMarks(questionMarksSum);
+        }
+
+        if (quiz.getStatus() == QuizStatus.PUBLISHED && quiz.getNumberOfQuestions() != null
+                && !linkedQuestions.isEmpty() && quiz.getNumberOfQuestions() > linkedQuestions.size()) {
+            throw new IllegalArgumentException(
+                    "Configured number of questions cannot exceed linked questions count (" + linkedQuestions.size() + ")");
+        }
+
+        validatePassingVsTotalMarks(quiz.getPassingMarks(), quiz.getTotalMarks());
+
+        Quiz saved = quizRepository.save(quiz);
+        return buildQuizSettingsResponse(saved, linkedQuestions, LocalDateTime.now(clock), null);
     }
 
     // =========================================================================
@@ -564,8 +679,31 @@ public class QuizService {
         if (request.getTimeLimitMinutes() != null && request.getTimeLimitMinutes() < 1) {
             throw new IllegalArgumentException("Time limit must be at least 1 minute");
         }
+        if (request.getNumberOfQuestions() != null && request.getNumberOfQuestions() < 1) {
+            throw new IllegalArgumentException("Number of questions must be at least 1");
+        }
         if (request.getMaxAttempts() != null && request.getMaxAttempts() < 1) {
             throw new IllegalArgumentException("Max attempts must be at least 1");
+        }
+    }
+
+    private void validateQuizSettingsFields(QuizSettingsRequest request) {
+        validateNonNegative(request.getTotalMarks(), "Total marks");
+        validateNonNegative(request.getPassingMarks(), "Passing marks");
+        if (request.getTimeLimitMinutes() != null && request.getTimeLimitMinutes() < 1) {
+            throw new IllegalArgumentException("Duration (timeLimitMinutes) must be at least 1 minute");
+        }
+        if (request.getNumberOfQuestions() != null && request.getNumberOfQuestions() < 1) {
+            throw new IllegalArgumentException("Number of questions must be at least 1");
+        }
+        if (request.getMaxAttempts() != null && request.getMaxAttempts() < 1) {
+            throw new IllegalArgumentException("Allowed attempts (maxAttempts) must be at least 1");
+        }
+    }
+
+    public void validateAvailabilityWindowBounds(LocalDateTime availableFrom, LocalDateTime availableUntil) {
+        if (availableFrom != null && availableUntil != null && !availableFrom.isBefore(availableUntil)) {
+            throw new IllegalArgumentException("Availability start time must be strictly before end time");
         }
     }
 
@@ -595,8 +733,11 @@ public class QuizService {
         }
     }
 
-    private BigDecimal calculateTotalMarks(List<QuizQuestion> quizQuestions) {
+    public BigDecimal calculateTotalMarks(List<QuizQuestion> quizQuestions) {
         BigDecimal total = BigDecimal.ZERO;
+        if (quizQuestions == null) {
+            return total;
+        }
         for (QuizQuestion qq : quizQuestions) {
             BigDecimal effective = qq.getMarks() != null ? qq.getMarks() : qq.getQuestion().getDefaultMarks();
             if (effective != null) {
@@ -651,7 +792,10 @@ public class QuizService {
         response.setTotalMarks(quiz.getTotalMarks());
         response.setPassingMarks(quiz.getPassingMarks());
         response.setTimeLimitMinutes(quiz.getTimeLimitMinutes());
+        response.setNumberOfQuestions(quiz.getNumberOfQuestions());
         response.setMaxAttempts(quiz.getMaxAttempts());
+        response.setAvailableFrom(quiz.getAvailableFrom());
+        response.setAvailableUntil(quiz.getAvailableUntil());
         List<QuizQuestionResponse> questionResponses = questions.stream()
                 .map(this::mapToQuizQuestionResponse)
                 .toList();
@@ -659,6 +803,53 @@ public class QuizService {
         response.setQuestions(questionResponses);
         response.setCreatedAt(quiz.getCreatedAt());
         response.setUpdatedAt(quiz.getUpdatedAt());
+        return response;
+    }
+
+    public QuizSettingsResponse buildQuizSettingsResponse(Quiz quiz,
+                                                          List<QuizQuestion> linkedQuestions,
+                                                          LocalDateTime serverNow,
+                                                          Long attemptsUsed) {
+        List<QuizQuestion> safeQuestions = linkedQuestions != null ? linkedQuestions : List.of();
+        BigDecimal calculatedSum = calculateTotalMarks(safeQuestions);
+        int maxAttempts = quiz.getMaxAttempts() != null && quiz.getMaxAttempts() >= 1 ? quiz.getMaxAttempts() : 1;
+
+        QuizSettingsResponse response = new QuizSettingsResponse();
+        response.setQuizId(quiz.getId());
+        response.setCourseId(quiz.getCourse().getId());
+        response.setTitle(quiz.getTitle());
+        response.setStatus(quiz.getStatus() != null ? quiz.getStatus().name() : QuizStatus.DRAFT.name());
+        response.setTimeLimitMinutes(quiz.getTimeLimitMinutes());
+        response.setNumberOfQuestions(quiz.getNumberOfQuestions());
+        response.setLinkedQuestionCount(safeQuestions.size());
+        response.setTotalMarks(quiz.getTotalMarks());
+        response.setCalculatedQuestionMarksSum(calculatedSum);
+        response.setMarksConsistent(quiz.getTotalMarks() != null && quiz.getTotalMarks().compareTo(calculatedSum) == 0);
+        response.setPassingMarks(quiz.getPassingMarks());
+        response.setMaxAttempts(maxAttempts);
+        response.setAvailableFrom(quiz.getAvailableFrom());
+        response.setAvailableUntil(quiz.getAvailableUntil());
+        response.setServerTime(serverNow);
+
+        boolean currentlyAvailable = quiz.getStatus() == QuizStatus.PUBLISHED;
+        String availabilityMessage = "Available";
+        if (quiz.getStatus() != QuizStatus.PUBLISHED) {
+            currentlyAvailable = false;
+            availabilityMessage = "Quiz is not published yet";
+        } else if (quiz.getAvailableFrom() != null && serverNow.isBefore(quiz.getAvailableFrom())) {
+            currentlyAvailable = false;
+            availabilityMessage = "Quiz opens at " + quiz.getAvailableFrom();
+        } else if (quiz.getAvailableUntil() != null && serverNow.isAfter(quiz.getAvailableUntil())) {
+            currentlyAvailable = false;
+            availabilityMessage = "Quiz closed at " + quiz.getAvailableUntil();
+        }
+        response.setCurrentlyAvailable(currentlyAvailable);
+        response.setAvailabilityMessage(availabilityMessage);
+
+        if (attemptsUsed != null) {
+            response.setAttemptsUsed(attemptsUsed);
+            response.setRemainingAttempts((int) Math.max(0L, maxAttempts - attemptsUsed));
+        }
         return response;
     }
 

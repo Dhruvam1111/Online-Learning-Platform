@@ -4,6 +4,7 @@
 -- ============================================================
 
 -- Clear existing data (safe to re-run)
+DELETE FROM quiz_attempts;
 DELETE FROM quiz_questions;
 DELETE FROM questions;
 DELETE FROM quizzes;
@@ -32,6 +33,7 @@ ALTER SEQUENCE course_association_requests_id_seq RESTART WITH 1;
 ALTER SEQUENCE quizzes_id_seq RESTART WITH 1;
 ALTER SEQUENCE questions_id_seq RESTART WITH 1;
 ALTER SEQUENCE quiz_questions_id_seq RESTART WITH 1;
+ALTER SEQUENCE quiz_attempts_id_seq RESTART WITH 1;
 
 -- =========================
 -- USERS
@@ -202,10 +204,10 @@ VALUES
 ON CONFLICT DO NOTHING;
 
 -- =========================
--- QUIZZES & QUESTIONS (FR-I19)
+-- QUIZZES & QUESTIONS (FR-I19, FR-I20)
 -- =========================
-INSERT INTO quizzes (course_id, module_id, lesson_id, created_by, title, description, instructions, status, total_marks, passing_marks, time_limit_minutes, max_attempts) VALUES
-    (1, 1, 3, 2, 'HTML Fundamentals Quick Check', 'Assess understanding of basic HTML tags and document structure', 'Answer all questions within the allotted time.', 'DRAFT', 10.00, 6.00, 15, 2);
+INSERT INTO quizzes (course_id, module_id, lesson_id, created_by, title, description, instructions, status, total_marks, passing_marks, time_limit_minutes, number_of_questions, max_attempts, available_from, available_until) VALUES
+    (1, 1, 3, 2, 'HTML Fundamentals Quick Check', 'Assess understanding of basic HTML tags and document structure', 'Answer all questions within the allotted time.', 'DRAFT', 10.00, 6.00, 15, 2, 2, NULL, NULL);
 
 INSERT INTO questions (course_id, created_by, question_text, question_type, options_json, correct_answer, default_marks, negative_marks, topic, difficulty, is_bank_question) VALUES
     (1, 2, 'Which HTML element defines the root of an HTML document?', 'MULTIPLE_CHOICE', '["<html>","<head>","<body>","<!DOCTYPE>"]', '<html>', 5.00, 0.00, 'HTML Basics', 'EASY', TRUE),
