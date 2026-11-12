@@ -88,3 +88,13 @@ CREATE INDEX IF NOT EXISTS idx_content_declarations_course_id ON content_declara
 CREATE INDEX IF NOT EXISTS idx_content_declarations_lesson_id ON content_declarations(lesson_id);
 CREATE INDEX IF NOT EXISTS idx_content_declarations_instructor_id ON content_declarations(instructor_id);
 CREATE INDEX IF NOT EXISTS idx_content_declarations_takedown_status ON content_declarations(takedown_status);
+
+-- FR-I19: Quizzes, Questions, and Quiz-Questions Indexes
+CREATE INDEX idx_quizzes_course_id ON quizzes(course_id);
+CREATE INDEX idx_quizzes_module_id ON quizzes(module_id);
+CREATE INDEX idx_quizzes_lesson_id ON quizzes(lesson_id);
+CREATE INDEX idx_quizzes_status ON quizzes(status);
+CREATE INDEX idx_questions_course_id ON questions(course_id);
+CREATE INDEX idx_questions_type ON questions(question_type);
+CREATE INDEX idx_quiz_questions_quiz_order ON quiz_questions(quiz_id, order_index);
+CREATE INDEX idx_quiz_questions_question_id ON quiz_questions(question_id);

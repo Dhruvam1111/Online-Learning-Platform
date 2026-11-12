@@ -4,6 +4,9 @@
 -- ============================================================
 
 -- Clear existing data (safe to re-run)
+DELETE FROM quiz_questions;
+DELETE FROM questions;
+DELETE FROM quizzes;
 DELETE FROM course_association_requests;
 DELETE FROM lessons;
 DELETE FROM course_sections;
@@ -26,6 +29,9 @@ ALTER SEQUENCE course_modules_id_seq RESTART WITH 1;
 ALTER SEQUENCE course_sections_id_seq RESTART WITH 1;
 ALTER SEQUENCE lessons_id_seq RESTART WITH 1;
 ALTER SEQUENCE course_association_requests_id_seq RESTART WITH 1;
+ALTER SEQUENCE quizzes_id_seq RESTART WITH 1;
+ALTER SEQUENCE questions_id_seq RESTART WITH 1;
+ALTER SEQUENCE quiz_questions_id_seq RESTART WITH 1;
 
 -- =========================
 -- USERS
@@ -194,3 +200,17 @@ VALUES
     (1, 2, 2, 'I confirm that I own all rights to this video lecture or possess the necessary licenses.', 'ORIGINAL_CREATOR', 'Created by Dr. Sarah Chen for Web Development Fundamentals', 'NONE'),
     (2, NULL, 2, 'I confirm that I hold full copyright or appropriate educational licenses for all materials in this course.', 'ORIGINAL_CREATOR', 'Database Systems Curriculum, Dr. Sarah Chen', 'NONE')
 ON CONFLICT DO NOTHING;
+
+-- =========================
+-- QUIZZES & QUESTIONS (FR-I19)
+-- =========================
+INSERT INTO quizzes (course_id, module_id, lesson_id, created_by, title, description, instructions, status, total_marks, passing_marks, time_limit_minutes, max_attempts) VALUES
+    (1, 1, 3, 2, 'HTML Fundamentals Quick Check', 'Assess understanding of basic HTML tags and document structure', 'Answer all questions within the allotted time.', 'DRAFT', 10.00, 6.00, 15, 2);
+
+INSERT INTO questions (course_id, created_by, question_text, question_type, options_json, correct_answer, default_marks, negative_marks, topic, difficulty, is_bank_question) VALUES
+    (1, 2, 'Which HTML element defines the root of an HTML document?', 'MULTIPLE_CHOICE', '["<html>","<head>","<body>","<!DOCTYPE>"]', '<html>', 5.00, 0.00, 'HTML Basics', 'EASY', TRUE),
+    (1, 2, 'The <head> element contains metadata that is directly rendered in the main browser viewport.', 'TRUE_FALSE', '["TRUE","FALSE"]', 'FALSE', 5.00, 0.00, 'HTML Basics', 'EASY', TRUE);
+
+INSERT INTO quiz_questions (quiz_id, question_id, order_index, marks, negative_marks, is_required) VALUES
+    (1, 1, 1, 5.00, 0.00, TRUE),
+    (1, 2, 2, 5.00, 0.00, TRUE);
