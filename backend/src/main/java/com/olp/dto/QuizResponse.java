@@ -26,7 +26,10 @@ public class QuizResponse {
     private BigDecimal totalMarks;
     private BigDecimal passingMarks;
     private Integer timeLimitMinutes;
+    private Integer numberOfQuestions;
     private Integer maxAttempts;
+    private LocalDateTime availableFrom;
+    private LocalDateTime availableUntil;
     private Integer questionCount;
     private List<QuizQuestionResponse> questions = new ArrayList<>();
     private LocalDateTime createdAt;
@@ -162,12 +165,36 @@ public class QuizResponse {
         this.timeLimitMinutes = timeLimitMinutes;
     }
 
+    public Integer getNumberOfQuestions() {
+        return numberOfQuestions;
+    }
+
+    public void setNumberOfQuestions(Integer numberOfQuestions) {
+        this.numberOfQuestions = numberOfQuestions;
+    }
+
     public Integer getMaxAttempts() {
         return maxAttempts;
     }
 
     public void setMaxAttempts(Integer maxAttempts) {
         this.maxAttempts = maxAttempts;
+    }
+
+    public LocalDateTime getAvailableFrom() {
+        return availableFrom;
+    }
+
+    public void setAvailableFrom(LocalDateTime availableFrom) {
+        this.availableFrom = availableFrom;
+    }
+
+    public LocalDateTime getAvailableUntil() {
+        return availableUntil;
+    }
+
+    public void setAvailableUntil(LocalDateTime availableUntil) {
+        this.availableUntil = availableUntil;
     }
 
     public Integer getQuestionCount() {

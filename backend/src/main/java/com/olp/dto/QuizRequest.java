@@ -1,5 +1,6 @@
 package com.olp.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -7,6 +8,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -26,17 +28,25 @@ public class QuizRequest {
     private String instructions;
     private String status;
 
+    @JsonAlias("maxMarks")
     @DecimalMin(value = "0.0", message = "Total marks cannot be negative")
     private BigDecimal totalMarks;
 
     @DecimalMin(value = "0.0", message = "Passing marks cannot be negative")
     private BigDecimal passingMarks;
 
+    @JsonAlias("durationMinutes")
     @Min(value = 1, message = "Time limit must be at least 1 minute")
     private Integer timeLimitMinutes;
 
+    @Min(value = 1, message = "Number of questions must be at least 1")
+    private Integer numberOfQuestions;
+
     @Min(value = 1, message = "Max attempts must be at least 1")
     private Integer maxAttempts;
+
+    private LocalDateTime availableFrom;
+    private LocalDateTime availableUntil;
 
     @Valid
     private List<QuizQuestionRequest> questions;
@@ -123,12 +133,36 @@ public class QuizRequest {
         this.timeLimitMinutes = timeLimitMinutes;
     }
 
+    public Integer getNumberOfQuestions() {
+        return numberOfQuestions;
+    }
+
+    public void setNumberOfQuestions(Integer numberOfQuestions) {
+        this.numberOfQuestions = numberOfQuestions;
+    }
+
     public Integer getMaxAttempts() {
         return maxAttempts;
     }
 
     public void setMaxAttempts(Integer maxAttempts) {
         this.maxAttempts = maxAttempts;
+    }
+
+    public LocalDateTime getAvailableFrom() {
+        return availableFrom;
+    }
+
+    public void setAvailableFrom(LocalDateTime availableFrom) {
+        this.availableFrom = availableFrom;
+    }
+
+    public LocalDateTime getAvailableUntil() {
+        return availableUntil;
+    }
+
+    public void setAvailableUntil(LocalDateTime availableUntil) {
+        this.availableUntil = availableUntil;
     }
 
     public List<QuizQuestionRequest> getQuestions() {
