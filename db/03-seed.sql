@@ -186,3 +186,11 @@ INSERT INTO lessons (section_id, title, lesson_type, content, content_url, durat
     (2, 'Semantic Markup Best Practices', 'MATERIAL', 'In-depth reading on landmark elements', NULL, 20, 1),
     (2, 'Building an Accessible Blog Page', 'ASSIGNMENT', 'Create a semantic HTML portfolio page', NULL, 45, 2),
     (3, 'Mastering the CSS Box Model', 'VIDEO', 'Detailed visual walkthrough of margin, border, padding', 'https://www.youtube.com/watch?v=rIO5326FgPE', 18, 1);
+
+-- Step 14 / FR-I64: Content Ownership Declarations Seed
+INSERT INTO content_declarations (course_id, lesson_id, instructor_id, declaration_text, license_type, source_attribution, takedown_status)
+VALUES
+    (1, 1, 2, 'I confirm that I own all rights to this video lecture or possess the necessary licenses.', 'ORIGINAL_CREATOR', 'Created by Dr. Sarah Chen for Web Development Fundamentals', 'NONE'),
+    (1, 2, 2, 'I confirm that I own all rights to this video lecture or possess the necessary licenses.', 'ORIGINAL_CREATOR', 'Created by Dr. Sarah Chen for Web Development Fundamentals', 'NONE'),
+    (2, NULL, 2, 'I confirm that I hold full copyright or appropriate educational licenses for all materials in this course.', 'ORIGINAL_CREATOR', 'Database Systems Curriculum, Dr. Sarah Chen', 'NONE')
+ON CONFLICT DO NOTHING;

@@ -9,6 +9,7 @@ import com.olp.repository.UserRepository;
 import com.olp.security.JwtUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +45,7 @@ public class OtpAuthService {
     private final TokenBlacklistService tokenBlacklistService;
     private final SecureRandom secureRandom = new SecureRandom();
 
+    @Autowired
     public OtpAuthService(TwoFactorTokenRepository tokenRepository,
                           UserRepository userRepository,
                           PasswordEncoder passwordEncoder,

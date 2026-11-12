@@ -82,3 +82,9 @@ CREATE INDEX idx_assoc_req_status ON course_association_requests(status);
 CREATE UNIQUE INDEX uq_assoc_req_pending_course_instructor
     ON course_association_requests(course_id, instructor_id)
     WHERE status = 'PENDING';
+
+-- Step 14 / FR-I64: Content Ownership Declaration Indexes
+CREATE INDEX IF NOT EXISTS idx_content_declarations_course_id ON content_declarations(course_id);
+CREATE INDEX IF NOT EXISTS idx_content_declarations_lesson_id ON content_declarations(lesson_id);
+CREATE INDEX IF NOT EXISTS idx_content_declarations_instructor_id ON content_declarations(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_content_declarations_takedown_status ON content_declarations(takedown_status);

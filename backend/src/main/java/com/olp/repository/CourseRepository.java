@@ -34,7 +34,7 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
         countQuery = "SELECT COUNT(c) FROM Course c WHERE c.status = :status"
     )
     Page<Course> findByStatus(
-        @Param("status") String status,
+        @Param("status") CourseStatus status,
         Pageable pageable
     );
 
@@ -42,17 +42,17 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
     @Query(
         value = "SELECT c FROM Course c JOIN FETCH c.instructor WHERE " +
                 "(:status IS NULL OR c.status = :status) AND " +
-                "(:search IS NULL OR " +
-                "LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-                "LOWER(c.description) LIKE LOWER(CONCAT('%', :search, '%')))",
+                "(CAST(:search AS string) IS NULL OR " +
+                "LOWER(c.title) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%') OR " +
+                "LOWER(c.description) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%'))",
         countQuery = "SELECT COUNT(c) FROM Course c WHERE " +
                      "(:status IS NULL OR c.status = :status) AND " +
-                     "(:search IS NULL OR " +
-                     "LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-                     "LOWER(c.description) LIKE LOWER(CONCAT('%', :search, '%')))"
+                     "(CAST(:search AS string) IS NULL OR " +
+                     "LOWER(c.title) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%') OR " +
+                     "LOWER(c.description) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%'))"
     )
     Page<Course> findCoursesWithFilters(
-        @Param("status") String status,
+        @Param("status") CourseStatus status,
         @Param("search") String search,
         Pageable pageable
     );

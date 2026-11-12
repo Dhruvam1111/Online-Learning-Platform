@@ -5,6 +5,7 @@ import com.olp.dto.AdminUserResponse;
 import com.olp.dto.PageResponse;
 import com.olp.dto.RejectCourseRequest;
 import com.olp.entity.Course;
+import com.olp.entity.CourseStatus;
 import com.olp.entity.User;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.CourseRepository;
@@ -197,20 +198,20 @@ class AdminServiceTest {
         assertNotNull(result);
         assertEquals(1, result.getContent().size());
         assertEquals("Java 101", result.getContent().get(0).getTitle());
-        verify(courseRepository, times(1)).findCoursesWithFilters(eq("pending_review"), eq("java"), any(Pageable.class));
+        verify(courseRepository, times(1)).findCoursesWithFilters(eq(CourseStatus.PENDING_REVIEW), eq("java"), any(Pageable.class));
     }
 
     @Test
     void testGetPendingCourses() {
         Page<Course> coursePage = new PageImpl<>(List.of(sampleCourse));
-        when(courseRepository.findByStatus(eq("pending_review"), any(Pageable.class))).thenReturn(coursePage);
+        when(courseRepository.findByStatus(eq(CourseStatus.PENDING_REVIEW), any(Pageable.class))).thenReturn(coursePage);
 
         PageResponse<AdminCourseResponse> result = adminService.getPendingCourses(0, 10);
 
         assertNotNull(result);
         assertEquals(1, result.getContent().size());
         assertEquals("pending_review", result.getContent().get(0).getStatus());
-        verify(courseRepository, times(1)).findByStatus(eq("pending_review"), any(Pageable.class));
+        verify(courseRepository, times(1)).findByStatus(eq(CourseStatus.PENDING_REVIEW), any(Pageable.class));
     }
 
     @Test

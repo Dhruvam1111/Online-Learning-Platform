@@ -27,9 +27,9 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     // Filter users by role, status, and search string (matching name or email)
     @Query("SELECT u FROM User u WHERE " +
-           "(:role IS NULL OR u.role = :role) AND " +
-           "(:status IS NULL OR u.accountStatus = :status) AND " +
-           "(:search IS NULL OR LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')))")
+           "(CAST(:role AS string) IS NULL OR u.role = :role) AND " +
+           "(CAST(:status AS string) IS NULL OR u.accountStatus = :status) AND " +
+           "(CAST(:search AS string) IS NULL OR LOWER(u.name) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%') OR LOWER(u.email) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%'))")
     Page<User> findUsersWithFilters(
             @Param("role") String role,
             @Param("status") String status,

@@ -170,10 +170,10 @@ public class AdminService {
 
         Pageable pageable = PageRequest.of(page, size, sort);
 
-        String trimmedStatus = (status != null && !status.isBlank()) ? status.trim().toLowerCase() : null;
+        CourseStatus courseStatus = (status != null && !status.isBlank()) ? CourseStatus.fromString(status) : null;
         String trimmedSearch = (search != null && !search.isBlank()) ? search.trim().toLowerCase() : null;
 
-        Page<Course> coursesPage = courseRepository.findCoursesWithFilters(trimmedStatus, trimmedSearch, pageable);
+        Page<Course> coursesPage = courseRepository.findCoursesWithFilters(courseStatus, trimmedSearch, pageable);
         return PageResponse.from(coursesPage.map(this::toAdminCourseResponse));
     }
 
@@ -184,7 +184,7 @@ public class AdminService {
     @Transactional(readOnly = true)
     public PageResponse<AdminCourseResponse> getPendingCourses(int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Course> pendingPage = courseRepository.findByStatus("pending_review", pageable);
+        Page<Course> pendingPage = courseRepository.findByStatus(CourseStatus.PENDING_REVIEW, pageable);
         return PageResponse.from(pendingPage.map(this::toAdminCourseResponse));
     }
 
