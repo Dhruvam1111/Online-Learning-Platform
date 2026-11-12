@@ -146,5 +146,25 @@ class QuizControllerTest {
         assertEquals(200, controller.removeQuestionFromQuiz(3, 50, authentication).getStatusCode().value());
         assertEquals(200, controller.reorderQuizQuestions(3, reorderReq, authentication).getStatusCode().value());
     }
+
+    @Test
+    void testQuizSettingsEndpoints_Success() {
+        givenResolvedUser();
+        QuizSettingsRequest req = new QuizSettingsRequest();
+        req.setTimeLimitMinutes(30);
+        req.setMaxAttempts(2);
+
+        QuizSettingsResponse expected = new QuizSettingsResponse();
+        expected.setQuizId(3);
+        expected.setTimeLimitMinutes(30);
+        expected.setMaxAttempts(2);
+
+        when(quizService.getQuizSettings(instructor, 3)).thenReturn(expected);
+        when(quizService.configureQuizSettings(instructor, 3, req)).thenReturn(expected);
+
+        assertEquals(200, controller.getQuizSettings(3, authentication).getStatusCode().value());
+        assertSame(expected, controller.createOrConfigureQuizSettings(3, req, authentication).getBody());
+        assertSame(expected, controller.updateQuizSettings(3, req, authentication).getBody());
+    }
 }
 
