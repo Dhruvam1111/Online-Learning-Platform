@@ -98,3 +98,8 @@ CREATE INDEX idx_questions_course_id ON questions(course_id);
 CREATE INDEX idx_questions_type ON questions(question_type);
 CREATE INDEX idx_quiz_questions_quiz_order ON quiz_questions(quiz_id, order_index);
 CREATE INDEX idx_quiz_questions_question_id ON quiz_questions(question_id);
+
+-- FR-I20: Quiz Availability & Server-Side Attempt Enforcement Indexes
+CREATE INDEX idx_quizzes_available_window ON quizzes(available_from, available_until);
+CREATE INDEX idx_quiz_attempts_quiz_student ON quiz_attempts(quiz_id, student_id);
+CREATE INDEX idx_quiz_attempts_status ON quiz_attempts(status);

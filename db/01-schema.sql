@@ -4,6 +4,7 @@
 -- ============================================================
 
 -- Clean slate (safe to re-run during development)
+DROP TABLE IF EXISTS quiz_attempts CASCADE;
 DROP TABLE IF EXISTS quiz_questions CASCADE;
 DROP TABLE IF EXISTS questions CASCADE;
 DROP TABLE IF EXISTS quizzes CASCADE;
@@ -524,12 +525,15 @@ CREATE TABLE quizzes (
     description        TEXT,
     instructions       TEXT,
     status             VARCHAR(20)   NOT NULL DEFAULT 'DRAFT',
-    total_marks        NUMERIC(8,2)  NOT NULL DEFAULT 0.00,
-    passing_marks      NUMERIC(8,2),
-    time_limit_minutes INTEGER,
-    max_attempts       INTEGER,
-    created_at         TIMESTAMP     NOT NULL DEFAULT NOW(),
-    updated_at         TIMESTAMP     NOT NULL DEFAULT NOW(),
+    total_marks         NUMERIC(8,2)  NOT NULL DEFAULT 0.00,
+    passing_marks       NUMERIC(8,2),
+    time_limit_minutes  INTEGER,
+    number_of_questions INTEGER,
+    max_attempts        INTEGER       NOT NULL DEFAULT 1,
+    available_from      TIMESTAMP,
+    available_until     TIMESTAMP,
+    created_at          TIMESTAMP     NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMP     NOT NULL DEFAULT NOW(),
 
     CONSTRAINT fk_quizzes_course
         FOREIGN KEY (course_id)
@@ -552,7 +556,13 @@ CREATE TABLE quizzes (
         ON DELETE SET NULL,
 
     CONSTRAINT chk_quiz_status
-        CHECK (status IN ('DRAFT', 'PUBLISHED'))
+        CHECK (status IN ('DRAFT', 'PUBLISHED')),
+
+    CONSTRAINT chk_quiz_max_attempts
+        CHECK (max_attempts >= 1),
+
+    CONSTRAINT chk_quiz_availability_window
+        CHECK (available_from IS NULL OR available_until IS NULL OR available_from < available_until)
 );
 
 -- Reusable Questions table (extensible for FR-I21 question types, FR-I22 marking schemes, FR-I24 question bank)
@@ -610,4 +620,38 @@ CREATE TABLE quiz_questions (
 
     CONSTRAINT uq_quiz_questions_quiz_question
         UNIQUE (quiz_id, question_id)
+);
+
+-- Persistent server-side quiz attempt tracking for FR-I20 / DR-ED06 / S19, S22, S24
+CREATE TABLE quiz_attempts (
+    id             SERIAL PRIMARY KEY,
+    quiz_id        INTEGER      NOT NULL,
+    student_id     INTEGER      NOT NULL,
+    attempt_number INTEGER      NOT NULL,
+    status         VARCHAR(20)  NOT NULL DEFAULT 'IN_PROGRESS',
+    started_at     TIMESTAMP    NOT NULL DEFAULT NOW(),
+    expires_at     TIMESTAMP,
+    submitted_at   TIMESTAMP,
+    obtained_marks NUMERIC(8,2),
+    created_at     TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at     TIMESTAMP    NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_quiz_attempts_quiz
+        FOREIGN KEY (quiz_id)
+        REFERENCES quizzes(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_quiz_attempts_student
+        FOREIGN KEY (student_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_quiz_attempts_quiz_student_num
+        UNIQUE (quiz_id, student_id, attempt_number),
+
+    CONSTRAINT chk_quiz_attempt_status
+        CHECK (status IN ('IN_PROGRESS', 'SUBMITTED', 'EXPIRED')),
+
+    CONSTRAINT chk_quiz_attempt_number
+        CHECK (attempt_number >= 1)
 );
