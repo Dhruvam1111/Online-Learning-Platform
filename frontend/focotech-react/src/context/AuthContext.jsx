@@ -74,15 +74,22 @@ export function AuthProvider({ children }) {
   }, []);
 
   // ── Register ──────────────────────────────────────────────────────────────
-  const register = useCallback(async (name, email, password, role = 'student') => {
+  const register = useCallback(async (name, email, password, role = 'student', extra = {}) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await authAPI.register({ name, email, password, role });
-      const { token: jwt, user: userData, message } = res.data;
-      setToken(jwt);
-      setUser(userData);
-      return { success: true, message, user: userData };
+      const payload = typeof extra === 'object'
+        ? { name, email, password, role, ...extra }
+        : { name, email, password, role };
+      const res = await authAPI.register(payload);
+      const { token: jwt, user: userData, message, verificationLink } = res.data;
+      
+      // For pending instructors, do not auto-login to active dashboard
+      if (role !== 'instructor' || (userData && userData.accountStatus === 'active')) {
+        setToken(jwt);
+        setUser(userData);
+      }
+      return { success: true, message, user: userData, verificationLink };
     } catch (err) {
       const msg =
         err.response?.data?.message || err.response?.data?.error || 'Registration failed. Please try again.';
@@ -118,6 +125,33 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
+  // ── Set Session directly (e.g. after OTP verification) ────────────────────
+  const setSession = useCallback((jwt, userData) => {
+    setToken(jwt);
+    setUser(userData);
+    setError(null);
+  }, []);
+
+  // ── Login with Google ─────────────────────────────────────────────────────
+  const loginWithGoogle = useCallback(async (email, name, idToken) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await authAPI.loginWithGoogle({ email, name, idToken });
+      const { token: jwt, user: userData, message } = res.data;
+      setToken(jwt);
+      setUser(userData);
+      return { success: true, message, user: userData };
+    } catch (err) {
+      const msg =
+        err.response?.data?.message || err.response?.data?.error || 'Google login failed. Please try again.';
+      setError(msg);
+      return { success: false, message: msg };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const isAuthenticated = !!token && !!user;
   const isStudent = user?.role === 'student';
   const isInstructor = user?.role === 'instructor';
@@ -134,6 +168,8 @@ export function AuthProvider({ children }) {
     isAdmin,
     login,
     register,
+    loginWithGoogle,
+    setSession,
     logout,
     refreshUser,
     setError,

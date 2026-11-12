@@ -1,0 +1,22 @@
+-- REVIEW BEFORE EXECUTING. Run as the database administrator against the approved dev database first.
+-- Example: psql -v ON_ERROR_STOP=1 -v runtime_role=olp_runtime -f db/scripts/restrict-financial-runtime.psql
+-- This creates a NOLOGIN privilege role, not an account or password. Provision an application
+-- login separately and grant it membership through your team's secure process.
+\if :{?runtime_role}
+\else
+\echo 'Supply -v runtime_role=olp_runtime'
+\quit
+\endif
+SELECT format('CREATE ROLE %I NOLOGIN', :'runtime_role')
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname=:'runtime_role')
+\gexec
+GRANT USAGE ON SCHEMA public TO :"runtime_role";
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO :"runtime_role";
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO :"runtime_role";
+REVOKE UPDATE, DELETE, TRUNCATE ON webhook_events FROM :"runtime_role";
+REVOKE ALL ON financial_ledger FROM :"runtime_role";
+GRANT SELECT ON financial_ledger TO :"runtime_role";
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+REVOKE CREATE ON SCHEMA public FROM :"runtime_role";
+-- A production runtime must not own tables, inherit an owner role, have superuser,
+-- or receive DDL privileges. PUBLIC grants must be reviewed by the administrator too.

@@ -3,13 +3,24 @@ package com.olp.controller;
 import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
 import com.olp.dto.ApiResponse;
+import com.olp.dto.CourseAssociationRequestResponse;
+import com.olp.dto.CourseAssociationReviewRequest;
+import com.olp.dto.CourseInstructorResponse;
+import com.olp.dto.InstructorCredentialResponse;
 import com.olp.dto.PageResponse;
 import com.olp.dto.RejectCourseRequest;
+import com.olp.entity.User;
 import com.olp.service.AdminService;
+import com.olp.service.CourseAssociationService;
+import com.olp.service.InstructorMediaService;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -17,9 +28,25 @@ import org.springframework.web.bind.annotation.*;
 public class AdminController {
 
     private final AdminService adminService;
+    private final InstructorMediaService instructorMediaService;
+    private final CourseAssociationService courseAssociationService;
 
     public AdminController(AdminService adminService) {
+        this(adminService, null, null);
+    }
+
+    public AdminController(AdminService adminService,
+                           InstructorMediaService instructorMediaService) {
+        this(adminService, instructorMediaService, null);
+    }
+
+    @Autowired
+    public AdminController(AdminService adminService,
+                           @Autowired(required = false) InstructorMediaService instructorMediaService,
+                           @Autowired(required = false) CourseAssociationService courseAssociationService) {
         this.adminService = adminService;
+        this.instructorMediaService = instructorMediaService;
+        this.courseAssociationService = courseAssociationService;
     }
 
     /**
@@ -180,5 +207,89 @@ public class AdminController {
     public ResponseEntity<ApiResponse> deleteCourse(@PathVariable Integer id) {
         adminService.deleteCourse(id);
         return ResponseEntity.ok(new ApiResponse(true, "Course deleted successfully"));
+    }
+
+    /**
+     * View credential verification documents uploaded by an instructor.
+     * FR-A03, FR-I04: Admin credentials verification
+     */
+    @GetMapping("/instructors/{instructorId:[0-9]+}/credentials")
+    public ResponseEntity<List<InstructorCredentialResponse>> getInstructorCredentials(
+            @PathVariable Integer instructorId) {
+        if (instructorMediaService == null) {
+            throw new IllegalStateException("InstructorMediaService is not configured");
+        }
+        List<InstructorCredentialResponse> response = instructorMediaService.getCredentialsForAdmin(instructorId);
+        return ResponseEntity.ok(response);
+    }
+
+    // =========================================================================
+    // COURSE ASSOCIATION REQUEST GOVERNANCE (FR-I58, FR-A10)
+    // =========================================================================
+
+    /**
+     * List instructor course association requests, optionally filtered by status.
+     */
+    @GetMapping("/association-requests")
+    public ResponseEntity<List<CourseAssociationRequestResponse>> getAssociationRequests(
+            @RequestParam(required = false) String status,
+            Authentication authentication) {
+        if (courseAssociationService == null) {
+            throw new IllegalStateException("CourseAssociationService is not configured");
+        }
+        User adminUser = courseAssociationService.resolveUser(authentication);
+        List<CourseAssociationRequestResponse> response =
+                courseAssociationService.getRequestsForAdmin(adminUser, status);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Approve an instructor's request to join a course as co-instructor and notify them.
+     */
+    @PutMapping("/association-requests/{requestId}/approve")
+    public ResponseEntity<CourseAssociationRequestResponse> approveAssociationRequest(
+            @PathVariable Integer requestId,
+            @Valid @RequestBody(required = false) CourseAssociationReviewRequest request,
+            Authentication authentication) {
+        if (courseAssociationService == null) {
+            throw new IllegalStateException("CourseAssociationService is not configured");
+        }
+        User adminUser = courseAssociationService.resolveUser(authentication);
+        CourseAssociationRequestResponse response =
+                courseAssociationService.approveRequest(adminUser, requestId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Reject an instructor's request to join a course and notify them.
+     */
+    @PutMapping("/association-requests/{requestId}/reject")
+    public ResponseEntity<CourseAssociationRequestResponse> rejectAssociationRequest(
+            @PathVariable Integer requestId,
+            @Valid @RequestBody(required = false) CourseAssociationReviewRequest request,
+            Authentication authentication) {
+        if (courseAssociationService == null) {
+            throw new IllegalStateException("CourseAssociationService is not configured");
+        }
+        User adminUser = courseAssociationService.resolveUser(authentication);
+        CourseAssociationRequestResponse response =
+                courseAssociationService.rejectRequest(adminUser, requestId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * List all instructors associated with a specific course (OWNER and CO_INSTRUCTORs) (FR-I59).
+     */
+    @GetMapping("/courses/{courseId:[0-9]+}/instructors")
+    public ResponseEntity<List<CourseInstructorResponse>> getCourseInstructors(
+            @PathVariable Integer courseId,
+            Authentication authentication) {
+        if (courseAssociationService == null) {
+            throw new IllegalStateException("CourseAssociationService is not configured");
+        }
+        User adminUser = courseAssociationService.resolveUser(authentication);
+        List<CourseInstructorResponse> response =
+                courseAssociationService.getCourseInstructorsForAdmin(adminUser, courseId);
+        return ResponseEntity.ok(response);
     }
 }

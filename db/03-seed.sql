@@ -4,6 +4,14 @@
 -- ============================================================
 
 -- Clear existing data (safe to re-run)
+DELETE FROM course_association_requests;
+DELETE FROM lessons;
+DELETE FROM course_sections;
+DELETE FROM course_modules;
+DELETE FROM course_prerequisites;
+DELETE FROM course_instructors;
+DELETE FROM instructor_upload_history;
+DELETE FROM instructor_credentials;
 DELETE FROM enrollments;
 DELETE FROM lectures;
 DELETE FROM courses;
@@ -14,6 +22,10 @@ ALTER SEQUENCE users_id_seq RESTART WITH 1;
 ALTER SEQUENCE courses_id_seq RESTART WITH 1;
 ALTER SEQUENCE lectures_id_seq RESTART WITH 1;
 ALTER SEQUENCE enrollments_id_seq RESTART WITH 1;
+ALTER SEQUENCE course_modules_id_seq RESTART WITH 1;
+ALTER SEQUENCE course_sections_id_seq RESTART WITH 1;
+ALTER SEQUENCE lessons_id_seq RESTART WITH 1;
+ALTER SEQUENCE course_association_requests_id_seq RESTART WITH 1;
 
 -- =========================
 -- USERS
@@ -45,26 +57,40 @@ INSERT INTO users (name, email, password_hash, role, account_status) VALUES
 -- COURSES
 -- =========================
 
-INSERT INTO courses (instructor_id, title, description, status) VALUES
+INSERT INTO courses (instructor_id, title, description, category, status) VALUES
     (1, 'Web Development Fundamentals',
         'Learn the core building blocks of the web: HTML for structure, CSS for styling, and JavaScript for interactivity. This course takes you from zero to building your first responsive website.',
+        'Web Development',
         'published'),
 
     (1, 'Introduction to Databases',
         'Understand how data is stored, queried, and managed. Covers relational database concepts, SQL syntax, table design, and normalization. Uses PostgreSQL for hands-on exercises.',
+        'Databases',
         'published'),
 
     (2, 'Python for Beginners',
         'A gentle introduction to programming using Python. Covers variables, loops, functions, and basic data structures. No prior coding experience required.',
+        'Programming',
         'published'),
 
     (2, 'Advanced Machine Learning',
         'Deep dive into neural networks, transformers, and reinforcement learning. Prerequisites: Python proficiency and basic statistics.',
+        'Data Science',
         'draft'),
 
     (2, 'Spring Boot 3 Masterclass',
         'Comprehensive guide to building production-ready REST APIs with Spring Boot 3.',
+        'Backend Development',
         'pending_review');
+
+-- Link initial course creators as 'owner' in course_instructors (FR-I05, FR-I59)
+INSERT INTO course_instructors (course_id, instructor_id, role) VALUES
+    (1, 1, 'owner'),
+    (1, 3, 'co-instructor'),
+    (2, 1, 'owner'),
+    (3, 2, 'owner'),
+    (4, 2, 'owner'),
+    (5, 2, 'owner');
 
 -- Course IDs after insert:
 --   1 = Web Development Fundamentals (published, by Sarah)
@@ -137,3 +163,26 @@ INSERT INTO enrollments (student_id, course_id) VALUES
 --   Bob (4):     enrolled in course 1 only, NOT in 2 or 3
 --   Charlie (5): enrolled in course 2 only, NOT in 1 or 3
 --   Nobody is enrolled in course 4 (which is draft anyway)
+
+
+-- =========================
+-- COURSE STRUCTURE (FR-I06)
+-- Modules → Sections → Lessons
+-- =========================
+
+INSERT INTO course_modules (course_id, title, description, order_index) VALUES
+    (1, 'Module 1: Getting Started with HTML', 'Introduction to web markup and structure', 1),
+    (1, 'Module 2: Styling with Modern CSS', 'Cascading Style Sheets, flexbox and grid layouts', 2);
+
+INSERT INTO course_sections (module_id, title, description, order_index) VALUES
+    (1, 'Section 1.1: HTML Basics', 'Core elements and page anatomy', 1),
+    (1, 'Section 1.2: Semantic HTML', 'Accessible and semantic tag usage', 2),
+    (2, 'Section 2.1: CSS Fundamentals', 'Selectors, box model, and cascade', 1);
+
+INSERT INTO lessons (section_id, title, lesson_type, content, content_url, duration_minutes, order_index) VALUES
+    (1, 'Introduction to HTML Tags', 'VIDEO', 'Overview of basic HTML syntax and elements', 'https://www.youtube.com/watch?v=UB1O30fR-EE', 15, 1),
+    (1, 'HTML Document Skeleton', 'MATERIAL', 'Reference guide and starter template code', NULL, 10, 2),
+    (1, 'HTML Quick Check', 'QUIZ', 'Knowledge check on tags and attributes', NULL, 5, 3),
+    (2, 'Semantic Markup Best Practices', 'MATERIAL', 'In-depth reading on landmark elements', NULL, 20, 1),
+    (2, 'Building an Accessible Blog Page', 'ASSIGNMENT', 'Create a semantic HTML portfolio page', NULL, 45, 2),
+    (3, 'Mastering the CSS Box Model', 'VIDEO', 'Detailed visual walkthrough of margin, border, padding', 'https://www.youtube.com/watch?v=rIO5326FgPE', 18, 1);

@@ -19,6 +19,7 @@ public class CourseDetailResponse {
     private boolean enrolled;
     private boolean bookmarked;
     private List<LectureResponse> lectures = new ArrayList<>();
+    private List<CourseInstructorResponse> instructors = new ArrayList<>();
 
     public CourseDetailResponse() {}
 
@@ -143,5 +144,13 @@ public class CourseDetailResponse {
 
     public void setLectures(List<LectureResponse> lectures) {
         this.lectures = lectures;
+    }
+
+    public List<CourseInstructorResponse> getInstructors() {
+        return instructors;
+    }
+
+    public void setInstructors(List<CourseInstructorResponse> instructors) {
+        this.instructors = instructors != null ? instructors : new ArrayList<>();
     }
 }

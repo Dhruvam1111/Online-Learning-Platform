@@ -4,11 +4,19 @@
 -- ============================================================
 
 -- Clean slate (safe to re-run during development)
+DROP TABLE IF EXISTS course_association_requests CASCADE;
+DROP TABLE IF EXISTS lessons CASCADE;
+DROP TABLE IF EXISTS course_sections CASCADE;
+DROP TABLE IF EXISTS course_modules CASCADE;
+DROP TABLE IF EXISTS course_prerequisites CASCADE;
+DROP TABLE IF EXISTS course_instructors CASCADE;
 DROP TABLE IF EXISTS lecture_progress CASCADE;
 DROP TABLE IF EXISTS bookmarks CASCADE;
 DROP TABLE IF EXISTS reviews CASCADE;
 DROP TABLE IF EXISTS enrollments CASCADE;
 DROP TABLE IF EXISTS lectures CASCADE;
+DROP TABLE IF EXISTS instructor_upload_history CASCADE;
+DROP TABLE IF EXISTS instructor_credentials CASCADE;
 DROP TABLE IF EXISTS instructor_profiles CASCADE;
 DROP TABLE IF EXISTS student_profiles CASCADE;
 DROP TABLE IF EXISTS courses CASCADE;
@@ -47,15 +55,19 @@ CREATE TABLE users (
 -- TABLE: courses
 -- =========================
 -- Each course belongs to exactly one instructor.
--- Status: 'draft' means only the instructor sees it.
+-- Status: 'draft' means only associated instructors and admins see it.
+--         'pending_review' means submitted for admin approval.
 --         'published' means students can see it in the catalog.
--- There is NO 'pending_review' status this sprint (no admin approval).
+--         'archived' means hidden from catalog while preserving data.
+--         'rejected' means returned by admin with feedback.
 
 CREATE TABLE courses (
     id              SERIAL PRIMARY KEY,
     instructor_id   INTEGER      NOT NULL,
     title           VARCHAR(200) NOT NULL,
     description     TEXT,
+    category        VARCHAR(100) NOT NULL DEFAULT 'General',
+    learning_outcomes TEXT,
     status          VARCHAR(20)  NOT NULL DEFAULT 'draft',
     rejection_reason TEXT,
     created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
@@ -65,12 +77,178 @@ CREATE TABLE courses (
         REFERENCES users(id)
         ON DELETE CASCADE,
 
-    CONSTRAINT chk_courses_status CHECK (status IN ('draft', 'pending_review', 'published', 'rejected'))
+    CONSTRAINT chk_courses_status CHECK (status IN ('draft', 'pending_review', 'published', 'archived', 'rejected'))
 );
 
 -- ON DELETE CASCADE: If an instructor account is deleted, their courses
 -- are also deleted. This is acceptable for Sprint 1. In production you
 -- might want RESTRICT or soft-delete instead.
+
+
+-- =========================
+-- TABLE: course_instructors
+-- =========================
+-- Many-to-many relationship supporting co-instructors and ownership (FR-I05, FR-I59)
+CREATE TABLE course_instructors (
+    id            SERIAL PRIMARY KEY,
+    course_id     INTEGER NOT NULL,
+    instructor_id INTEGER NOT NULL,
+    role          VARCHAR(50) NOT NULL DEFAULT 'owner',
+    created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_course_instructors_course
+        FOREIGN KEY (course_id)
+        REFERENCES courses(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_course_instructors_user
+        FOREIGN KEY (instructor_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_course_instructor
+        UNIQUE (course_id, instructor_id),
+
+    CONSTRAINT chk_course_instructor_role
+        CHECK (role IN ('owner', 'co-instructor', 'OWNER', 'CO_INSTRUCTOR'))
+);
+
+
+-- =========================
+-- TABLE: course_association_requests
+-- =========================
+-- Instructor requests to join existing courses as co-instructors (FR-I58, FR-I59)
+CREATE TABLE course_association_requests (
+    id             SERIAL PRIMARY KEY,
+    course_id      INTEGER     NOT NULL,
+    instructor_id  INTEGER     NOT NULL,
+    requested_role VARCHAR(50) NOT NULL DEFAULT 'co-instructor',
+    message        TEXT,
+    status         VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    admin_notes    TEXT,
+    reviewed_by    INTEGER,
+    reviewed_at    TIMESTAMP,
+    created_at     TIMESTAMP   NOT NULL DEFAULT NOW(),
+    updated_at     TIMESTAMP   NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_assoc_req_course
+        FOREIGN KEY (course_id)
+        REFERENCES courses(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_assoc_req_instructor
+        FOREIGN KEY (instructor_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_assoc_req_reviewer
+        FOREIGN KEY (reviewed_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT chk_assoc_req_status
+        CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+
+    CONSTRAINT chk_assoc_req_role
+        CHECK (requested_role IN ('co-instructor'))
+);
+
+
+-- =========================
+-- TABLE: course_prerequisites
+-- =========================
+-- Structured prerequisite requirements for courses and skills (FR-I05)
+-- Reusable for student enrollment eligibility verification.
+CREATE TABLE course_prerequisites (
+    id                  SERIAL PRIMARY KEY,
+    course_id           INTEGER NOT NULL,
+    prerequisite_type   VARCHAR(20) NOT NULL DEFAULT 'SKILL',
+    required_course_id  INTEGER,
+    title               VARCHAR(200) NOT NULL,
+    description         VARCHAR(500),
+    created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_course_prerequisites_course
+        FOREIGN KEY (course_id)
+        REFERENCES courses(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_course_prerequisites_required_course
+        FOREIGN KEY (required_course_id)
+        REFERENCES courses(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT chk_course_prerequisite_type
+        CHECK (prerequisite_type IN ('COURSE', 'SKILL'))
+);
+
+
+-- =========================
+-- TABLE: course_modules
+-- =========================
+-- Course hierarchy Level 1: Modules grouping content within a course (FR-I06)
+CREATE TABLE course_modules (
+    id          SERIAL PRIMARY KEY,
+    course_id   INTEGER      NOT NULL,
+    title       VARCHAR(200) NOT NULL,
+    description TEXT,
+    order_index INTEGER      NOT NULL DEFAULT 0,
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_course_modules_course
+        FOREIGN KEY (course_id)
+        REFERENCES courses(id)
+        ON DELETE CASCADE
+);
+
+
+-- =========================
+-- TABLE: course_sections
+-- =========================
+-- Course hierarchy Level 2: Sections dividing a module into logical topics (FR-I06)
+CREATE TABLE course_sections (
+    id          SERIAL PRIMARY KEY,
+    module_id   INTEGER      NOT NULL,
+    title       VARCHAR(200) NOT NULL,
+    description TEXT,
+    order_index INTEGER      NOT NULL DEFAULT 0,
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_course_sections_module
+        FOREIGN KEY (module_id)
+        REFERENCES course_modules(id)
+        ON DELETE CASCADE
+);
+
+
+-- =========================
+-- TABLE: lessons
+-- =========================
+-- Course hierarchy Level 3: Individual learning units with specific types (FR-I06)
+-- Extensible for quizzes, assignments, materials, and SCORM/xAPI packaging (DR-14)
+CREATE TABLE lessons (
+    id               SERIAL PRIMARY KEY,
+    section_id       INTEGER      NOT NULL,
+    title            VARCHAR(200) NOT NULL,
+    lesson_type      VARCHAR(50)  NOT NULL DEFAULT 'VIDEO',
+    content          TEXT,
+    content_url      VARCHAR(500),
+    duration_minutes INTEGER,
+    order_index      INTEGER      NOT NULL DEFAULT 0,
+    metadata         TEXT,
+    created_at       TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMP    NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_lessons_section
+        FOREIGN KEY (section_id)
+        REFERENCES course_sections(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT chk_lesson_type
+        CHECK (lesson_type IN ('VIDEO', 'MATERIAL', 'QUIZ', 'ASSIGNMENT'))
+);
 
 
 -- =========================
@@ -173,14 +351,70 @@ CREATE TABLE student_profiles (
 -- TABLE: instructor_profiles
 -- =========================
 CREATE TABLE instructor_profiles (
-    id              SERIAL PRIMARY KEY,
-    instructor_id   INTEGER NOT NULL UNIQUE,
-    qualifications  TEXT,
-    expertise_areas TEXT,
-    bio             TEXT,
-    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    id                  SERIAL PRIMARY KEY,
+    instructor_id       INTEGER NOT NULL UNIQUE,
+    qualifications      TEXT,
+    expertise_areas     TEXT,
+    bio                 TEXT,
+    profile_picture_url VARCHAR(500),
+    created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMP NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_instructor_profiles_user FOREIGN KEY (instructor_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- =========================
+-- TABLE: instructor_credentials
+-- =========================
+-- Stores private credential verification documents (degrees, certificates, identity)
+-- uploaded by instructors. Access is restricted to the owning instructor and admins.
+CREATE TABLE instructor_credentials (
+    id                 SERIAL PRIMARY KEY,
+    instructor_id      INTEGER NOT NULL,
+    original_file_name VARCHAR(255) NOT NULL,
+    stored_file_name   VARCHAR(255) NOT NULL,
+    content_type       VARCHAR(100) NOT NULL,
+    file_size          BIGINT NOT NULL,
+    document_type      VARCHAR(100) NOT NULL DEFAULT 'CREDENTIAL',
+    status             VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+    uploaded_at        TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_instructor_credentials_user
+        FOREIGN KEY (instructor_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT chk_credential_status
+        CHECK (status IN ('ACTIVE', 'REPLACED', 'DELETED'))
+);
+
+-- =========================
+-- TABLE: instructor_upload_history
+-- =========================
+-- Audit trail tracking upload, replacement, and deletion lifecycle events
+-- for instructor profile pictures and credential documents.
+CREATE TABLE instructor_upload_history (
+    id                 SERIAL PRIMARY KEY,
+    instructor_id      INTEGER NOT NULL,
+    category           VARCHAR(50) NOT NULL,
+    action             VARCHAR(50) NOT NULL,
+    original_file_name VARCHAR(255) NOT NULL,
+    stored_file_name   VARCHAR(255) NOT NULL,
+    content_type       VARCHAR(100) NOT NULL,
+    file_size          BIGINT NOT NULL,
+    details            TEXT,
+    created_at         TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_instructor_upload_history_user
+        FOREIGN KEY (instructor_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT chk_upload_category
+        CHECK (category IN ('PROFILE_PICTURE', 'CREDENTIAL')),
+
+    CONSTRAINT chk_upload_action
+        CHECK (action IN ('UPLOADED', 'REPLACED', 'DELETED'))
 );
 
 -- =========================
@@ -218,3 +452,60 @@ CREATE TABLE IF NOT EXISTS lecture_bookmarks (
     created_at        TIMESTAMP NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_student_lecture_bookmark UNIQUE (student_id, lecture_id)
 );
+-- Simulated payments. Apply on a disposable DB first, then reviewed Neon dev migration.
+CREATE TABLE IF NOT EXISTS payments (amount numeric(10,2) not null, course_id integer not null REFERENCES courses(id), discount_amount numeric(10,2), id integer generated by default as identity, instructor_earning numeric(10,2), platform_fee numeric(10,2), refund_amount numeric(10,2), risk_score integer, student_id integer not null REFERENCES users(id), wallet_amount_used numeric(10,2), created_at timestamp(6) not null, updated_at timestamp(6) not null, currency varchar(10) not null, refund_status varchar(20), status varchar(20) not null, coupon_code varchar(50), payment_method varchar(50), invoice_number varchar(100), order_id varchar(100) not null unique, payment_id varchar(100), failure_reason TEXT, refund_reason TEXT, signature varchar(255), primary key (id));
+CREATE TABLE IF NOT EXISTS wallets (balance numeric(10,2) not null, id integer generated by default as identity, student_id integer not null REFERENCES users(id) unique, updated_at timestamp(6) not null, primary key (id));
+CREATE TABLE IF NOT EXISTS wallet_transactions (amount numeric(10,2) not null, id integer generated by default as identity, wallet_id integer not null REFERENCES wallets(id), created_at timestamp(6) not null, type varchar(20) not null, description varchar(255) not null, primary key (id));
+CREATE TABLE IF NOT EXISTS coupons (fixed_discount_amount numeric(10,2), discount_percentage numeric(5,2) not null, id integer generated by default as identity, is_active boolean, max_discount_amount numeric(10,2), min_order_amount numeric(10,2), times_used integer, usage_limit integer, created_at timestamp(6) not null, valid_until timestamp(6) not null, code varchar(50) not null unique, primary key (id));
+CREATE TABLE IF NOT EXISTS coupon_usages (coupon_id integer not null REFERENCES coupons(id), discount_applied numeric(10,2) not null, id integer generated by default as identity, student_id integer not null REFERENCES users(id), used_at timestamp(6) not null, order_id varchar(100) not null, primary key (id));
+CREATE TABLE IF NOT EXISTS refunds (amount numeric(10,2) not null, id integer generated by default as identity, payment_id integer not null REFERENCES payments(id), created_at timestamp(6) not null, status varchar(20) not null, razorpay_refund_id varchar(100) not null unique, reason TEXT, primary key (id));
+CREATE TABLE IF NOT EXISTS instructor_earnings (course_id integer not null REFERENCES courses(id), gross_amount numeric(10,2) not null, id integer generated by default as identity, instructor_id integer not null REFERENCES users(id), net_instructor_earning numeric(10,2) not null, payment_id integer not null REFERENCES payments(id), platform_commission numeric(10,2) not null, created_at timestamp(6) not null, payout_status varchar(20) not null, primary key (id));
+CREATE TABLE IF NOT EXISTS webhook_events (id integer generated by default as identity, processed_at timestamp(6) not null, event_type varchar(50) not null, event_id varchar(100) not null unique, payload TEXT, primary key (id));
+ALTER TABLE coupons ADD COLUMN IF NOT EXISTS fixed_discount_amount NUMERIC(10,2);
+
+-- Payment audit hardening; incremental migration is also supplied.
+-- Apply only after 20261110-payment-claims.sql. No automatic Hibernate DDL.
+-- Indefinite retention: no scheduled deletion. Operators must maintain verified backups.
+BEGIN;
+CREATE TABLE IF NOT EXISTS financial_ledger (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    table_name text NOT NULL,
+    operation text NOT NULL,
+    database_actor text NOT NULL DEFAULT session_user,
+    recorded_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    old_record jsonb,
+    new_record jsonb
+);
+CREATE INDEX IF NOT EXISTS idx_financial_ledger_recorded_at ON financial_ledger(recorded_at);
+CREATE OR REPLACE FUNCTION protect_financial_history() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'Financial history is append-only; corrections require new entries';
+END;
+$$;
+DROP TRIGGER IF EXISTS protect_financial_ledger ON financial_ledger;
+CREATE TRIGGER protect_financial_ledger BEFORE UPDATE OR DELETE OR TRUNCATE ON financial_ledger
+FOR EACH STATEMENT EXECUTE FUNCTION protect_financial_history();
+DROP TRIGGER IF EXISTS protect_webhook_history ON webhook_events;
+CREATE TRIGGER protect_webhook_history BEFORE UPDATE OR DELETE OR TRUNCATE ON webhook_events
+FOR EACH STATEMENT EXECUTE FUNCTION protect_financial_history();
+CREATE OR REPLACE FUNCTION public.record_financial_change() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+BEGIN
+    IF TG_TABLE_SCHEMA <> 'public' OR TG_RELID NOT IN ('public.payments'::regclass,'public.refunds'::regclass,'public.instructor_earnings'::regclass,'public.wallets'::regclass,'public.wallet_transactions'::regclass,'public.coupons'::regclass,'public.coupon_usages'::regclass) THEN
+        RAISE EXCEPTION 'Unexpected financial audit source';
+    END IF;
+    INSERT INTO public.financial_ledger(table_name, operation, old_record, new_record)
+    VALUES(TG_TABLE_NAME,TG_OP,
+      CASE WHEN TG_OP IN ('UPDATE','DELETE') THEN to_jsonb(OLD) - 'signature' ELSE NULL END,
+      CASE WHEN TG_OP IN ('INSERT','UPDATE') THEN to_jsonb(NEW) - 'signature' ELSE NULL END);
+    RETURN NULL;
+END;
+$$;
+DO $$ DECLARE item text; BEGIN
+    FOREACH item IN ARRAY ARRAY['payments','refunds','instructor_earnings','wallets','wallet_transactions','coupons','coupon_usages'] LOOP
+        EXECUTE format('DROP TRIGGER IF EXISTS financial_history ON %I',item);
+        EXECUTE format('CREATE TRIGGER financial_history AFTER INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION record_financial_change()',item);
+        EXECUTE format('DROP TRIGGER IF EXISTS prevent_financial_truncate ON %I',item);
+        EXECUTE format('CREATE TRIGGER prevent_financial_truncate BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION protect_financial_history()',item);
+    END LOOP;
+END $$;
+COMMIT;

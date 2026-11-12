@@ -75,4 +75,8 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST)  // 400
                 .body(new ErrorResponse(400, "Malformed request body"));
     }
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleConflict(IllegalStateException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(409, ex.getMessage()));
+    }
 }

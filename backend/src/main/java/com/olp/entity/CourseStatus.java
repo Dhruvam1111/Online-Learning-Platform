@@ -7,6 +7,7 @@ public enum CourseStatus {
     DRAFT,
     PENDING_REVIEW,
     PUBLISHED,
+    ARCHIVED,
     REJECTED;
 
     @JsonCreator
@@ -20,7 +21,7 @@ public enum CourseStatus {
                 return status;
             }
         }
-        throw new IllegalArgumentException("Invalid course status: '" + value + "'. Valid statuses are DRAFT, PENDING_REVIEW, PUBLISHED, and REJECTED");
+        throw new IllegalArgumentException("Invalid course status: '" + value + "'. Valid statuses are DRAFT, PENDING_REVIEW, PUBLISHED, ARCHIVED, and REJECTED");
     }
 
     @JsonValue

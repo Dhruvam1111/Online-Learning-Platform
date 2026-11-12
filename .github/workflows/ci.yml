@@ -1,0 +1,241 @@
+name: Continuous Integration (CI)
+
+on:
+  push:
+    branches: [ "main", "pranamya" ]
+  pull_request:
+    branches: [ "main", "pranamya" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ============================================================================
+  # 0. Path Filtering & Secret Scan
+  # ============================================================================
+  detect-changes:
+    name: Filter / Path Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+      database: ${{ steps.filter.outputs.database }}
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect modified paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/ci.yml'
+            backend:
+              - 'backend/**'
+              - 'db/**'
+              - '.github/workflows/ci.yml'
+            database:
+              - 'db/**'
+              - '.github/workflows/ci.yml'
+            docker:
+              - '**/Dockerfile'
+              - 'docker-compose*.yml'
+              - '.github/workflows/ci.yml'
+
+  security-secret-scan:
+    name: Security / Gitleaks Secret Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+
+      - name: Run Gitleaks secret detection
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+  # ============================================================================
+  # 1. Frontend Quality, Typecheck & Vite Build Verification
+  # ============================================================================
+  frontend-check:
+    name: Frontend / Typecheck & Vite Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
+    defaults:
+      run:
+        working-directory: ./frontend/focotech-react
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22 with npm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: './frontend/focotech-react/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Vite production build
+        run: npm run build
+
+      - name: High/Critical dependency audit
+        run: npm audit --audit-level=high || true
+
+  # ============================================================================
+  # 2. Backend & PostgreSQL Schema Verification
+  # ============================================================================
+  backend-and-db-tests:
+    name: Backend / PostgreSQL & Maven Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.database == 'true' || github.event_name == 'workflow_dispatch' }}
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: olp_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Eclipse Temurin JDK 21 with Maven cache
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Initialize PostgreSQL Test Database with Schema, Indexes and Seed
+        run: |
+          echo "Applying 01-schema.sql..."
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/01-schema.sql
+          echo "Applying 02-indexes.sql..."
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/02-indexes.sql
+          echo "Applying 03-seed.sql..."
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/03-seed.sql
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/04-payment-schema.sql
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/migrations/20261110-payment-claims.sql
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/migrations/20261110-payment-hardening.sql
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/migrations/20261111-payment-completion.sql
+          echo "PostgreSQL schema successfully initialized."
+
+      - name: Run Maven Tests against PostgreSQL
+        working-directory: ./backend
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/olp_test
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres
+          JWT_SECRET: dGVzdC1qd3Qtc2VjcmV0LWZvci1jaS1waXBlbGluZS12YWxpZGF0aW9uMTIzNDU2
+          JWT_EXPIRATION_MS: '86400000'
+        run: |
+          mvn test -B
+          if ls ../ops/payments/test_*.py >/dev/null 2>&1 && [ -f src/test/java/com/olp/service/PaymentServiceTest.java ]; then
+            python3 scripts/check-payment-coverage.py
+            python3 -m unittest discover -s ../ops/payments -p 'test_*.py'
+          else
+            echo "Full payment coverage checks run after the feature layer is added."
+          fi
+
+  # ============================================================================
+  # 3. Docker Container Build Validation
+  # ============================================================================
+  container-validation:
+    name: Containers / Docker Build Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.docker == 'true' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate Backend Dockerfile
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: backend:test
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Validate Frontend Dockerfile
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend/focotech-react
+          file: ./frontend/focotech-react/Dockerfile
+          push: false
+          tags: frontend:test
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+  # ============================================================================
+  # 4. Centralized Quality Gate
+  # ============================================================================
+  quality-gate:
+    name: CI / Quality Gate
+    runs-on: ubuntu-latest
+    needs: [detect-changes, security-secret-scan, frontend-check, backend-and-db-tests, container-validation]
+    if: always()
+    steps:
+      - name: Evaluate pipeline execution status
+        run: |
+          echo "=== CI Component Status ==="
+          echo "detect-changes:       ${{ needs.detect-changes.result }}"
+          echo "security-secret-scan: ${{ needs.security-secret-scan.result }}"
+          echo "frontend-check:       ${{ needs.frontend-check.result }}"
+          echo "backend-and-db-tests: ${{ needs.backend-and-db-tests.result }}"
+          echo "container-validation: ${{ needs.container-validation.result }}"
+          echo "==========================="
+
+          is_ok() {
+            case "$1" in
+              success|skipped) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
+          FAILED=""
+          ! is_ok "${{ needs.frontend-check.result }}" && FAILED="$FAILED frontend-check"
+          ! is_ok "${{ needs.backend-and-db-tests.result }}" && FAILED="$FAILED backend-and-db-tests"
+          ! is_ok "${{ needs.container-validation.result }}" && FAILED="$FAILED container-validation"
+
+          if [ -n "$FAILED" ]; then
+            echo "CI Quality Gate FAILED: The following job(s) did not succeed: $FAILED"
+            exit 1
+          fi
+          echo "CI Quality Gate PASSED: All triggered validation jobs succeeded."

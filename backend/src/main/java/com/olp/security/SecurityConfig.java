@@ -1,5 +1,6 @@
 package com.olp.security;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -15,17 +16,29 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity  // enables @PreAuthorize on controller methods
+@EnableMethodSecurity // enables @PreAuthorize on controller methods
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final CustomAccessDeniedHandler customAccessDeniedHandler;
+    private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    @Value("${app.cors.allowed-origins:${FRONTEND_URL:}}")
+    private String allowedOrigins;
+
+    public SecurityConfig(
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            CustomAccessDeniedHandler customAccessDeniedHandler,
+            CustomAuthenticationEntryPoint customAuthenticationEntryPoint) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.customAccessDeniedHandler = customAccessDeniedHandler;
+        this.customAuthenticationEntryPoint = customAuthenticationEntryPoint;
     }
 
     @Bean
@@ -38,26 +51,45 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
                 // Stateless sessions — no server-side session, JWT only
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                // Exception handling for 401 Unauthorized & 403 Forbidden
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(customAuthenticationEntryPoint)
+                        .accessDeniedHandler(customAccessDeniedHandler))
 
                 // URL-level access rules
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints (no login required)
-                        .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-
+                        .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/register/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/google").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/password-reset/**", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/otp/**").permitAll()
+                        .requestMatchers("/api/auth/password-reset/**", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/otp/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/auth/verify-email").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
+                        .requestMatchers("/api/payments/webhook").permitAll()
+                        .requestMatchers("/api/payments/simulator/**", "/api/payments/wallet/add-reward").hasRole("admin")
+                        .requestMatchers("/api/payments/**").authenticated()
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/actuator/**").hasRole("admin")
+                        .requestMatchers(HttpMethod.GET, "/api/instructors/{id:[0-9]+}/summary",
+                                                         "/api/instructor/{id:[0-9]+}/summary",
+                                                         "/api/instructors/{id:[0-9]+}",
+                                                         "/api/instructor/{id:[0-9]+}",
+                                                         "/api/instructors/{id:[0-9]+}/picture",
+                                                         "/api/instructor/{id:[0-9]+}/picture").permitAll()
                         // Admin endpoints require ROLE_admin
                         .requestMatchers("/api/admin/**").hasRole("admin")
 
-                        // Instructor endpoints require instructor role
-                        .requestMatchers("/api/instructor/**", "/api/instructors/**").hasRole("instructor")
+                        // Instructor endpoints require instructor or admin role
+                        .requestMatchers("/api/instructor/**", "/api/instructors/**").hasAnyRole("instructor", "admin")
+
+                        // Student endpoints require student role
+                        .requestMatchers("/api/student/**", "/api/students/**").hasRole("student")
 
                         // Everything else requires authentication
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
 
                 // Add our JWT filter BEFORE Spring's default username/password filter
                 .addFilterBefore(jwtAuthenticationFilter,
@@ -75,13 +107,22 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-                "http://localhost:3000",       // React dev server
-                "http://localhost:5173"        // Vite dev server
-                // Person 4 will add the deployed frontend URL here later
-        ));
+
+        List<String> origins = new ArrayList<>(List.of(
+                "http://localhost:*",
+                "http://127.0.0.1:*"));
+
+        if (allowedOrigins != null && !allowedOrigins.isBlank()) {
+            Arrays.stream(allowedOrigins.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .forEach(origins::add);
+        }
+
+        config.setAllowedOriginPatterns(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
+        config.setExposedHeaders(List.of("Content-Disposition"));
         config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

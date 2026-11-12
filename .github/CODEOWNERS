@@ -1,0 +1,33 @@
+# ==============================================================================
+# GitHub CODEOWNERS Configuration
+# ==============================================================================
+# GitHub automatically assigns designated code owners as reviewers whenever
+# a pull request is opened or modified.
+#
+# Rules:
+# - The file MUST be named 'CODEOWNERS' (without any .md extension) in .github/
+# - The owners will automatically be added as required PR reviewers.
+# ==============================================================================
+
+# Global Default Owner:
+# All files and directories across the repository require review:
+* @Elite407 202401165@daiict.ac.in
+
+# ------------------------------------------------------------------------------
+# Core Components
+# ------------------------------------------------------------------------------
+# Backend & Spring Boot services
+/backend/                 @Elite407 202401165@daiict.ac.in
+
+# Database migrations & schemas
+/db/                      @Elite407 202401165@daiict.ac.in
+
+# CI/CD Workflows & GitHub Configurations
+/.github/                 @Elite407 202401165@daiict.ac.in
+
+# Frontend Application
+/frontend/                @Elite407 202401165@daiict.ac.in
+
+# Docker & Orchestration
+/docker-compose*.yml      @Elite407 202401165@daiict.ac.in
+
