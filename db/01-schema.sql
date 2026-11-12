@@ -484,4 +484,25 @@ DO $$ DECLARE item text; BEGIN
         EXECUTE format('CREATE TRIGGER prevent_financial_truncate BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION protect_financial_history()',item);
     END LOOP;
 END $$;
+
+-- Step 14 / FR-I64: Content Ownership Declarations
+CREATE TABLE IF NOT EXISTS content_declarations (
+    id SERIAL PRIMARY KEY,
+    course_id INT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    lesson_id INT REFERENCES lessons(id) ON DELETE CASCADE,
+    instructor_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    declaration_text TEXT NOT NULL,
+    license_type VARCHAR(50) NOT NULL,
+    source_attribution TEXT,
+    declared_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    takedown_status VARCHAR(30) NOT NULL DEFAULT 'NONE',
+    takedown_reason TEXT,
+    takedown_flagged_at TIMESTAMP,
+    instructor_response TEXT,
+    instructor_responded_at TIMESTAMP,
+    resolved_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 COMMIT;
