@@ -55,8 +55,17 @@ public class Quiz {
     @Column(name = "time_limit_minutes")
     private Integer timeLimitMinutes;
 
-    @Column(name = "max_attempts")
-    private Integer maxAttempts;
+    @Column(name = "number_of_questions")
+    private Integer numberOfQuestions;
+
+    @Column(name = "max_attempts", nullable = false)
+    private Integer maxAttempts = 1;
+
+    @Column(name = "available_from")
+    private LocalDateTime availableFrom;
+
+    @Column(name = "available_until")
+    private LocalDateTime availableUntil;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -97,6 +106,9 @@ public class Quiz {
         }
         if (this.totalMarks == null) {
             this.totalMarks = BigDecimal.ZERO;
+        }
+        if (this.maxAttempts == null) {
+            this.maxAttempts = 1;
         }
     }
 
@@ -201,12 +213,36 @@ public class Quiz {
         this.timeLimitMinutes = timeLimitMinutes;
     }
 
+    public Integer getNumberOfQuestions() {
+        return numberOfQuestions;
+    }
+
+    public void setNumberOfQuestions(Integer numberOfQuestions) {
+        this.numberOfQuestions = numberOfQuestions;
+    }
+
     public Integer getMaxAttempts() {
         return maxAttempts;
     }
 
     public void setMaxAttempts(Integer maxAttempts) {
         this.maxAttempts = maxAttempts;
+    }
+
+    public LocalDateTime getAvailableFrom() {
+        return availableFrom;
+    }
+
+    public void setAvailableFrom(LocalDateTime availableFrom) {
+        this.availableFrom = availableFrom;
+    }
+
+    public LocalDateTime getAvailableUntil() {
+        return availableUntil;
+    }
+
+    public void setAvailableUntil(LocalDateTime availableUntil) {
+        this.availableUntil = availableUntil;
     }
 
     public LocalDateTime getCreatedAt() {
