@@ -105,6 +105,14 @@ public class PaymentService {
         if (course.getStatus() != CourseStatus.PUBLISHED)
             throw new IllegalStateException("This course is not currently available for purchase.");
 
+        // FR-I10: Prevent enrollment when course enrollment limit is reached
+        if (course.getEnrollmentLimit() != null && course.getEnrollmentLimit() > 0) {
+            long currentCount = enrollmentRepository.countByCourseId(course.getId());
+            if (currentCount >= course.getEnrollmentLimit()) {
+                throw new IllegalStateException("Course enrollment limit has been reached.");
+            }
+        }
+
         log.info("[Payment Gateway] Initializing checkout order for student '{}' on course '{}' (ID: {})",
                 student != null ? student.getEmail() : "demo", course.getTitle(), course.getId());
 
@@ -126,6 +134,21 @@ public class PaymentService {
                     student);
             discountAmount = (BigDecimal) couponResult.get("discountAmount");
             couponCode = (String) couponResult.get("couponCode");
+        } else if (course.getDiscountType() != null && course.getDiscountValue() != null &&
+                course.getDiscountValue().compareTo(BigDecimal.ZERO) > 0) {
+            // Apply course-level discount if active (FR-I10)
+            LocalDateTime now = LocalDateTime.now();
+            boolean validStart = course.getDiscountStartDate() == null || !now.isBefore(course.getDiscountStartDate());
+            boolean validEnd = course.getDiscountEndDate() == null || !now.isAfter(course.getDiscountEndDate());
+            if (validStart && validEnd) {
+                if (course.getDiscountType() == com.olp.entity.DiscountType.PERCENTAGE) {
+                    discountAmount = basePrice.multiply(course.getDiscountValue())
+                            .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP)
+                            .min(basePrice);
+                } else if (course.getDiscountType() == com.olp.entity.DiscountType.FIXED) {
+                    discountAmount = course.getDiscountValue().min(basePrice);
+                }
+            }
         }
 
         BigDecimal finalPayable = basePrice.subtract(discountAmount).max(BigDecimal.ZERO);
@@ -232,6 +255,10 @@ public class PaymentService {
     // Courses have no persisted price column. Use the existing catalog tiers on the
     // server.
     static BigDecimal catalogPrice(Course course) {
+        if (course != null && course.getPrice() != null && course.getPrice().compareTo(BigDecimal.ZERO) >= 0) {
+            return course.getPrice();
+        }
+        if (course == null) return DEFAULT_COURSE_PRICE;
         String title = course.getTitle() == null ? "" : course.getTitle().toLowerCase(java.util.Locale.ROOT);
         Integer id = course.getId();
         if (title.contains("machine learning") || title.contains("ai") || title.contains("deep learning")
@@ -431,6 +458,12 @@ public class PaymentService {
 
         // Atomic Course Enrollment (FR-PG04, NFR-12)
         if (!enrollmentRepository.existsByStudentIdAndCourseId(student.getId(), payment.getCourse().getId())) {
+            if (payment.getCourse().getEnrollmentLimit() != null && payment.getCourse().getEnrollmentLimit() > 0) {
+                long currentCount = enrollmentRepository.countByCourseId(payment.getCourse().getId());
+                if (currentCount >= payment.getCourse().getEnrollmentLimit()) {
+                    throw new IllegalStateException("Course enrollment limit has been reached.");
+                }
+            }
             Enrollment enrollment = new Enrollment(student, payment.getCourse());
             enrollmentRepository.save(enrollment);
             log.info("[Payment & Enrollment] Enrolled Student ID {} in Course ID {} via Order {}",

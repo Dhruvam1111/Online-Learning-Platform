@@ -2,6 +2,8 @@ package com.olp.service;
 
 import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseInstructorResponse;
+import com.olp.dto.CoursePricingRequest;
+import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.CoursePrerequisiteRequest;
 import com.olp.dto.CourseResponse;
 import com.olp.dto.CreateCourseRequest;
@@ -59,9 +61,10 @@ public class InstructorCourseService {
     private final CoursePrerequisiteRepository coursePrerequisiteRepository;
     private final InstructorProfileRepository instructorProfileRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final CoursePricingService coursePricingService;
 
     public InstructorCourseService(CourseRepository courseRepository, UserRepository userRepository) {
-        this(courseRepository, userRepository, null, null, null, null);
+        this(courseRepository, userRepository, null, null, null, null, null);
     }
 
     public InstructorCourseService(
@@ -69,7 +72,7 @@ public class InstructorCourseService {
             UserRepository userRepository,
             CourseInstructorRepository courseInstructorRepository,
             CoursePrerequisiteRepository coursePrerequisiteRepository) {
-        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository, null, null);
+        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository, null, null, null);
     }
 
     public InstructorCourseService(
@@ -79,7 +82,7 @@ public class InstructorCourseService {
             CoursePrerequisiteRepository coursePrerequisiteRepository,
             InstructorProfileRepository instructorProfileRepository) {
         this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
-                instructorProfileRepository, null);
+                instructorProfileRepository, null, null);
     }
 
     @Autowired
@@ -89,13 +92,15 @@ public class InstructorCourseService {
             @Autowired(required = false) CourseInstructorRepository courseInstructorRepository,
             @Autowired(required = false) CoursePrerequisiteRepository coursePrerequisiteRepository,
             @Autowired(required = false) InstructorProfileRepository instructorProfileRepository,
-            @Autowired(required = false) EnrollmentRepository enrollmentRepository) {
+            @Autowired(required = false) EnrollmentRepository enrollmentRepository,
+            @Autowired(required = false) CoursePricingService coursePricingService) {
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.courseInstructorRepository = courseInstructorRepository;
         this.coursePrerequisiteRepository = coursePrerequisiteRepository;
         this.instructorProfileRepository = instructorProfileRepository;
         this.enrollmentRepository = enrollmentRepository;
+        this.coursePricingService = coursePricingService;
     }
 
     /**
@@ -339,6 +344,29 @@ public class InstructorCourseService {
             course.setLearningOutcomesList(cleanOutcomes);
         }
 
+        if (request.getPrice() != null || request.getDiscountValue() != null || request.getEnrollmentLimit() != null
+                || request.getDiscountType() != null) {
+            CoursePricingRequest pricingReq = new CoursePricingRequest(
+                    request.getPrice(),
+                    request.getDiscountType(),
+                    request.getDiscountValue(),
+                    request.getDiscountStartDate(),
+                    request.getDiscountEndDate(),
+                    request.getEnrollmentLimit()
+            );
+            if (coursePricingService != null) {
+                coursePricingService.validatePricingRequest(pricingReq);
+                coursePricingService.applyPricing(course, pricingReq);
+            } else {
+                course.setPrice(request.getPrice() != null ? request.getPrice() : java.math.BigDecimal.ZERO);
+                course.setDiscountType(request.getDiscountType());
+                course.setDiscountValue(request.getDiscountValue() != null ? request.getDiscountValue() : java.math.BigDecimal.ZERO);
+                course.setDiscountStartDate(request.getDiscountStartDate());
+                course.setDiscountEndDate(request.getDiscountEndDate());
+                course.setEnrollmentLimit(request.getEnrollmentLimit());
+            }
+        }
+
         Course saved = courseRepository.save(course);
 
         // FR-I05 & FR-I59: Maintain multi-instructor ownership mapping (creator is OWNER)
@@ -432,6 +460,29 @@ public class InstructorCourseService {
             course.setLearningOutcomesList(cleanOutcomes);
         }
 
+        if (request.getPrice() != null || request.getDiscountValue() != null || request.getEnrollmentLimit() != null
+                || request.getDiscountType() != null) {
+            CoursePricingRequest pricingReq = new CoursePricingRequest(
+                    request.getPrice(),
+                    request.getDiscountType(),
+                    request.getDiscountValue(),
+                    request.getDiscountStartDate(),
+                    request.getDiscountEndDate(),
+                    request.getEnrollmentLimit()
+            );
+            if (coursePricingService != null) {
+                coursePricingService.validatePricingRequest(pricingReq);
+                coursePricingService.applyPricing(course, pricingReq);
+            } else {
+                course.setPrice(request.getPrice() != null ? request.getPrice() : java.math.BigDecimal.ZERO);
+                course.setDiscountType(request.getDiscountType());
+                course.setDiscountValue(request.getDiscountValue() != null ? request.getDiscountValue() : java.math.BigDecimal.ZERO);
+                course.setDiscountStartDate(request.getDiscountStartDate());
+                course.setDiscountEndDate(request.getDiscountEndDate());
+                course.setEnrollmentLimit(request.getEnrollmentLimit());
+            }
+        }
+
         Course saved = courseRepository.save(course);
 
         if (saved != null && courseInstructorRepository != null) {
@@ -509,6 +560,25 @@ public class InstructorCourseService {
                     persistPrerequisites(existing, request.getPrerequisites());
                 }
             }
+
+            if (request.getPrice() != null) {
+                existing.setPrice(request.getPrice());
+            }
+            if (request.getDiscountType() != null) {
+                existing.setDiscountType(request.getDiscountType());
+            }
+            if (request.getDiscountValue() != null) {
+                existing.setDiscountValue(request.getDiscountValue());
+            }
+            if (request.getDiscountStartDate() != null) {
+                existing.setDiscountStartDate(request.getDiscountStartDate());
+            }
+            if (request.getDiscountEndDate() != null) {
+                existing.setDiscountEndDate(request.getDiscountEndDate());
+            }
+            if (request.getEnrollmentLimit() != null) {
+                existing.setEnrollmentLimit(request.getEnrollmentLimit());
+            }
         }
 
         Course saved = courseRepository.save(existing);
@@ -542,8 +612,80 @@ public class InstructorCourseService {
             course.setDescription(request.getDescription());
         }
 
+        if (request.getPrice() != null || request.getDiscountType() != null || request.getDiscountValue() != null
+                || request.getDiscountStartDate() != null || request.getDiscountEndDate() != null || request.getEnrollmentLimit() != null) {
+            CoursePricingRequest pricingReq = new CoursePricingRequest(
+                    request.getPrice() != null ? request.getPrice() : course.getPrice(),
+                    request.getDiscountType() != null ? request.getDiscountType() : course.getDiscountType(),
+                    request.getDiscountValue() != null ? request.getDiscountValue() : course.getDiscountValue(),
+                    request.getDiscountStartDate() != null ? request.getDiscountStartDate() : course.getDiscountStartDate(),
+                    request.getDiscountEndDate() != null ? request.getDiscountEndDate() : course.getDiscountEndDate(),
+                    request.getEnrollmentLimit() != null ? request.getEnrollmentLimit() : course.getEnrollmentLimit()
+            );
+            if (coursePricingService != null) {
+                coursePricingService.validatePricingRequest(pricingReq);
+                coursePricingService.applyPricing(course, pricingReq);
+            } else {
+                if (request.getPrice() != null) course.setPrice(request.getPrice());
+                if (request.getDiscountType() != null) course.setDiscountType(request.getDiscountType());
+                if (request.getDiscountValue() != null) course.setDiscountValue(request.getDiscountValue());
+                if (request.getDiscountStartDate() != null) course.setDiscountStartDate(request.getDiscountStartDate());
+                if (request.getDiscountEndDate() != null) course.setDiscountEndDate(request.getDiscountEndDate());
+                if (request.getEnrollmentLimit() != null) course.setEnrollmentLimit(request.getEnrollmentLimit());
+            }
+        }
+
         Course updated = courseRepository.save(course);
         return enrichCourseResponse(updated);
+    }
+
+    /**
+     * FR-I10 — Update pricing, discount rules, and enrollment limits for an associated course.
+     */
+    @Transactional
+    public CoursePricingResponse updateCoursePricing(User currentUser, Integer courseId, CoursePricingRequest request) {
+        validateInstructor(currentUser);
+        if (coursePricingService != null) {
+            return coursePricingService.updateCoursePricing(currentUser, courseId, request);
+        }
+        Course course = findCourseAndVerifyOwnership(courseId, currentUser);
+        if (request.getPrice() != null) {
+            course.setPrice(request.getPrice());
+        }
+        course.setDiscountType(request.getDiscountType());
+        course.setDiscountValue(request.getDiscountValue() != null ? request.getDiscountValue() : java.math.BigDecimal.ZERO);
+        course.setDiscountStartDate(request.getDiscountStartDate());
+        course.setDiscountEndDate(request.getDiscountEndDate());
+        course.setEnrollmentLimit(request.getEnrollmentLimit());
+        Course saved = courseRepository.save(course);
+        CoursePricingResponse resp = new CoursePricingResponse();
+        resp.setCourseId(saved.getId());
+        resp.setCourseTitle(saved.getTitle());
+        resp.setBasePrice(saved.getPrice());
+        resp.setInstructorPrice(saved.getPrice());
+        resp.setFree(saved.isFree());
+        resp.setEnrollmentLimit(saved.getEnrollmentLimit());
+        return resp;
+    }
+
+    /**
+     * FR-I10 — Retrieve pricing, discounts, tax, and final payable amount breakdown for an associated course.
+     */
+    @Transactional(readOnly = true)
+    public CoursePricingResponse getCoursePricing(User currentUser, Integer courseId) {
+        validateInstructor(currentUser);
+        Course course = findCourseAndVerifyOwnership(courseId, currentUser);
+        if (coursePricingService != null) {
+            return coursePricingService.calculatePricing(course);
+        }
+        CoursePricingResponse resp = new CoursePricingResponse();
+        resp.setCourseId(course.getId());
+        resp.setCourseTitle(course.getTitle());
+        resp.setBasePrice(course.getPrice());
+        resp.setInstructorPrice(course.getPrice());
+        resp.setFree(course.isFree());
+        resp.setEnrollmentLimit(course.getEnrollmentLimit());
+        return resp;
     }
 
     /**

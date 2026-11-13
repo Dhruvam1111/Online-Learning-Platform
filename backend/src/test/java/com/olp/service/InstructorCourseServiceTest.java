@@ -59,6 +59,8 @@ class InstructorCourseServiceTest {
     private InstructorProfileRepository instructorProfileRepository;
     @Mock
     private EnrollmentRepository enrollmentRepository;
+    @Mock
+    private CoursePricingService coursePricingService;
 
     @InjectMocks
     private InstructorCourseService service;
@@ -1123,5 +1125,40 @@ class InstructorCourseServiceTest {
         assertThrows(AccessDeniedException.class, () -> service.getMyCourses(student(2), null, 0, 10));
         assertThrows(AccessDeniedException.class, () -> service.getMyCourses(pending, null, 0, 10));
         verifyNoInteractions(courseRepository, enrollmentRepository);
+    }
+
+    @Test
+    void testGetCoursePricing_DelegatesToPricingService() {
+        User owner = instructor(1);
+        Course course = course(10, owner);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(course));
+
+        com.olp.dto.CoursePricingResponse response = new com.olp.dto.CoursePricingResponse();
+        response.setCourseId(10);
+        response.setBasePrice(new java.math.BigDecimal("999.00"));
+        when(coursePricingService.calculatePricing(course)).thenReturn(response);
+
+        com.olp.dto.CoursePricingResponse result = service.getCoursePricing(owner, 10);
+
+        assertNotNull(result);
+        assertEquals(new java.math.BigDecimal("999.00"), result.getBasePrice());
+    }
+
+    @Test
+    void testUpdateCoursePricing_DelegatesToPricingService() {
+        User owner = instructor(1);
+        com.olp.dto.CoursePricingRequest request = new com.olp.dto.CoursePricingRequest(
+                new java.math.BigDecimal("499.00"), null, null, null, null, 50
+        );
+        com.olp.dto.CoursePricingResponse response = new com.olp.dto.CoursePricingResponse();
+        response.setCourseId(10);
+        response.setBasePrice(new java.math.BigDecimal("499.00"));
+
+        when(coursePricingService.updateCoursePricing(owner, 10, request)).thenReturn(response);
+
+        com.olp.dto.CoursePricingResponse result = service.updateCoursePricing(owner, 10, request);
+
+        assertNotNull(result);
+        assertEquals(new java.math.BigDecimal("499.00"), result.getBasePrice());
     }
 }
