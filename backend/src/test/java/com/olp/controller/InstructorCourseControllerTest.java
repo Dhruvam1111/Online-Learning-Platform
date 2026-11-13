@@ -569,7 +569,7 @@ class InstructorCourseControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("UNPUBLISHED", response.getBody().getStatus());
+        assertEquals(CourseStatus.UNPUBLISHED, response.getBody().getStatus());
         verify(instructorCourseService).unpublishCourse(currentUser, 10);
     }
 

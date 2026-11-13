@@ -121,9 +121,13 @@ public class CoursePricingService {
         BigDecimal discountedPrice = basePrice.subtract(discountAmount).max(BigDecimal.ZERO);
 
         // Tax calculation according to DR-PY03: price - discount + tax
-        BigDecimal taxRate = paymentPolicyService != null && course.getId() != null
-                ? paymentPolicyService.getTaxRateForCourse(course.getId())
-                : new BigDecimal("0.18");
+        BigDecimal taxRate = null;
+        if (paymentPolicyService != null && course.getId() != null) {
+            taxRate = paymentPolicyService.getTaxRateForCourse(course.getId());
+        }
+        if (taxRate == null) {
+            taxRate = new BigDecimal("0.18");
+        }
 
         BigDecimal taxAmount = isFree ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
                 : discountedPrice.multiply(taxRate).setScale(2, RoundingMode.HALF_UP);

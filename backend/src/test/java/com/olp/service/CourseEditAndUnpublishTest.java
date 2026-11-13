@@ -183,6 +183,8 @@ class CourseEditAndUnpublishTest {
         when(courseInstructorRepository.existsByCourseIdAndInstructorId(100, 2)).thenReturn(true);
         when(courseInstructorRepository.existsByCourseIdAndInstructorId(100, 3)).thenReturn(false);
 
+        when(paymentPolicyService.getTaxRateForCourse(anyInt())).thenReturn(new BigDecimal("0.18"));
+
         when(enrollmentRepository.existsByStudentIdAndCourseId(10, 100)).thenReturn(true);
         when(enrollmentRepository.existsByStudentIdAndCourseId(20, 100)).thenReturn(false);
     }
@@ -203,7 +205,7 @@ class CourseEditAndUnpublishTest {
 
             assertNotNull(response);
             assertEquals("Updated Spring Boot Masterclass", response.getTitle());
-            assertEquals("PUBLISHED", response.getStatus());
+            assertEquals(CourseStatus.PUBLISHED, response.getStatus());
             assertEquals(CourseStatus.PUBLISHED, publishedCourse.getStatus());
 
             // Verify audit history was recorded with COURSE_EDIT_MINOR
@@ -228,7 +230,7 @@ class CourseEditAndUnpublishTest {
 
             assertNotNull(response);
             assertEquals("Co-edited Title", response.getTitle());
-            assertEquals("PUBLISHED", response.getStatus());
+            assertEquals(CourseStatus.PUBLISHED, response.getStatus());
             verify(courseAuditRepository).save(any(CourseAudit.class));
         }
     }
@@ -249,7 +251,7 @@ class CourseEditAndUnpublishTest {
             CourseResponse response = instructorCourseService.updateCourse(owner, 100, request);
 
             assertNotNull(response);
-            assertEquals("PENDING_REVIEW", response.getStatus());
+            assertEquals(CourseStatus.PENDING_REVIEW, response.getStatus());
             assertEquals(CourseStatus.PENDING_REVIEW, publishedCourse.getStatus());
 
             // Verify submission record created for review
@@ -278,7 +280,7 @@ class CourseEditAndUnpublishTest {
             CourseResponse response = instructorCourseService.updateCourse(owner, 100, request);
 
             assertNotNull(response);
-            assertEquals("PENDING_REVIEW", response.getStatus());
+            assertEquals(CourseStatus.PENDING_REVIEW, response.getStatus());
             assertEquals(CourseStatus.PENDING_REVIEW, publishedCourse.getStatus());
             verify(courseSubmissionRepository).save(any(CourseSubmission.class));
         }
@@ -339,7 +341,7 @@ class CourseEditAndUnpublishTest {
             CourseResponse response = instructorCourseService.unpublishCourse(owner, 100);
 
             assertNotNull(response);
-            assertEquals("UNPUBLISHED", response.getStatus());
+            assertEquals(CourseStatus.UNPUBLISHED, response.getStatus());
             assertEquals(CourseStatus.UNPUBLISHED, publishedCourse.getStatus());
 
             // Verify audit record
@@ -373,7 +375,7 @@ class CourseEditAndUnpublishTest {
             CourseResponse response = instructorCourseService.updateCourseStatus(owner, 100, req);
 
             assertNotNull(response);
-            assertEquals("UNPUBLISHED", response.getStatus());
+            assertEquals(CourseStatus.UNPUBLISHED, response.getStatus());
             verify(courseAuditRepository).save(argThat(a -> "COURSE_UNPUBLISH".equals(a.getActionType())));
         }
     }
