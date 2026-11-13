@@ -1,9 +1,11 @@
 package com.olp.controller;
 
+import com.olp.dto.CoursePreviewResponse;
 import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.EnrollmentResponse;
 import com.olp.entity.User;
 import com.olp.service.CourseCatalogService;
+import com.olp.service.CoursePreviewService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +25,9 @@ class CourseControllerTest {
 
     @Mock
     private CourseCatalogService courseCatalogService;
+
+    @Mock
+    private CoursePreviewService coursePreviewService;
 
     @Mock
     private Authentication authentication;
@@ -70,6 +75,25 @@ class CourseControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertTrue(response.getBody().success());
         verify(courseCatalogService).enrollCourse(student, 101);
+    }
+
+    @Test
+    void testPreviewCourse_Returns200WithPreviewDetails() {
+        when(courseCatalogService.resolveUser(authentication)).thenReturn(student);
+        CoursePreviewResponse preview = new CoursePreviewResponse();
+        preview.setId(101);
+        preview.setTitle("Java Masterclass");
+        preview.setPreview(true);
+        preview.setReadOnly(true);
+        when(coursePreviewService.previewCourseAsStudent(student, 101)).thenReturn(preview);
+
+        ResponseEntity<CoursePreviewResponse> response = controller.previewCourse(101, authentication);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertSame(preview, response.getBody());
+        assertTrue(response.getBody().isPreview());
+        verify(coursePreviewService).previewCourseAsStudent(student, 101);
     }
 }
 

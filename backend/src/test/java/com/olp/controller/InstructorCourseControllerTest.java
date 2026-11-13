@@ -3,6 +3,7 @@ package com.olp.controller;
 import com.olp.dto.ApiResponse;
 import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseInstructorResponse;
+import com.olp.dto.CoursePreviewResponse;
 import com.olp.dto.CoursePricingRequest;
 import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.CourseResponse;
@@ -439,5 +440,29 @@ class InstructorCourseControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertSame(pricing, response.getBody());
         verify(instructorCourseService).updateCoursePricing(currentUser, 10, request);
+    }
+
+    @Test
+    void testPreviewCourse_Returns200WithPreviewDetails() {
+        givenResolvedUser();
+        CoursePreviewResponse preview = new CoursePreviewResponse();
+        preview.setId(10);
+        preview.setTitle("Spring Boot Deep Dive");
+        preview.setStatus("DRAFT");
+        preview.setPreview(true);
+        preview.setReadOnly(true);
+        preview.setCanEnroll(false);
+
+        when(instructorCourseService.previewCourseAsStudent(currentUser, 10)).thenReturn(preview);
+
+        ResponseEntity<CoursePreviewResponse> response = controller.previewCourse(authentication, 10);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertSame(preview, response.getBody());
+        assertTrue(response.getBody().isPreview());
+        assertTrue(response.getBody().isReadOnly());
+        assertFalse(response.getBody().isCanEnroll());
+        verify(instructorCourseService).previewCourseAsStudent(currentUser, 10);
     }
 }
