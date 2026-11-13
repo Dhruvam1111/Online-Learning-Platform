@@ -21,14 +21,12 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -156,7 +154,8 @@ class ContentDeclarationServiceTest {
 
         when(courseRepository.findById(100)).thenReturn(Optional.of(course));
         when(courseInstructorRepository.existsByCourseIdAndInstructorId(100, 11)).thenReturn(true);
-        when(declarationRepository.save(any(ContentDeclaration.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(declarationRepository.save(any(ContentDeclaration.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ContentDeclarationResponse response = declarationService.declareContent(coInstructor, request);
         assertNotNull(response);
@@ -170,7 +169,8 @@ class ContentDeclarationServiceTest {
         request.setDeclarationText("Admin verified public domain content.");
 
         when(courseRepository.findById(100)).thenReturn(Optional.of(course));
-        when(declarationRepository.save(any(ContentDeclaration.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(declarationRepository.save(any(ContentDeclaration.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ContentDeclarationResponse response = declarationService.declareContent(admin, request);
         assertNotNull(response);
@@ -249,7 +249,8 @@ class ContentDeclarationServiceTest {
 
     @Test
     void testGetDeclarationsByCourse_Success() {
-        ContentDeclaration cd = new ContentDeclaration(course, null, instructor, "Text", LicenseType.ORIGINAL_CREATOR, null);
+        ContentDeclaration cd = new ContentDeclaration(course, null, instructor, "Text", LicenseType.ORIGINAL_CREATOR,
+                null);
         cd.setId(1);
 
         when(courseRepository.findById(100)).thenReturn(Optional.of(course));
@@ -262,7 +263,8 @@ class ContentDeclarationServiceTest {
 
     @Test
     void testGetDeclarationByLesson_Success_DirectLesson() {
-        ContentDeclaration cd = new ContentDeclaration(course, lesson, instructor, "Text", LicenseType.ORIGINAL_CREATOR, null);
+        ContentDeclaration cd = new ContentDeclaration(course, lesson, instructor, "Text", LicenseType.ORIGINAL_CREATOR,
+                null);
         cd.setId(10);
 
         when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
@@ -276,13 +278,15 @@ class ContentDeclarationServiceTest {
 
     @Test
     void testGetDeclarationByLesson_Success_FallbackCourse() {
-        ContentDeclaration cd = new ContentDeclaration(course, null, instructor, "Text", LicenseType.ORIGINAL_CREATOR, null);
+        ContentDeclaration cd = new ContentDeclaration(course, null, instructor, "Text", LicenseType.ORIGINAL_CREATOR,
+                null);
         cd.setId(11);
 
         when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
         when(courseRepository.findById(100)).thenReturn(Optional.of(course));
         when(declarationRepository.findFirstByLessonIdOrderByDeclaredAtDesc(400)).thenReturn(Optional.empty());
-        when(declarationRepository.findFirstByCourseIdAndLessonIsNullOrderByDeclaredAtDesc(100)).thenReturn(Optional.of(cd));
+        when(declarationRepository.findFirstByCourseIdAndLessonIsNullOrderByDeclaredAtDesc(100))
+                .thenReturn(Optional.of(cd));
 
         ContentDeclarationResponse response = declarationService.getDeclarationByLesson(400, instructor);
         assertNotNull(response);
@@ -294,14 +298,16 @@ class ContentDeclarationServiceTest {
         when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
         when(courseRepository.findById(100)).thenReturn(Optional.of(course));
         when(declarationRepository.findFirstByLessonIdOrderByDeclaredAtDesc(400)).thenReturn(Optional.empty());
-        when(declarationRepository.findFirstByCourseIdAndLessonIsNullOrderByDeclaredAtDesc(100)).thenReturn(Optional.empty());
+        when(declarationRepository.findFirstByCourseIdAndLessonIsNullOrderByDeclaredAtDesc(100))
+                .thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> declarationService.getDeclarationByLesson(400, instructor));
     }
 
     @Test
     void testGetDeclarationById_Success() {
-        ContentDeclaration cd = new ContentDeclaration(course, null, instructor, "Text", LicenseType.ORIGINAL_CREATOR, null);
+        ContentDeclaration cd = new ContentDeclaration(course, null, instructor, "Text", LicenseType.ORIGINAL_CREATOR,
+                null);
         cd.setId(1);
 
         when(declarationRepository.findById(1)).thenReturn(Optional.of(cd));
@@ -313,7 +319,8 @@ class ContentDeclarationServiceTest {
 
     @Test
     void testRespondToTakedown_Success() {
-        ContentDeclaration cd = new ContentDeclaration(course, null, instructor, "Text", LicenseType.ORIGINAL_CREATOR, null);
+        ContentDeclaration cd = new ContentDeclaration(course, null, instructor, "Text", LicenseType.ORIGINAL_CREATOR,
+                null);
         cd.setId(1);
         cd.setTakedownStatus(TakedownStatus.FLAGGED);
 
@@ -321,7 +328,8 @@ class ContentDeclarationServiceTest {
         req.setResponse("We hold explicit license from the publisher.");
 
         when(declarationRepository.findById(1)).thenReturn(Optional.of(cd));
-        when(declarationRepository.save(any(ContentDeclaration.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(declarationRepository.save(any(ContentDeclaration.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ContentDeclarationResponse response = declarationService.respondToTakedown(1, instructor, req);
         assertEquals(TakedownStatus.RESPONDED, response.getTakedownStatus());
@@ -331,7 +339,8 @@ class ContentDeclarationServiceTest {
 
     @Test
     void testRespondToTakedown_Fails_IfNotFlagged() {
-        ContentDeclaration cd = new ContentDeclaration(course, null, instructor, "Text", LicenseType.ORIGINAL_CREATOR, null);
+        ContentDeclaration cd = new ContentDeclaration(course, null, instructor, "Text", LicenseType.ORIGINAL_CREATOR,
+                null);
         cd.setId(1);
         cd.setTakedownStatus(TakedownStatus.NONE);
 
@@ -345,12 +354,14 @@ class ContentDeclarationServiceTest {
 
     @Test
     void testRemoveContent_Success() {
-        ContentDeclaration cd = new ContentDeclaration(course, null, instructor, "Text", LicenseType.ORIGINAL_CREATOR, null);
+        ContentDeclaration cd = new ContentDeclaration(course, null, instructor, "Text", LicenseType.ORIGINAL_CREATOR,
+                null);
         cd.setId(1);
         cd.setTakedownStatus(TakedownStatus.FLAGGED);
 
         when(declarationRepository.findById(1)).thenReturn(Optional.of(cd));
-        when(declarationRepository.save(any(ContentDeclaration.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(declarationRepository.save(any(ContentDeclaration.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ContentDeclarationResponse response = declarationService.removeContent(1, instructor);
         assertEquals(TakedownStatus.REMOVED, response.getTakedownStatus());
@@ -359,7 +370,8 @@ class ContentDeclarationServiceTest {
 
     @Test
     void testRemoveContent_Fails_IfInvalidState() {
-        ContentDeclaration cd = new ContentDeclaration(course, null, instructor, "Text", LicenseType.ORIGINAL_CREATOR, null);
+        ContentDeclaration cd = new ContentDeclaration(course, null, instructor, "Text", LicenseType.ORIGINAL_CREATOR,
+                null);
         cd.setId(1);
         cd.setTakedownStatus(TakedownStatus.NONE);
 
@@ -370,7 +382,8 @@ class ContentDeclarationServiceTest {
 
     @Test
     void testReplaceContent_Success() {
-        ContentDeclaration cd = new ContentDeclaration(course, null, instructor, "Text", LicenseType.ORIGINAL_CREATOR, null);
+        ContentDeclaration cd = new ContentDeclaration(course, null, instructor, "Text", LicenseType.ORIGINAL_CREATOR,
+                null);
         cd.setId(1);
         cd.setTakedownStatus(TakedownStatus.RESPONDED);
 
@@ -378,7 +391,8 @@ class ContentDeclarationServiceTest {
         req.setSourceAttribution("https://new-license.org/terms");
 
         when(declarationRepository.findById(1)).thenReturn(Optional.of(cd));
-        when(declarationRepository.save(any(ContentDeclaration.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(declarationRepository.save(any(ContentDeclaration.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ContentDeclarationResponse response = declarationService.replaceContent(1, instructor, req);
         assertEquals(TakedownStatus.REPLACED, response.getTakedownStatus());
@@ -409,9 +423,11 @@ class ContentDeclarationServiceTest {
     void testAssertDeclared_Throws_WhenNotDeclared() {
         when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
         when(declarationRepository.existsByLessonIdAndTakedownStatusNot(400, TakedownStatus.REMOVED)).thenReturn(false);
-        when(declarationRepository.existsByCourseIdAndLessonIsNullAndTakedownStatusNot(100, TakedownStatus.REMOVED)).thenReturn(false);
+        when(declarationRepository.existsByCourseIdAndLessonIsNullAndTakedownStatusNot(100, TakedownStatus.REMOVED))
+                .thenReturn(false);
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> declarationService.assertDeclared(400));
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> declarationService.assertDeclared(400));
         assertTrue(ex.getMessage().contains("Content upload blocked"));
     }
 
@@ -441,4 +457,3 @@ class ContentDeclarationServiceTest {
         assertThrows(AccessDeniedException.class, () -> declarationService.resolveUser(null));
     }
 }
-

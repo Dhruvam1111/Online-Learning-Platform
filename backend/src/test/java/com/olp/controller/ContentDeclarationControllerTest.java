@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -82,7 +81,8 @@ class ContentDeclarationControllerTest {
         when(declarationService.resolveUser(authentication)).thenReturn(instructor);
         when(declarationService.getDeclarationsByCourse(100, instructor)).thenReturn(List.of(resp));
 
-        ResponseEntity<List<ContentDeclarationResponse>> response = controller.getDeclarationsByCourse(100, authentication);
+        ResponseEntity<List<ContentDeclarationResponse>> response = controller.getDeclarationsByCourse(100,
+                authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -183,4 +183,3 @@ class ContentDeclarationControllerTest {
         assertTrue((Boolean) response.getBody().get("declared"));
     }
 }
-

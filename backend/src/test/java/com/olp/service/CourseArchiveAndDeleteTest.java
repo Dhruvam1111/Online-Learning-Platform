@@ -16,7 +16,6 @@ import org.mockito.quality.Strictness;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -24,30 +23,49 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Comprehensive Unit and Integration Test Suite for FR-I12: Archive or Delete Course.
- * Validates course archiving, catalog hiding, enrolled student access preservation,
- * certificate retention, soft-deletion constraints under DR-ED09, and audit history.
+ * Comprehensive Unit and Integration Test Suite for FR-I12: Archive or Delete
+ * Course.
+ * Validates course archiving, catalog hiding, enrolled student access
+ * preservation,
+ * certificate retention, soft-deletion constraints under DR-ED09, and audit
+ * history.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class CourseArchiveAndDeleteTest {
 
-    @Mock private CourseRepository courseRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private CourseInstructorRepository courseInstructorRepository;
-    @Mock private CoursePrerequisiteRepository coursePrerequisiteRepository;
-    @Mock private InstructorProfileRepository instructorProfileRepository;
-    @Mock private EnrollmentRepository enrollmentRepository;
-    @Mock private LectureRepository lectureRepository;
-    @Mock private ReviewRepository reviewRepository;
-    @Mock private BookmarkRepository bookmarkRepository;
-    @Mock private CertificateRepository certificateRepository;
-    @Mock private CourseAuditRepository courseAuditRepository;
-    @Mock private CourseSubmissionRepository courseSubmissionRepository;
-    @Mock private CourseModuleRepository courseModuleRepository;
-    @Mock private CourseSectionRepository courseSectionRepository;
-    @Mock private LessonRepository lessonRepository;
-    @Mock private PaymentPolicyService paymentPolicyService;
+    @Mock
+    private CourseRepository courseRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private CourseInstructorRepository courseInstructorRepository;
+    @Mock
+    private CoursePrerequisiteRepository coursePrerequisiteRepository;
+    @Mock
+    private InstructorProfileRepository instructorProfileRepository;
+    @Mock
+    private EnrollmentRepository enrollmentRepository;
+    @Mock
+    private LectureRepository lectureRepository;
+    @Mock
+    private ReviewRepository reviewRepository;
+    @Mock
+    private BookmarkRepository bookmarkRepository;
+    @Mock
+    private CertificateRepository certificateRepository;
+    @Mock
+    private CourseAuditRepository courseAuditRepository;
+    @Mock
+    private CourseSubmissionRepository courseSubmissionRepository;
+    @Mock
+    private CourseModuleRepository courseModuleRepository;
+    @Mock
+    private CourseSectionRepository courseSectionRepository;
+    @Mock
+    private LessonRepository lessonRepository;
+    @Mock
+    private PaymentPolicyService paymentPolicyService;
 
     private CourseAuditService courseAuditService;
     private CoursePricingService coursePricingService;
@@ -81,7 +99,8 @@ class CourseArchiveAndDeleteTest {
         unenrolledStudent = new User("Unenrolled Student", "otherstudent@olp.com", "hash", "student", "active");
         unenrolledStudent.setId(20);
 
-        publishedCourse = new Course(owner, "Cloud Architecture", "Comprehensive cloud design course", CourseStatus.PUBLISHED);
+        publishedCourse = new Course(owner, "Cloud Architecture", "Comprehensive cloud design course",
+                CourseStatus.PUBLISHED);
         publishedCourse.setId(101);
         publishedCourse.setPrice(new BigDecimal("2999.00"));
         publishedCourse.setEnrollmentLimit(100);
@@ -98,15 +117,13 @@ class CourseArchiveAndDeleteTest {
                 lessonRepository,
                 lectureRepository,
                 courseInstructorRepository,
-                userRepository
-        );
+                userRepository);
 
         // CourseAuditService
         courseAuditService = new CourseAuditService(
                 courseAuditRepository,
                 courseRepository,
-                courseInstructorRepository
-        );
+                courseInstructorRepository);
 
         // CoursePricingService
         coursePricingService = new CoursePricingService(
@@ -115,8 +132,7 @@ class CourseArchiveAndDeleteTest {
                 courseInstructorRepository,
                 paymentPolicyService,
                 courseSubmissionService,
-                courseAuditService
-        );
+                courseAuditService);
 
         // InstructorCourseService
         instructorCourseService = new InstructorCourseService(
@@ -131,8 +147,7 @@ class CourseArchiveAndDeleteTest {
                 courseSubmissionService,
                 courseAuditService,
                 courseAuditRepository,
-                certificateRepository
-        );
+                certificateRepository);
 
         // CourseCatalogService
         courseCatalogService = new CourseCatalogService(
@@ -145,20 +160,22 @@ class CourseArchiveAndDeleteTest {
                 courseInstructorRepository,
                 instructorProfileRepository,
                 coursePricingService,
-                certificateRepository
-        );
+                certificateRepository);
 
         // Default mock behaviors
         when(courseRepository.findById(101)).thenReturn(Optional.of(publishedCourse));
         when(courseRepository.findById(102)).thenReturn(Optional.of(draftCourse));
         when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        when(courseInstructorRepository.existsByCourseIdAndInstructorIdAndRole(101, 1, CourseInstructorRole.OWNER)).thenReturn(true);
-        when(courseInstructorRepository.existsByCourseIdAndInstructorIdAndRole(101, 2, CourseInstructorRole.OWNER)).thenReturn(false);
+        when(courseInstructorRepository.existsByCourseIdAndInstructorIdAndRole(101, 1, CourseInstructorRole.OWNER))
+                .thenReturn(true);
+        when(courseInstructorRepository.existsByCourseIdAndInstructorIdAndRole(101, 2, CourseInstructorRole.OWNER))
+                .thenReturn(false);
         when(courseInstructorRepository.existsByCourseIdAndInstructorId(101, 2)).thenReturn(true);
 
         when(courseInstructorRepository.existsByCourseIdAndInstructorId(101, 3)).thenReturn(false);
-        when(courseInstructorRepository.existsByCourseIdAndInstructorIdAndRole(101, 3, CourseInstructorRole.OWNER)).thenReturn(false);
+        when(courseInstructorRepository.existsByCourseIdAndInstructorIdAndRole(101, 3, CourseInstructorRole.OWNER))
+                .thenReturn(false);
 
         when(enrollmentRepository.existsByStudentIdAndCourseId(10, 101)).thenReturn(true);
         when(enrollmentRepository.existsByStudentIdAndCourseId(20, 101)).thenReturn(false);
@@ -239,7 +256,8 @@ class CourseArchiveAndDeleteTest {
         void testArchivedCourse_EnrolledStudentRetainsAccess() {
             publishedCourse.setStatus(CourseStatus.ARCHIVED);
 
-            Lecture lecture = new Lecture(publishedCourse, "Cloud Virtual Networks", "https://youtube.com/watch?v=vnet123", 1);
+            Lecture lecture = new Lecture(publishedCourse, "Cloud Virtual Networks",
+                    "https://youtube.com/watch?v=vnet123", 1);
             lecture.setId(501);
             when(lectureRepository.findByCourseIdOrderByOrderIndexAsc(101)).thenReturn(List.of(lecture));
 
@@ -433,4 +451,3 @@ class CourseArchiveAndDeleteTest {
         }
     }
 }
-

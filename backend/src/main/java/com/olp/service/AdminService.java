@@ -7,7 +7,6 @@ import com.olp.dto.PageResponse;
 import com.olp.dto.RejectCourseRequest;
 import com.olp.entity.Course;
 import com.olp.entity.CourseStatus;
-import com.olp.entity.CourseSubmission;
 import com.olp.entity.User;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.CourseRepository;
@@ -48,7 +47,8 @@ public class AdminService {
     }
 
     /**
-     * Get all users with optional filtering by role, account status, and search keyword.
+     * Get all users with optional filtering by role, account status, and search
+     * keyword.
      * FR-A02: Account and Access Management
      */
     @Transactional(readOnly = true)
@@ -197,7 +197,8 @@ public class AdminService {
     }
 
     /**
-     * List all courses currently awaiting admin approval (status = 'pending_review').
+     * List all courses currently awaiting admin approval (status =
+     * 'pending_review').
      * FR-A06: Review submitted courses prior to publishing
      */
     @Transactional(readOnly = true)
@@ -236,8 +237,7 @@ public class AdminService {
                     course.getInstructor().getName(),
                     course.getTitle(),
                     "APPROVED",
-                    null
-            );
+                    null);
         }
 
         return toAdminCourseResponse(course);
@@ -274,16 +274,17 @@ public class AdminService {
                     course.getInstructor().getName(),
                     course.getTitle(),
                     "REJECTED",
-                    reason
-            );
+                    reason);
         }
 
         return toAdminCourseResponse(course);
     }
 
     /**
-     * Request changes on a submitted course with actionable feedback for the instructor.
-     * Transitions status to CHANGES_REQUESTED, records review feedback, updates latest submission,
+     * Request changes on a submitted course with actionable feedback for the
+     * instructor.
+     * Transitions status to CHANGES_REQUESTED, records review feedback, updates
+     * latest submission,
      * and notifies the instructor via email (FR-I71).
      */
     @Transactional
@@ -316,8 +317,7 @@ public class AdminService {
                     course.getInstructor().getName(),
                     course.getTitle(),
                     "CHANGES_REQUESTED",
-                    feedback
-            );
+                    feedback);
         }
 
         return toAdminCourseResponse(course);
@@ -336,7 +336,8 @@ public class AdminService {
     }
 
     /**
-     * Permanently remove a course from the platform (cascades lectures & enrollments).
+     * Permanently remove a course from the platform (cascades lectures &
+     * enrollments).
      * FR-A08: Remove a live course
      */
     @Transactional
@@ -364,8 +365,7 @@ public class AdminService {
                 user.getEmail(),
                 user.getRole(),
                 user.getAccountStatus(),
-                user.getCreatedAt()
-        );
+                user.getCreatedAt());
     }
 
     private AdminCourseResponse toAdminCourseResponse(Course course) {
@@ -379,7 +379,6 @@ public class AdminService {
                 instructor != null ? instructor.getEmail() : null,
                 course.getStatus() != null ? course.getStatus().name().toLowerCase() : null,
                 course.getRejectionReason(),
-                course.getCreatedAt()
-        );
+                course.getCreatedAt());
     }
 }

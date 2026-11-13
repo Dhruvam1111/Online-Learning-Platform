@@ -3,7 +3,6 @@ package com.olp.controller;
 import com.olp.dto.QuizAttemptResponse;
 import com.olp.dto.QuizEvaluationSummary;
 import com.olp.dto.QuizSettingsResponse;
-import com.olp.dto.QuizSubmissionRequest;
 import com.olp.entity.User;
 import com.olp.service.QuizAttemptService;
 import org.junit.jupiter.api.BeforeEach;
@@ -87,4 +86,3 @@ class StudentQuizControllerTest {
         assertSame(evalSummary, controller.getAttemptEvaluation(10, 55, authentication).getBody());
     }
 }
-

@@ -11,7 +11,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -27,27 +26,43 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Comprehensive Unit and Integration Test Suite for FR-I56: Certificate Completion Criteria.
- * Tests completion rule configuration, reusable evaluation engine (evaluate(student, course)),
- * rule immutability lock after certificate issuance, and prerequisite checks (DR-03).
+ * Comprehensive Unit and Integration Test Suite for FR-I56: Certificate
+ * Completion Criteria.
+ * Tests completion rule configuration, reusable evaluation engine
+ * (evaluate(student, course)),
+ * rule immutability lock after certificate issuance, and prerequisite checks
+ * (DR-03).
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class CourseCompletionServiceTest {
 
-    @Mock private CourseRepository courseRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private CourseCompletionCriteriaRepository completionCriteriaRepository;
-    @Mock private CertificateRepository certificateRepository;
-    @Mock private EnrollmentRepository enrollmentRepository;
-    @Mock private LessonRepository lessonRepository;
-    @Mock private LessonProgressRepository lessonProgressRepository;
-    @Mock private LectureRepository lectureRepository;
-    @Mock private LectureProgressRepository lectureProgressRepository;
-    @Mock private QuizRepository quizRepository;
-    @Mock private QuizAttemptRepository quizAttemptRepository;
-    @Mock private CourseInstructorRepository courseInstructorRepository;
-    @Mock private CourseAuditService courseAuditService;
+    @Mock
+    private CourseRepository courseRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private CourseCompletionCriteriaRepository completionCriteriaRepository;
+    @Mock
+    private CertificateRepository certificateRepository;
+    @Mock
+    private EnrollmentRepository enrollmentRepository;
+    @Mock
+    private LessonRepository lessonRepository;
+    @Mock
+    private LessonProgressRepository lessonProgressRepository;
+    @Mock
+    private LectureRepository lectureRepository;
+    @Mock
+    private LectureProgressRepository lectureProgressRepository;
+    @Mock
+    private QuizRepository quizRepository;
+    @Mock
+    private QuizAttemptRepository quizAttemptRepository;
+    @Mock
+    private CourseInstructorRepository courseInstructorRepository;
+    @Mock
+    private CourseAuditService courseAuditService;
 
     private CourseCompletionService service;
 
@@ -84,7 +99,8 @@ class CourseCompletionServiceTest {
         lecture2 = new Lecture(course, "Spring Boot Security", "https://youtube.com/watch?v=222", 2);
         lecture2.setId(202);
 
-        quiz1 = new Quiz(course, null, null, owner, "Midterm Assessment", "Comprehensive quiz", "Answer all", QuizStatus.PUBLISHED);
+        quiz1 = new Quiz(course, null, null, owner, "Midterm Assessment", "Comprehensive quiz", "Answer all",
+                QuizStatus.PUBLISHED);
         quiz1.setId(301);
         quiz1.setTotalMarks(BigDecimal.valueOf(100));
         quiz1.setPassingMarks(BigDecimal.valueOf(70));
@@ -102,8 +118,7 @@ class CourseCompletionServiceTest {
                 quizRepository,
                 quizAttemptRepository,
                 courseInstructorRepository,
-                courseAuditService
-        );
+                courseAuditService);
 
         when(courseRepository.findById(100)).thenReturn(Optional.of(course));
         when(userRepository.findById(10)).thenReturn(Optional.of(student));
@@ -111,7 +126,8 @@ class CourseCompletionServiceTest {
         when(courseInstructorRepository.existsByCourseIdAndInstructorId(100, 3)).thenReturn(false);
         when(enrollmentRepository.existsByStudentIdAndCourseId(10, 100)).thenReturn(true);
         when(lectureRepository.findByCourseIdOrderByOrderIndexAsc(100)).thenReturn(List.of(lecture1, lecture2));
-        when(quizRepository.findByCourseIdAndStatusOrderByCreatedAtDesc(100, QuizStatus.PUBLISHED)).thenReturn(List.of(quiz1));
+        when(quizRepository.findByCourseIdAndStatusOrderByCreatedAtDesc(100, QuizStatus.PUBLISHED))
+                .thenReturn(List.of(quiz1));
         when(quizRepository.findByCourseIdOrderByCreatedAtDesc(100)).thenReturn(List.of(quiz1));
     }
 
@@ -144,7 +160,8 @@ class CourseCompletionServiceTest {
             assertFalse(response.isLocked());
 
             verify(completionCriteriaRepository).save(any(CourseCompletionCriteria.class));
-            verify(courseAuditService).recordAudit(eq(course), eq(owner), eq("COURSE_COMPLETION_CRITERIA_UPDATE"), anyString(), anyMap(), anyMap());
+            verify(courseAuditService).recordAudit(eq(course), eq(owner), eq("COURSE_COMPLETION_CRITERIA_UPDATE"),
+                    anyString(), anyMap(), anyMap());
         }
 
         @Test
@@ -230,7 +247,8 @@ class CourseCompletionServiceTest {
             when(completionCriteriaRepository.findByCourseId(100)).thenReturn(Optional.of(criteria));
 
             // Student completed only 1 of 2 lectures (50%)
-            when(lectureProgressRepository.countCompletedByStudentIdAndLectureIds(eq(10), anyCollection())).thenReturn(1L);
+            when(lectureProgressRepository.countCompletedByStudentIdAndLectureIds(eq(10), anyCollection()))
+                    .thenReturn(1L);
 
             CompletionEvaluationResult result = service.evaluate(student, course);
 
@@ -250,8 +268,10 @@ class CourseCompletionServiceTest {
             when(completionCriteriaRepository.findByCourseId(100)).thenReturn(Optional.of(criteria));
 
             // Student completed lecture1 (201) but not lecture2 (202)
-            when(lectureProgressRepository.countCompletedByStudentIdAndLectureIds(eq(10), anyCollection())).thenReturn(1L);
-            when(lectureProgressRepository.findCompletedLectureIdsByStudentId(eq(10), anyCollection())).thenReturn(List.of(201));
+            when(lectureProgressRepository.countCompletedByStudentIdAndLectureIds(eq(10), anyCollection()))
+                    .thenReturn(1L);
+            when(lectureProgressRepository.findCompletedLectureIdsByStudentId(eq(10), anyCollection()))
+                    .thenReturn(List.of(201));
 
             CompletionEvaluationResult result = service.evaluate(student, course);
 
@@ -270,11 +290,13 @@ class CourseCompletionServiceTest {
             criteria.setMinQuizPassingMarks(BigDecimal.valueOf(80.0));
             when(completionCriteriaRepository.findByCourseId(100)).thenReturn(Optional.of(criteria));
 
-            QuizAttempt attempt = new QuizAttempt(quiz1, student, 1, LocalDateTime.now(), LocalDateTime.now().plusHours(1));
+            QuizAttempt attempt = new QuizAttempt(quiz1, student, 1, LocalDateTime.now(),
+                    LocalDateTime.now().plusHours(1));
             attempt.setStatus(QuizAttemptStatus.SUBMITTED);
             attempt.setObtainedMarks(BigDecimal.valueOf(72.0)); // < 80.0
 
-            when(quizAttemptRepository.findByQuizIdAndStudentIdAndStatusOrderByAttemptNumberDesc(eq(301), eq(10), eq(QuizAttemptStatus.SUBMITTED)))
+            when(quizAttemptRepository.findByQuizIdAndStudentIdAndStatusOrderByAttemptNumberDesc(eq(301), eq(10),
+                    eq(QuizAttemptStatus.SUBMITTED)))
                     .thenReturn(List.of(attempt));
 
             CompletionEvaluationResult result = service.evaluate(student, course);
@@ -295,15 +317,19 @@ class CourseCompletionServiceTest {
             when(completionCriteriaRepository.findByCourseId(100)).thenReturn(Optional.of(criteria));
 
             // Completed both lectures
-            when(lectureProgressRepository.countCompletedByStudentIdAndLectureIds(eq(10), anyCollection())).thenReturn(2L);
-            when(lectureProgressRepository.findCompletedLectureIdsByStudentId(eq(10), anyCollection())).thenReturn(List.of(201, 202));
+            when(lectureProgressRepository.countCompletedByStudentIdAndLectureIds(eq(10), anyCollection()))
+                    .thenReturn(2L);
+            when(lectureProgressRepository.findCompletedLectureIdsByStudentId(eq(10), anyCollection()))
+                    .thenReturn(List.of(201, 202));
 
             // Passed quiz with score 85.0 >= 70.0
-            QuizAttempt attempt = new QuizAttempt(quiz1, student, 1, LocalDateTime.now(), LocalDateTime.now().plusHours(1));
+            QuizAttempt attempt = new QuizAttempt(quiz1, student, 1, LocalDateTime.now(),
+                    LocalDateTime.now().plusHours(1));
             attempt.setStatus(QuizAttemptStatus.SUBMITTED);
             attempt.setObtainedMarks(BigDecimal.valueOf(85.0));
 
-            when(quizAttemptRepository.findByQuizIdAndStudentIdAndStatusOrderByAttemptNumberDesc(eq(301), eq(10), eq(QuizAttemptStatus.SUBMITTED)))
+            when(quizAttemptRepository.findByQuizIdAndStudentIdAndStatusOrderByAttemptNumberDesc(eq(301), eq(10),
+                    eq(QuizAttemptStatus.SUBMITTED)))
                     .thenReturn(List.of(attempt));
 
             CompletionEvaluationResult result = service.evaluate(student, course);
@@ -327,7 +353,8 @@ class CourseCompletionServiceTest {
         @DisplayName("Issuing certificate fails with IllegalStateException when criteria are unmet")
         void testIssueCertificate_UnmetCriteria_ThrowsIllegalState() {
             // No lectures completed
-            when(lectureProgressRepository.countCompletedByStudentIdAndLectureIds(eq(10), anyCollection())).thenReturn(0L);
+            when(lectureProgressRepository.countCompletedByStudentIdAndLectureIds(eq(10), anyCollection()))
+                    .thenReturn(0L);
 
             IllegalStateException ex = assertThrows(IllegalStateException.class,
                     () -> service.issueCertificate(student, course));
@@ -342,13 +369,17 @@ class CourseCompletionServiceTest {
             criteria.setMinLessonCompletionPercentage(BigDecimal.valueOf(100.0));
             when(completionCriteriaRepository.findByCourseId(100)).thenReturn(Optional.of(criteria));
 
-            when(lectureProgressRepository.countCompletedByStudentIdAndLectureIds(eq(10), anyCollection())).thenReturn(2L);
-            when(lectureProgressRepository.findCompletedLectureIdsByStudentId(eq(10), anyCollection())).thenReturn(List.of(201, 202));
+            when(lectureProgressRepository.countCompletedByStudentIdAndLectureIds(eq(10), anyCollection()))
+                    .thenReturn(2L);
+            when(lectureProgressRepository.findCompletedLectureIdsByStudentId(eq(10), anyCollection()))
+                    .thenReturn(List.of(201, 202));
 
-            QuizAttempt attempt = new QuizAttempt(quiz1, student, 1, LocalDateTime.now(), LocalDateTime.now().plusHours(1));
+            QuizAttempt attempt = new QuizAttempt(quiz1, student, 1, LocalDateTime.now(),
+                    LocalDateTime.now().plusHours(1));
             attempt.setStatus(QuizAttemptStatus.SUBMITTED);
             attempt.setObtainedMarks(BigDecimal.valueOf(90.0));
-            when(quizAttemptRepository.findByQuizIdAndStudentIdAndStatusOrderByAttemptNumberDesc(eq(301), eq(10), eq(QuizAttemptStatus.SUBMITTED)))
+            when(quizAttemptRepository.findByQuizIdAndStudentIdAndStatusOrderByAttemptNumberDesc(eq(301), eq(10),
+                    eq(QuizAttemptStatus.SUBMITTED)))
                     .thenReturn(List.of(attempt));
 
             when(certificateRepository.findByCourseId(100)).thenReturn(Collections.emptyList());
@@ -365,7 +396,8 @@ class CourseCompletionServiceTest {
             assertTrue(criteria.isLocked(), "Completion criteria must lock after first certificate issuance (DR-03)");
             verify(completionCriteriaRepository).save(criteria);
             verify(certificateRepository).save(any(Certificate.class));
-            verify(courseAuditService).recordAudit(eq(course), eq(student), eq("CERTIFICATE_ISSUED"), anyString(), anyMap(), anyMap());
+            verify(courseAuditService).recordAudit(eq(course), eq(student), eq("CERTIFICATE_ISSUED"), anyString(),
+                    anyMap(), anyMap());
         }
     }
 }

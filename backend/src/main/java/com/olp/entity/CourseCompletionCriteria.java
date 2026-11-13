@@ -3,14 +3,14 @@ package com.olp.entity;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Entity storing certificate completion rules and criteria per course (FR-I56, DR-03).
+ * Entity storing certificate completion rules and criteria per course (FR-I56,
+ * DR-03).
  * Supports minimum lesson completion percentage, quiz/exam passing marks,
  * and mandatory curriculum components (lessons, quizzes).
  */
@@ -53,7 +53,8 @@ public class CourseCompletionCriteria {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public CourseCompletionCriteria() {}
+    public CourseCompletionCriteria() {
+    }
 
     public CourseCompletionCriteria(Course course) {
         this.course = course;

@@ -17,7 +17,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -32,25 +31,26 @@ public class CourseAuditService {
     private final CourseInstructorRepository courseInstructorRepository;
 
     public CourseAuditService(CourseAuditRepository courseAuditRepository,
-                              CourseRepository courseRepository) {
+            CourseRepository courseRepository) {
         this(courseAuditRepository, courseRepository, null);
     }
 
     @Autowired
     public CourseAuditService(CourseAuditRepository courseAuditRepository,
-                              CourseRepository courseRepository,
-                              @Autowired(required = false) CourseInstructorRepository courseInstructorRepository) {
+            CourseRepository courseRepository,
+            @Autowired(required = false) CourseInstructorRepository courseInstructorRepository) {
         this.courseAuditRepository = courseAuditRepository;
         this.courseRepository = courseRepository;
         this.courseInstructorRepository = courseInstructorRepository;
     }
 
     /**
-     * Record an audit event tracking course modification, unpublishing, or status transitions (FR-I09).
+     * Record an audit event tracking course modification, unpublishing, or status
+     * transitions (FR-I09).
      */
     @Transactional
     public CourseAudit recordAudit(Course course, User actor, String actionType,
-                                   String changedFields, String previousValues, String newValues) {
+            String changedFields, String previousValues, String newValues) {
         if (course == null) {
             throw new IllegalArgumentException("Course cannot be null when recording audit");
         }
@@ -67,8 +67,7 @@ public class CourseAuditService {
                 actionType.trim(),
                 changedFields,
                 previousValues,
-                newValues
-        );
+                newValues);
         return courseAuditRepository.save(audit);
     }
 
@@ -77,14 +76,15 @@ public class CourseAuditService {
      */
     @Transactional
     public CourseAudit recordAudit(Course course, User actor, String actionType,
-                                   String changedFields, Map<String, ?> prevMap, Map<String, ?> newMap) {
+            String changedFields, Map<String, ?> prevMap, Map<String, ?> newMap) {
         String prevJson = toJson(prevMap);
         String newJson = toJson(newMap);
         return recordAudit(course, actor, actionType, changedFields, prevJson, newJson);
     }
 
     /**
-     * Retrieve audit history for a course, ensuring caller is an associated instructor or administrator.
+     * Retrieve audit history for a course, ensuring caller is an associated
+     * instructor or administrator.
      */
     @Transactional(readOnly = true)
     public List<CourseAuditResponse> getAuditsForCourse(User currentUser, @NonNull Integer courseId) {
@@ -114,7 +114,8 @@ public class CourseAuditService {
                 && courseInstructorRepository.existsByCourseIdAndInstructorId(course.getId(), currentUser.getId());
 
         if (!isAdmin && !isOwner && !isCoInstructor) {
-            throw new AccessDeniedException("Access denied: only course instructors or administrators can view course audits");
+            throw new AccessDeniedException(
+                    "Access denied: only course instructors or administrators can view course audits");
         }
     }
 
@@ -129,4 +130,3 @@ public class CourseAuditService {
         }
     }
 }
-
