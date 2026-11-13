@@ -4,6 +4,7 @@
 -- ============================================================
 
 -- Clean slate (safe to re-run during development)
+DROP TABLE IF EXISTS quiz_attempt_answers CASCADE;
 DROP TABLE IF EXISTS quiz_attempts CASCADE;
 DROP TABLE IF EXISTS quiz_questions CASCADE;
 DROP TABLE IF EXISTS questions CASCADE;
@@ -681,4 +682,35 @@ CREATE TABLE quiz_attempts (
 
     CONSTRAINT chk_quiz_attempt_number
         CHECK (attempt_number >= 1)
+);
+
+-- FR-I22: Persistent evaluated answers and marking records for quiz attempts
+CREATE TABLE quiz_attempt_answers (
+    id                SERIAL PRIMARY KEY,
+    attempt_id        INTEGER       NOT NULL,
+    question_id       INTEGER       NOT NULL,
+    submitted_answer  TEXT,
+    awarded_marks     NUMERIC(8,2)  NOT NULL DEFAULT 0.00,
+    max_marks         NUMERIC(8,2)  NOT NULL DEFAULT 0.00,
+    evaluation_status VARCHAR(30)   NOT NULL DEFAULT 'UNANSWERED',
+    feedback          TEXT,
+    evaluated_at      TIMESTAMP,
+    created_at        TIMESTAMP     NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMP     NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_quiz_attempt_answers_attempt
+        FOREIGN KEY (attempt_id)
+        REFERENCES quiz_attempts(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_quiz_attempt_answers_question
+        FOREIGN KEY (question_id)
+        REFERENCES questions(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_quiz_attempt_answers_attempt_question
+        UNIQUE (attempt_id, question_id),
+
+    CONSTRAINT chk_attempt_answer_status
+        CHECK (evaluation_status IN ('CORRECT', 'INCORRECT', 'PARTIALLY_CORRECT', 'MANUAL_GRADING_REQUIRED', 'PENDING', 'UNANSWERED', 'INVALID_SUBMISSION'))
 );

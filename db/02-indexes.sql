@@ -107,3 +107,8 @@ CREATE INDEX idx_quiz_questions_question_id ON quiz_questions(question_id);
 CREATE INDEX idx_quizzes_available_window ON quizzes(available_from, available_until);
 CREATE INDEX idx_quiz_attempts_quiz_student ON quiz_attempts(quiz_id, student_id);
 CREATE INDEX idx_quiz_attempts_status ON quiz_attempts(status);
+
+-- FR-I22: Auto-Graded and Evaluated Attempt Answers Indexes
+CREATE INDEX idx_quiz_attempt_answers_attempt ON quiz_attempt_answers(attempt_id);
+CREATE INDEX idx_quiz_attempt_answers_question ON quiz_attempt_answers(question_id);
+CREATE INDEX idx_quiz_attempt_answers_status ON quiz_attempt_answers(evaluation_status);
