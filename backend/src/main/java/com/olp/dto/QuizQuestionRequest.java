@@ -1,10 +1,12 @@
 package com.olp.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * Request DTO to attach an existing question (via questionId) or create and attach
@@ -17,8 +19,11 @@ public class QuizQuestionRequest {
     private String questionText;
     private String questionType;
     private String optionsJson;
+    private List<String> options;
     private String correctAnswer;
+    private List<String> correctAnswers;
 
+    @JsonAlias("maxMarks")
     @DecimalMin(value = "0.0", message = "Default marks cannot be negative")
     private BigDecimal defaultMarks;
 
@@ -27,6 +32,15 @@ public class QuizQuestionRequest {
 
     @DecimalMin(value = "0.0", message = "Negative marks cannot be negative")
     private BigDecimal negativeMarks;
+
+    @JsonAlias("tolerance")
+    @DecimalMin(value = "0.0", message = "Numerical tolerance cannot be negative")
+    private BigDecimal numericalTolerance;
+
+    @JsonAlias("rubric")
+    private String gradingRubric;
+
+    private Boolean requiresManualGrading;
 
     @Size(max = 100, message = "Topic must not exceed 100 characters")
     private String topic;
@@ -106,6 +120,54 @@ public class QuizQuestionRequest {
 
     public void setNegativeMarks(BigDecimal negativeMarks) {
         this.negativeMarks = negativeMarks;
+    }
+
+    public List<String> getOptions() {
+        return options;
+    }
+
+    public void setOptions(List<String> options) {
+        this.options = options;
+    }
+
+    public List<String> getCorrectAnswers() {
+        return correctAnswers;
+    }
+
+    public void setCorrectAnswers(List<String> correctAnswers) {
+        this.correctAnswers = correctAnswers;
+    }
+
+    public BigDecimal getNumericalTolerance() {
+        return numericalTolerance;
+    }
+
+    public void setNumericalTolerance(BigDecimal numericalTolerance) {
+        this.numericalTolerance = numericalTolerance;
+    }
+
+    public String getGradingRubric() {
+        return gradingRubric;
+    }
+
+    public void setGradingRubric(String gradingRubric) {
+        this.gradingRubric = gradingRubric;
+    }
+
+    public Boolean getRequiresManualGrading() {
+        return requiresManualGrading;
+    }
+
+    public void setRequiresManualGrading(Boolean requiresManualGrading) {
+        this.requiresManualGrading = requiresManualGrading;
+    }
+
+    public BigDecimal getMaxMarks() {
+        return defaultMarks;
+    }
+
+    public void setMaxMarks(BigDecimal maxMarks) {
+        this.defaultMarks = maxMarks;
     }
 
     public String getTopic() {

@@ -2,6 +2,7 @@ package com.olp.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Response DTO representing an ordered Question inside a Quiz (FR-I19).
@@ -20,8 +21,14 @@ public class QuizQuestionResponse {
     private String questionText;
     private String questionType;
     private String optionsJson;
+    private List<String> options;
     private String correctAnswer;
+    private List<String> correctAnswers;
     private BigDecimal defaultMarks;
+    private BigDecimal maxMarks;
+    private BigDecimal numericalTolerance;
+    private String gradingRubric;
+    private Boolean requiresManualGrading;
     private String topic;
     private String difficulty;
     private String explanation;
@@ -140,6 +147,55 @@ public class QuizQuestionResponse {
 
     public void setDefaultMarks(BigDecimal defaultMarks) {
         this.defaultMarks = defaultMarks;
+        this.maxMarks = defaultMarks;
+    }
+
+    public List<String> getOptions() {
+        return options;
+    }
+
+    public void setOptions(List<String> options) {
+        this.options = options;
+    }
+
+    public List<String> getCorrectAnswers() {
+        return correctAnswers;
+    }
+
+    public void setCorrectAnswers(List<String> correctAnswers) {
+        this.correctAnswers = correctAnswers;
+    }
+
+    public BigDecimal getMaxMarks() {
+        return maxMarks != null ? maxMarks : defaultMarks;
+    }
+
+    public void setMaxMarks(BigDecimal maxMarks) {
+        this.maxMarks = maxMarks;
+    }
+
+    public BigDecimal getNumericalTolerance() {
+        return numericalTolerance;
+    }
+
+    public void setNumericalTolerance(BigDecimal numericalTolerance) {
+        this.numericalTolerance = numericalTolerance;
+    }
+
+    public String getGradingRubric() {
+        return gradingRubric;
+    }
+
+    public void setGradingRubric(String gradingRubric) {
+        this.gradingRubric = gradingRubric;
+    }
+
+    public Boolean getRequiresManualGrading() {
+        return requiresManualGrading;
+    }
+
+    public void setRequiresManualGrading(Boolean requiresManualGrading) {
+        this.requiresManualGrading = requiresManualGrading;
     }
 
     public String getTopic() {
