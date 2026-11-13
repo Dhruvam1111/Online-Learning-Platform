@@ -81,5 +81,35 @@ public class StudentQuizController {
         User currentUser = quizAttemptService.resolveUser(authentication);
         return ResponseEntity.ok(quizAttemptService.getAttemptEvaluation(currentUser, quizId, attemptId));
     }
+
+    @GetMapping("/course/{courseId}")
+    public ResponseEntity<List<QuizSettingsResponse>> getCourseQuizzes(
+            @PathVariable Integer courseId,
+            Authentication authentication) {
+        User currentUser = quizAttemptService.resolveUser(authentication);
+        return ResponseEntity.ok(quizAttemptService.getStudentCourseQuizzes(currentUser, courseId));
+    }
+
+    @GetMapping("/{quizId}/attempts/{attemptId}/questions")
+    public ResponseEntity<List<com.olp.dto.StudentQuizQuestionDto>> getAttemptQuestions(
+            @PathVariable Integer quizId,
+            @PathVariable Integer attemptId,
+            Authentication authentication) {
+        User currentUser = quizAttemptService.resolveUser(authentication);
+        return ResponseEntity.ok(quizAttemptService.getAttemptQuestions(currentUser, quizId, attemptId));
+    }
+
+    @PostMapping("/{quizId}/attempts/{attemptId}/answers")
+    public ResponseEntity<com.olp.dto.ApiResponse> saveAttemptAnswer(
+            @PathVariable Integer quizId,
+            @PathVariable Integer attemptId,
+            @jakarta.validation.Valid @RequestBody com.olp.dto.SaveAnswerRequest request,
+            Authentication authentication) {
+        User currentUser = quizAttemptService.resolveUser(authentication);
+        quizAttemptService.saveAttemptAnswer(currentUser, quizId, attemptId, request);
+        return ResponseEntity.ok(new com.olp.dto.ApiResponse(true, "Answer saved successfully"));
+    }
 }
 
+
+    

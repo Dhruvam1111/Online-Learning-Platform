@@ -121,4 +121,7 @@ CREATE INDEX IF NOT EXISTS idx_video_uploads_status ON video_uploads(status);
 CREATE INDEX IF NOT EXISTS idx_courses_price ON courses(price);
 CREATE INDEX IF NOT EXISTS idx_courses_enrollment_limit ON courses(enrollment_limit);
 
+CREATE INDEX IF NOT EXISTS idx_quiz_attempt_answers_attempt ON quiz_attempt_answers(attempt_id);
+CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz_student ON quiz_attempts(quiz_id, student_id);
+
 
