@@ -27,7 +27,10 @@ public class StudentLearningController {
     }
 
     private Integer getStudentId(Authentication authentication) {
-        User user = (User) authentication.getPrincipal();
+        if (authentication == null || !(authentication.getPrincipal() instanceof User user)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED, "User is not authenticated");
+        }
         return user.getId();
     }
 

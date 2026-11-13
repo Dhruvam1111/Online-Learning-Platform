@@ -20,6 +20,14 @@ public class CourseProgressController {
         this.progressService = progressService;
     }
 
+    private User resolveStudent(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof User user)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED, "User is not authenticated");
+        }
+        return user;
+    }
+
     /**
      * POST /api/courses/{courseId}/lectures/{lectureId}/complete
      * Mark a lecture as completed.
@@ -31,7 +39,7 @@ public class CourseProgressController {
             @PathVariable Integer lectureId,
             Authentication authentication) {
 
-        User currentUser = (User) authentication.getPrincipal();
+        User currentUser = resolveStudent(authentication);
         progressService.markLectureComplete(currentUser.getId(), courseId, lectureId);
 
         return ResponseEntity.ok(Map.of(
@@ -52,7 +60,7 @@ public class CourseProgressController {
             @PathVariable Integer lectureId,
             Authentication authentication) {
 
-        User currentUser = (User) authentication.getPrincipal();
+        User currentUser = resolveStudent(authentication);
         progressService.unmarkLectureComplete(currentUser.getId(), courseId, lectureId);
 
         return ResponseEntity.ok(Map.of(
@@ -72,7 +80,7 @@ public class CourseProgressController {
             @PathVariable Integer courseId,
             Authentication authentication) {
 
-        User currentUser = (User) authentication.getPrincipal();
+        User currentUser = resolveStudent(authentication);
         CourseProgressResponse response = progressService.getCourseProgress(currentUser.getId(), courseId);
         return ResponseEntity.ok(response);
     }

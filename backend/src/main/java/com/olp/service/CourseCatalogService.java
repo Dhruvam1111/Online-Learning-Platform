@@ -137,7 +137,7 @@ public class CourseCatalogService {
     }
 
     /**
-     * Public course catalog — returns all published courses.
+     * Public course catalog - returns all published courses.
      */
     @Transactional(readOnly = true)
     public List<PublicCourseResponse> getPublishedCourses(String search, User currentUser) {
@@ -226,7 +226,7 @@ public class CourseCatalogService {
                 course.getId(),
                 course.getTitle(),
                 course.getDescription(),
-                course.getStatus().name(),
+                course.getStatus() != null ? course.getStatus().name() : null,
                 course.getInstructor() != null ? course.getInstructor().getId() : null,
                 course.getInstructor() != null ? course.getInstructor().getName() : "Instructor",
                 course.getCreatedAt(),
@@ -261,7 +261,7 @@ public class CourseCatalogService {
     }
 
     /**
-     * FR-I59 — Retrieve all instructors associated with a course, including roles and basic profile info.
+     * FR-I59 - Retrieve all instructors associated with a course, including roles and basic profile info.
      * Respects draft privacy: non-published courses require associated instructor or admin access.
      */
     @Transactional(readOnly = true)
@@ -416,7 +416,7 @@ public class CourseCatalogService {
     }
 
     /**
-     * FR-I10 — Retrieve pricing breakdown, active discounts, taxes, and final payable amount (DR-PY03).
+     * FR-I10 - Retrieve pricing breakdown, active discounts, taxes, and final payable amount (DR-PY03).
      */
     @Transactional(readOnly = true)
     public CoursePricingResponse getCoursePricing(Integer courseId) {

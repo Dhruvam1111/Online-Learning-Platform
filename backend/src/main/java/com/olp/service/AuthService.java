@@ -112,8 +112,6 @@ public class AuthService {
             logger.info("================================================================================");
             logger.info("[EMAIL DISPATCH] Verification link sent to {}: {}", user.getEmail(), verificationLink);
             logger.info("================================================================================");
-            System.out
-                    .println("[EMAIL DISPATCH] Verification link sent to " + user.getEmail() + ": " + verificationLink);
         }
 
         // 6. Generate a JWT token
@@ -279,7 +277,6 @@ public class AuthService {
         logger.info("================================================================================");
         logger.info("[EMAIL DISPATCH] Password reset link sent to {}: {}", user.getEmail(), resetLink);
         logger.info("================================================================================");
-        System.out.println("[EMAIL DISPATCH] Password reset link sent to " + user.getEmail() + ": " + resetLink);
 
         return Map.of(
                 "message", "Password reset link sent to your registered email address.",

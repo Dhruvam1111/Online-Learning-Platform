@@ -4,7 +4,6 @@ import com.olp.dto.CourseReviewStatusResponse;
 import com.olp.dto.CourseSubmissionRequest;
 import com.olp.dto.CourseSubmissionResponse;
 import com.olp.entity.*;
-import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,7 +27,8 @@ import static org.mockito.Mockito.*;
 
 /**
  * Comprehensive unit tests for FR-I71 – Review Status and Resubmit.
- * Validates review status retrieval across PENDING, APPROVED, REJECTED, and CHANGES_REQUESTED states,
+ * Validates review status retrieval across PENDING, APPROVED, REJECTED, and
+ * CHANGES_REQUESTED states,
  * admin review comment exposure, strict resubmission eligibility enforcement,
  * pre-resubmission validation, and immutable history preservation.
  */
@@ -92,8 +92,7 @@ class CourseReviewStatusServiceTest {
                 "Microservices with Spring Boot 3",
                 "End-to-end cloud-native microservices architecture guide.",
                 "Engineering",
-                CourseStatus.DRAFT
-        );
+                CourseStatus.DRAFT);
         sampleCourse.setId(100);
         sampleCourse.setPrice(new BigDecimal("799.00"));
 
@@ -103,7 +102,8 @@ class CourseReviewStatusServiceTest {
         sampleSection = new CourseSection(sampleModule, "Section 1.1: Services", "Design", 1);
         sampleSection.setId(20);
 
-        sampleLesson = new Lesson(sampleSection, "Lesson 1: Intro", LessonType.VIDEO, "Content", "https://video.mp4", 15, 1, null);
+        sampleLesson = new Lesson(sampleSection, "Lesson 1: Intro", LessonType.VIDEO, "Content", "https://video.mp4",
+                15, 1, null);
         sampleLesson.setId(30);
     }
 
@@ -126,7 +126,8 @@ class CourseReviewStatusServiceTest {
         sampleCourse.setStatus(CourseStatus.PENDING_REVIEW);
         when(courseRepository.findById(100)).thenReturn(Optional.of(sampleCourse));
 
-        CourseSubmission sub = new CourseSubmission(sampleCourse, ownerInstructor, "PENDING_REVIEW", "Initial submit", "{}");
+        CourseSubmission sub = new CourseSubmission(sampleCourse, ownerInstructor, "PENDING_REVIEW", "Initial submit",
+                "{}");
         sub.setId(1);
         when(courseSubmissionRepository.findByCourseIdOrderBySubmittedAtDesc(100)).thenReturn(List.of(sub));
 
@@ -148,7 +149,8 @@ class CourseReviewStatusServiceTest {
         sampleCourse.setStatus(CourseStatus.PUBLISHED);
         when(courseRepository.findById(100)).thenReturn(Optional.of(sampleCourse));
 
-        CourseSubmission sub = new CourseSubmission(sampleCourse, ownerInstructor, "APPROVED", "Approved by admin", "{}");
+        CourseSubmission sub = new CourseSubmission(sampleCourse, ownerInstructor, "APPROVED", "Approved by admin",
+                "{}");
         sub.setId(2);
         sub.setReviewedAt(LocalDateTime.now());
         when(courseSubmissionRepository.findByCourseIdOrderBySubmittedAtDesc(100)).thenReturn(List.of(sub));
@@ -196,7 +198,8 @@ class CourseReviewStatusServiceTest {
         sampleCourse.setRejectionReason("Need practical exercises and discount update.");
         when(courseRepository.findById(100)).thenReturn(Optional.of(sampleCourse));
 
-        CourseSubmission sub = new CourseSubmission(sampleCourse, ownerInstructor, "CHANGES_REQUESTED", "Please review", "{}");
+        CourseSubmission sub = new CourseSubmission(sampleCourse, ownerInstructor, "CHANGES_REQUESTED", "Please review",
+                "{}");
         sub.setId(4);
         sub.setReviewComments("Please add practical exercises in section 1.1 and revise the discount rate.");
         sub.setReviewedAt(LocalDateTime.now().minusHours(2));
@@ -207,8 +210,10 @@ class CourseReviewStatusServiceTest {
         assertNotNull(response);
         assertEquals("CHANGES_REQUESTED", response.getStatus());
         assertEquals("CHANGES_REQUESTED", response.getReviewStatus());
-        assertEquals("Please add practical exercises in section 1.1 and revise the discount rate.", response.getAdminComments());
-        assertEquals("Please add practical exercises in section 1.1 and revise the discount rate.", response.getChangeRequestReason());
+        assertEquals("Please add practical exercises in section 1.1 and revise the discount rate.",
+                response.getAdminComments());
+        assertEquals("Please add practical exercises in section 1.1 and revise the discount rate.",
+                response.getChangeRequestReason());
         assertTrue(response.isCanResubmit(), "Courses in CHANGES_REQUESTED must allow resubmission");
         assertTrue(response.isCanEdit(), "Courses in CHANGES_REQUESTED must allow editing");
     }
@@ -238,13 +243,15 @@ class CourseReviewStatusServiceTest {
         sampleCourse.setReviewComments("Follow-up changes required");
         when(courseRepository.findById(100)).thenReturn(Optional.of(sampleCourse));
 
-        CourseSubmission sub1 = new CourseSubmission(sampleCourse, ownerInstructor, "CHANGES_REQUESTED", "Version 1", "{}");
+        CourseSubmission sub1 = new CourseSubmission(sampleCourse, ownerInstructor, "CHANGES_REQUESTED", "Version 1",
+                "{}");
         sub1.setId(10);
         sub1.setReviewComments("First review notes");
         sub1.setSubmittedAt(LocalDateTime.now().minusDays(5));
         sub1.setReviewedAt(LocalDateTime.now().minusDays(4));
 
-        CourseSubmission sub2 = new CourseSubmission(sampleCourse, ownerInstructor, "CHANGES_REQUESTED", "Version 2", "{}");
+        CourseSubmission sub2 = new CourseSubmission(sampleCourse, ownerInstructor, "CHANGES_REQUESTED", "Version 2",
+                "{}");
         sub2.setId(11);
         sub2.setReviewComments("Follow-up changes required");
         sub2.setSubmittedAt(LocalDateTime.now().minusDays(2));
@@ -285,10 +292,10 @@ class CourseReviewStatusServiceTest {
     @DisplayName("Review status: Unauthorized instructor cannot access course review status")
     void testGetReviewStatus_UnauthorizedInstructor_ThrowsAccessDenied() {
         when(courseRepository.findById(100)).thenReturn(Optional.of(sampleCourse));
-        when(courseInstructorRepository.existsByCourseIdAndInstructorId(100, otherInstructor.getId())).thenReturn(false);
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(100, otherInstructor.getId()))
+                .thenReturn(false);
 
-        assertThrows(AccessDeniedException.class, () ->
-                submissionService.getReviewStatus(otherInstructor, 100));
+        assertThrows(AccessDeniedException.class, () -> submissionService.getReviewStatus(otherInstructor, 100));
     }
 
     @Test
@@ -296,8 +303,7 @@ class CourseReviewStatusServiceTest {
     void testGetReviewStatus_CourseNotFound_ThrowsException() {
         when(courseRepository.findById(999)).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () ->
-                submissionService.getReviewStatus(ownerInstructor, 999));
+        assertThrows(ResourceNotFoundException.class, () -> submissionService.getReviewStatus(ownerInstructor, 999));
     }
 
     // =========================================================================
@@ -322,7 +328,8 @@ class CourseReviewStatusServiceTest {
         });
         when(courseSubmissionRepository.countByCourseId(100)).thenReturn(2L);
 
-        CourseSubmissionRequest request = new CourseSubmissionRequest("Updated syllabus with detailed week-by-week plan.");
+        CourseSubmissionRequest request = new CourseSubmissionRequest(
+                "Updated syllabus with detailed week-by-week plan.");
         CourseSubmissionResponse response = submissionService.resubmitCourse(ownerInstructor, 100, request);
 
         assertNotNull(response);
@@ -345,10 +352,11 @@ class CourseReviewStatusServiceTest {
         sampleCourse.setStatus(CourseStatus.DRAFT);
         when(courseRepository.findById(100)).thenReturn(Optional.of(sampleCourse));
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
-                submissionService.resubmitCourse(ownerInstructor, 100, new CourseSubmissionRequest("Resubmitting draft")));
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> submissionService
+                .resubmitCourse(ownerInstructor, 100, new CourseSubmissionRequest("Resubmitting draft")));
 
-        assertTrue(ex.getMessage().contains("CHANGES_REQUESTED"), "Error should explain that course can only be resubmitted when status is CHANGES_REQUESTED");
+        assertTrue(ex.getMessage().contains("CHANGES_REQUESTED"),
+                "Error should explain that course can only be resubmitted when status is CHANGES_REQUESTED");
         verify(courseSubmissionRepository, never()).save(any());
     }
 
@@ -358,8 +366,8 @@ class CourseReviewStatusServiceTest {
         sampleCourse.setStatus(CourseStatus.PENDING_REVIEW);
         when(courseRepository.findById(100)).thenReturn(Optional.of(sampleCourse));
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
-                submissionService.resubmitCourse(ownerInstructor, 100, new CourseSubmissionRequest("Resubmit")));
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> submissionService.resubmitCourse(ownerInstructor, 100, new CourseSubmissionRequest("Resubmit")));
 
         assertTrue(ex.getMessage().contains("CHANGES_REQUESTED"));
     }
@@ -370,8 +378,8 @@ class CourseReviewStatusServiceTest {
         sampleCourse.setStatus(CourseStatus.PUBLISHED);
         when(courseRepository.findById(100)).thenReturn(Optional.of(sampleCourse));
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
-                submissionService.resubmitCourse(ownerInstructor, 100, new CourseSubmissionRequest("Resubmit")));
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> submissionService.resubmitCourse(ownerInstructor, 100, new CourseSubmissionRequest("Resubmit")));
 
         assertTrue(ex.getMessage().contains("CHANGES_REQUESTED"));
     }
@@ -382,8 +390,8 @@ class CourseReviewStatusServiceTest {
         sampleCourse.setStatus(CourseStatus.REJECTED);
         when(courseRepository.findById(100)).thenReturn(Optional.of(sampleCourse));
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
-                submissionService.resubmitCourse(ownerInstructor, 100, new CourseSubmissionRequest("Resubmit")));
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> submissionService.resubmitCourse(ownerInstructor, 100, new CourseSubmissionRequest("Resubmit")));
 
         assertTrue(ex.getMessage().contains("CHANGES_REQUESTED"));
     }
@@ -395,8 +403,8 @@ class CourseReviewStatusServiceTest {
         sampleCourse.setTitle("   ");
         when(courseRepository.findById(100)).thenReturn(Optional.of(sampleCourse));
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
-                submissionService.resubmitCourse(ownerInstructor, 100, new CourseSubmissionRequest()));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> submissionService.resubmitCourse(ownerInstructor, 100, new CourseSubmissionRequest()));
 
         assertTrue(ex.getMessage().contains("title"));
     }
@@ -408,8 +416,8 @@ class CourseReviewStatusServiceTest {
         when(courseRepository.findById(100)).thenReturn(Optional.of(sampleCourse));
         when(courseModuleRepository.findByCourseIdOrderByOrderIndexAsc(100)).thenReturn(Collections.emptyList());
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
-                submissionService.resubmitCourse(ownerInstructor, 100, new CourseSubmissionRequest()));
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> submissionService.resubmitCourse(ownerInstructor, 100, new CourseSubmissionRequest()));
 
         assertTrue(ex.getMessage().contains("module"));
     }
@@ -425,7 +433,8 @@ class CourseReviewStatusServiceTest {
         when(courseSubmissionRepository.save(any(CourseSubmission.class))).thenAnswer(inv -> inv.getArgument(0));
         when(courseSubmissionRepository.countByCourseId(100)).thenReturn(3L);
 
-        CourseSubmissionResponse response = submissionService.resubmitCourse(coInstructor, 100, new CourseSubmissionRequest("Co-instructor update"));
+        CourseSubmissionResponse response = submissionService.resubmitCourse(coInstructor, 100,
+                new CourseSubmissionRequest("Co-instructor update"));
 
         assertNotNull(response);
         assertEquals(CourseStatus.PENDING_REVIEW.name(), response.getStatus());
@@ -436,10 +445,10 @@ class CourseReviewStatusServiceTest {
     void testResubmitCourse_UnauthorizedInstructor_ThrowsAccessDenied() {
         sampleCourse.setStatus(CourseStatus.CHANGES_REQUESTED);
         when(courseRepository.findById(100)).thenReturn(Optional.of(sampleCourse));
-        when(courseInstructorRepository.existsByCourseIdAndInstructorId(100, otherInstructor.getId())).thenReturn(false);
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(100, otherInstructor.getId()))
+                .thenReturn(false);
 
-        assertThrows(AccessDeniedException.class, () ->
-                submissionService.resubmitCourse(otherInstructor, 100, new CourseSubmissionRequest()));
+        assertThrows(AccessDeniedException.class,
+                () -> submissionService.resubmitCourse(otherInstructor, 100, new CourseSubmissionRequest()));
     }
 }
-

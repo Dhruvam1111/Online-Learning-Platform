@@ -13,6 +13,7 @@ import com.olp.repository.LectureProgressRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -72,7 +73,7 @@ class StudentLearningServiceTest {
     }
 
     private void mockLessonCourseLookup() {
-        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(lessonId)))
+        when(jdbcTemplate.query(anyString(), ArgumentMatchers.<RowMapper<Integer>>any(), eq(lessonId)))
                 .thenReturn(List.of(courseId));
     }
 
@@ -103,6 +104,7 @@ class StudentLearningServiceTest {
                 studentLearningService.downloadMaterial(studentId, 102));
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertNotNull(ex.getReason());
         assertTrue(ex.getReason().contains("view-only"));
         verify(materialStorageService, never()).loadMaterialAsResource(anyString());
     }
@@ -117,6 +119,7 @@ class StudentLearningServiceTest {
                 studentLearningService.downloadMaterial(studentId, 101));
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertNotNull(ex.getReason());
         assertTrue(ex.getReason().contains("enrolled"));
         verify(materialStorageService, never()).loadMaterialAsResource(anyString());
     }
@@ -194,7 +197,7 @@ class StudentLearningServiceTest {
 
     @Test
     void testGetLectureMaterials_MasksDownloadUrl_WhenViewOnly() {
-        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(lectureId)))
+        when(jdbcTemplate.query(anyString(), ArgumentMatchers.<RowMapper<Integer>>any(), eq(lectureId)))
                 .thenReturn(List.of(courseId));
         when(enrollmentCheckRepository.isStudentEnrolled(studentId, courseId)).thenReturn(true);
 
@@ -231,7 +234,7 @@ class StudentLearningServiceTest {
 
     @Test
     void testGetModuleMaterials() {
-        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(moduleId)))
+        when(jdbcTemplate.query(anyString(), ArgumentMatchers.<RowMapper<Integer>>any(), eq(moduleId)))
                 .thenReturn(List.of(courseId));
         when(enrollmentCheckRepository.isStudentEnrolled(studentId, courseId)).thenReturn(true);
 
@@ -249,7 +252,7 @@ class StudentLearningServiceTest {
 
     @Test
     void testPlaybackPosition() {
-        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(lectureId)))
+        when(jdbcTemplate.query(anyString(), ArgumentMatchers.<RowMapper<Integer>>any(), eq(lectureId)))
                 .thenReturn(List.of(courseId));
         when(enrollmentCheckRepository.isStudentEnrolled(studentId, courseId)).thenReturn(true);
 
@@ -268,7 +271,7 @@ class StudentLearningServiceTest {
 
     @Test
     void testToggleBookmark() {
-        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(lectureId)))
+        when(jdbcTemplate.query(anyString(), ArgumentMatchers.<RowMapper<Integer>>any(), eq(lectureId)))
                 .thenReturn(List.of(courseId));
         when(enrollmentCheckRepository.isStudentEnrolled(studentId, courseId)).thenReturn(true);
 
