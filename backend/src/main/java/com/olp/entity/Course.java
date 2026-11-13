@@ -41,6 +41,9 @@ public class Course {
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
 
+    @Column(name = "review_comments", columnDefinition = "TEXT")
+    private String reviewComments;
+
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price = BigDecimal.ZERO;
 
@@ -242,6 +245,14 @@ public class Course {
 
     public void setRejectionReason(String rejectionReason) {
         this.rejectionReason = rejectionReason;
+    }
+
+    public String getReviewComments() {
+        return reviewComments;
+    }
+
+    public void setReviewComments(String reviewComments) {
+        this.reviewComments = reviewComments;
     }
 
     public LocalDateTime getCreatedAt() {
