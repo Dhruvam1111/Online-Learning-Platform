@@ -61,6 +61,8 @@ class InstructorCourseServiceTest {
     private EnrollmentRepository enrollmentRepository;
     @Mock
     private CoursePricingService coursePricingService;
+    @Mock
+    private CoursePreviewService coursePreviewService;
 
     @InjectMocks
     private InstructorCourseService service;
@@ -1160,5 +1162,25 @@ class InstructorCourseServiceTest {
 
         assertNotNull(result);
         assertEquals(new java.math.BigDecimal("499.00"), result.getBasePrice());
+    }
+
+    @Test
+    void testPreviewCourseAsStudent_DelegatesToPreviewService() {
+        User owner = instructor(1);
+        com.olp.dto.CoursePreviewResponse previewResponse = new com.olp.dto.CoursePreviewResponse();
+        previewResponse.setId(10);
+        previewResponse.setTitle("Quantum Physics");
+        previewResponse.setPreview(true);
+        previewResponse.setReadOnly(true);
+
+        when(coursePreviewService.previewCourseAsStudent(owner, 10)).thenReturn(previewResponse);
+
+        com.olp.dto.CoursePreviewResponse result = service.previewCourseAsStudent(owner, 10);
+
+        assertNotNull(result);
+        assertEquals(10, result.getId());
+        assertTrue(result.isPreview());
+        assertTrue(result.isReadOnly());
+        verify(coursePreviewService).previewCourseAsStudent(owner, 10);
     }
 }
