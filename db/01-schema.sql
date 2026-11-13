@@ -4,6 +4,7 @@
 -- ============================================================
 
 -- Clean slate (safe to re-run during development)
+DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS quiz_attempt_answers CASCADE;
 DROP TABLE IF EXISTS quiz_attempts CASCADE;
 DROP TABLE IF EXISTS quiz_questions CASCADE;
@@ -792,4 +793,20 @@ CREATE TABLE IF NOT EXISTS quiz_attempt_answers (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_attempt_question UNIQUE (attempt_id, question_id)
 );
+
+-- =========================
+-- Step 5 / FR-I70: Notification Centre
+-- =========================
+CREATE TABLE IF NOT EXISTS notifications (
+    id          SERIAL PRIMARY KEY,
+    user_id     INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type        VARCHAR(50)  NOT NULL DEFAULT 'SYSTEM',
+    title       VARCHAR(255),
+    message     TEXT         NOT NULL,
+    link        VARCHAR(500),
+    is_read     BOOLEAN      NOT NULL DEFAULT FALSE,
+    read_at     TIMESTAMP,
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
 

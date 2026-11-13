@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import NotificationBell from './NotificationBell';
 
 export default function Header({
   user,
@@ -106,6 +107,7 @@ export default function Header({
         <div className="flex items-center gap-3 sm:gap-4 shrink-0">
           {isAuthenticated ? (
             <>
+              <NotificationBell isAuthenticated={isAuthenticated} />
               {/* Authenticated User Pill */}
               <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container-high/60 border border-outline-variant/20 text-xs font-semibold text-on-surface">
                 <div className="w-5 h-5 rounded-full bg-primary-container text-white flex items-center justify-center font-bold text-[10px]">

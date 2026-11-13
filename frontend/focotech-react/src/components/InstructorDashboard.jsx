@@ -3,6 +3,7 @@ import PaymentGovernance from './PaymentGovernance';
 import { payoutStatusLabel } from '../utils/payoutStatus';
 import PaymentPagination from './PaymentPagination';
 import { downloadFinancialDocument } from '../utils/financialDocument';
+import NotificationBell from './NotificationBell';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api, { instructorAPI } from '../services/api';
@@ -226,6 +227,7 @@ export default function InstructorDashboard({ onNavigateHome }) {
           </button>
 
           <div className="flex items-center gap-3">
+            <NotificationBell isAuthenticated={true} />
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
               Instructor: {user?.name || 'Dr. Instructor'}
             </span>

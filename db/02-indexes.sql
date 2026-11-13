@@ -133,4 +133,9 @@ CREATE INDEX IF NOT EXISTS idx_course_submissions_submitted_at ON course_submiss
 CREATE INDEX IF NOT EXISTS idx_quiz_attempt_answers_attempt ON quiz_attempt_answers(attempt_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz_student ON quiz_attempts(quiz_id, student_id);
 
+-- Step 5 / FR-I70: Notification Centre Indexes
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, is_read);
+
+
 

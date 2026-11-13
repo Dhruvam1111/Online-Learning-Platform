@@ -941,6 +941,85 @@ public class EmailService {
         }
     }
 
+    /**
+     * Step 5 / FR-I70: Sends a general platform notification email (announcements, replies, deadlines, etc.).
+     * Never throws exceptions so in-app notification persistence is never blocked by SMTP issues.
+     */
+    public void sendNotificationEmail(
+            String toEmail,
+            String recipientName,
+            String type,
+            String title,
+            String messageText,
+            String link) {
+        if (toEmail == null || toEmail.isBlank()) {
+            return;
+        }
+        String displayName = (recipientName != null && !recipientName.isBlank()) ? recipientName.trim() : toEmail;
+        String safeType = (type != null && !type.isBlank()) ? type.trim().toUpperCase() : "NOTIFICATION";
+        String safeTitle = (title != null && !title.isBlank()) ? title.trim() : "New Platform Notification";
+        String safeMessage = (messageText != null) ? messageText.trim() : "";
+
+        log.info("[EmailService] Notification email queued for {} [{}] - {}", toEmail, safeType, safeTitle);
+
+        if (senderEmail == null || senderEmail.isBlank()) {
+            return;
+        }
+
+        try {
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+
+            helper.setFrom(senderEmail, "Focotech");
+            helper.setTo(toEmail);
+            helper.setSubject("Focotech [" + safeType + "]: " + safeTitle);
+
+            String linkBlock = (link != null && !link.isBlank())
+                    ? "<div style=\"margin-top: 20px;\"><a href=\"" + escapeHtml(link.trim())
+                            + "\" style=\"background-color: #ff5a36; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block;\">View in Portal</a></div>"
+                    : "";
+
+            String html = """
+                    <!DOCTYPE html>
+                    <html lang="en">
+                    <head><meta charset="UTF-8"><title>%s</title></head>
+                    <body style="margin: 0; padding: 0; background-color: #f7f4f1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%%" style="background-color: #f7f4f1; padding: 36px 16px;">
+                        <tr>
+                          <td align="center">
+                            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%%" style="max-width: 520px; background-color: #ffffff; border-radius: 12px; border: 1px solid #e8e2dc; padding: 32px;">
+                              <tr>
+                                <td>
+                                  <div style="font-size: 11px; font-weight: 700; color: #ff5a36; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;">%s</div>
+                                  <h2 style="color: #1e1b19; margin: 0 0 12px 0; font-size: 20px;">%s</h2>
+                                  <p style="color: #5a524c; font-size: 14px; margin: 0 0 12px 0;">Hello %s,</p>
+                                  <p style="color: #443e3a; font-size: 14px; line-height: 22px; white-space: pre-wrap;">%s</p>
+                                  %s
+                                  <p style="color: #8a817a; font-size: 12px; margin-top: 28px; border-top: 1px solid #eee7e2; padding-top: 14px;">Focotech Notification Centre</p>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+                    </body>
+                    </html>
+                    """.formatted(
+                    escapeHtml(safeTitle),
+                    escapeHtml(safeType),
+                    escapeHtml(safeTitle),
+                    escapeHtml(displayName),
+                    escapeHtml(safeMessage),
+                    linkBlock);
+
+            helper.setText(html, true);
+            mailSender.send(mimeMessage);
+            log.info("[EmailService] Notification email sent to: {}", toEmail);
+        } catch (Exception e) {
+            log.warn("[EmailService] Failed to send notification email via SMTP ({}), continuing.", e.getMessage());
+        }
+    }
+
     private String buildCourseAssociationDecisionHtml(
             String displayName,
             String courseTitle,
