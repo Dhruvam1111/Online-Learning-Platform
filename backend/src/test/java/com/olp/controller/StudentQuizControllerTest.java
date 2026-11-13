@@ -1,7 +1,9 @@
 package com.olp.controller;
 
 import com.olp.dto.QuizAttemptResponse;
+import com.olp.dto.QuizEvaluationSummary;
 import com.olp.dto.QuizSettingsResponse;
+import com.olp.dto.QuizSubmissionRequest;
 import com.olp.entity.User;
 import com.olp.service.QuizAttemptService;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,7 +68,12 @@ class StudentQuizControllerTest {
         QuizAttemptResponse submitted = new QuizAttemptResponse();
         submitted.setId(55);
         submitted.setStatus("SUBMITTED");
-        when(quizAttemptService.submitQuizAttempt(student, 10, 55)).thenReturn(submitted);
+        when(quizAttemptService.submitQuizAttempt(student, 10, 55, null)).thenReturn(submitted);
+
+        QuizEvaluationSummary evalSummary = new QuizEvaluationSummary();
+        evalSummary.setQuizId(10);
+        evalSummary.setPassed(true);
+        when(quizAttemptService.getAttemptEvaluation(student, 10, 55)).thenReturn(evalSummary);
 
         assertSame(settings, controller.getStudentQuizSettings(10, authentication).getBody());
 
@@ -76,7 +83,8 @@ class StudentQuizControllerTest {
 
         assertEquals(1, controller.getStudentQuizAttempts(10, authentication).getBody().size());
         assertSame(attempt, controller.getQuizAttemptStatus(10, 55, authentication).getBody());
-        assertEquals("SUBMITTED", controller.submitQuizAttempt(10, 55, authentication).getBody().getStatus());
+        assertEquals("SUBMITTED", controller.submitQuizAttempt(10, 55, null, authentication).getBody().getStatus());
+        assertSame(evalSummary, controller.getAttemptEvaluation(10, 55, authentication).getBody());
     }
 }
 

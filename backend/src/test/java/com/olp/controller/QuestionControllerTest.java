@@ -1,8 +1,12 @@
 package com.olp.controller;
 
 import com.olp.dto.ApiResponse;
+import com.olp.dto.QuestionEvaluationRequest;
+import com.olp.dto.QuestionEvaluationResult;
 import com.olp.dto.QuestionRequest;
 import com.olp.dto.QuestionResponse;
+import com.olp.entity.EvaluationStatus;
+import com.olp.entity.QuestionType;
 import com.olp.entity.User;
 import com.olp.service.QuestionService;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,6 +84,12 @@ class QuestionControllerTest {
         assertEquals(201, createdForCourse.getStatusCode().value());
         assertEquals(10, req.getCourseId());
 
+        QuestionEvaluationResult evalRes = new QuestionEvaluationResult(
+                12, QuestionType.TRUE_FALSE, EvaluationStatus.CORRECT,
+                java.math.BigDecimal.ONE, java.math.BigDecimal.ONE,
+                "TRUE", "TRUE", null, "Correct", false);
+        when(questionService.evaluateQuestion(eq(instructor), eq(12), any())).thenReturn(evalRes);
+
         assertEquals(1, controller.getQuestions(null, null, null, authentication).getBody().size());
         assertEquals(1, controller.getQuestionsByCourse(10, "DESCRIPTIVE", true, authentication).getBody().size());
         assertSame(qRes, controller.getQuestionById(12, authentication).getBody());
@@ -87,6 +97,7 @@ class QuestionControllerTest {
         assertTrue(controller.deleteQuestion(12, authentication).getBody().isSuccess());
         assertEquals(1, controller.getManualGradingQuestions(null, authentication).getBody().size());
         assertSame(qRes, controller.sendForManualGrading(12, Map.of("gradingRubric", "Rubric"), authentication).getBody());
+        assertSame(evalRes, controller.evaluateQuestion(12, new QuestionEvaluationRequest("TRUE"), authentication).getBody());
     }
 }
 

@@ -1,6 +1,8 @@
 package com.olp.controller;
 
 import com.olp.dto.ApiResponse;
+import com.olp.dto.QuestionEvaluationRequest;
+import com.olp.dto.QuestionEvaluationResult;
 import com.olp.dto.QuestionRequest;
 import com.olp.dto.QuestionResponse;
 import com.olp.entity.User;
@@ -111,6 +113,15 @@ public class QuestionController {
         User currentUser = questionService.resolveUser(authentication);
         String rubric = body != null ? body.get("gradingRubric") : null;
         return ResponseEntity.ok(questionService.sendForManualGrading(currentUser, questionId, rubric));
+    }
+
+    @PostMapping("/questions/{questionId}/evaluate")
+    public ResponseEntity<QuestionEvaluationResult> evaluateQuestion(
+            @PathVariable Integer questionId,
+            @RequestBody(required = false) QuestionEvaluationRequest request,
+            Authentication authentication) {
+        User currentUser = questionService.resolveUser(authentication);
+        return ResponseEntity.ok(questionService.evaluateQuestion(currentUser, questionId, request));
     }
 }
 
