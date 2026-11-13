@@ -141,6 +141,11 @@ CREATE INDEX IF NOT EXISTS idx_course_audits_course_id ON course_audits(course_i
 CREATE INDEX IF NOT EXISTS idx_course_audits_actor_id ON course_audits(actor_id);
 CREATE INDEX IF NOT EXISTS idx_course_audits_created_at ON course_audits(created_at DESC);
 
+-- Step 37 / FR-I12: Course Archiving, Soft Deletion, and Certificates Indexes
+CREATE INDEX IF NOT EXISTS idx_courses_is_deleted ON courses(is_deleted);
+CREATE INDEX IF NOT EXISTS idx_certificates_course_id ON certificates(course_id);
+CREATE INDEX IF NOT EXISTS idx_certificates_student_id ON certificates(student_id);
+
 
 
 

@@ -81,6 +81,8 @@ CREATE TABLE courses (
     discount_start_date TIMESTAMP,
     discount_end_date   TIMESTAMP,
     enrollment_limit INTEGER,
+    is_deleted      BOOLEAN      NOT NULL DEFAULT FALSE,
+    deleted_at      TIMESTAMP,
     created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
 
     CONSTRAINT fk_courses_instructor
@@ -811,6 +813,18 @@ CREATE TABLE IF NOT EXISTS course_audits (
     previous_values TEXT,
     new_values TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Step 37 / FR-I12: Course Archiving, Soft Deletion, and Certificates
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+
+CREATE TABLE IF NOT EXISTS certificates (
+    id SERIAL PRIMARY KEY,
+    course_id INT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    student_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    certificate_code VARCHAR(100) UNIQUE,
+    issued_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 
