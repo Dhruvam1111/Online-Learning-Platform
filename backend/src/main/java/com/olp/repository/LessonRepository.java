@@ -20,5 +20,11 @@ public interface LessonRepository extends JpaRepository<Lesson, Integer> {
 
     @Query("SELECT COALESCE(MAX(l.orderIndex), 0) FROM Lesson l WHERE l.section.id = :sectionId")
     int findMaxOrderIndexBySectionId(@Param("sectionId") Integer sectionId);
+
+    @Query("SELECT l FROM Lesson l WHERE l.section.module.course.id = :courseId ORDER BY l.section.module.orderIndex ASC, l.section.orderIndex ASC, l.orderIndex ASC")
+    List<Lesson> findByCourseId(@Param("courseId") Integer courseId);
+
+    @Query("SELECT COUNT(l) FROM Lesson l WHERE l.section.module.course.id = :courseId")
+    long countByCourseId(@Param("courseId") Integer courseId);
 }
 

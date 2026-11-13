@@ -1,5 +1,7 @@
 package com.olp.controller;
 
+import com.olp.dto.CertificateResponse;
+import com.olp.dto.CompletionEvaluationResult;
 import com.olp.dto.CourseDetailResponse;
 import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CoursePreviewResponse;
@@ -12,6 +14,7 @@ import com.olp.dto.LectureResponse;
 import com.olp.dto.PublicCourseResponse;
 import com.olp.entity.User;
 import com.olp.service.CourseCatalogService;
+import com.olp.service.CourseCompletionService;
 import com.olp.service.CoursePreviewService;
 import com.olp.service.CourseSubmissionService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,25 +32,35 @@ public class CourseController {
     private final CourseCatalogService courseCatalogService;
     private final CoursePreviewService coursePreviewService;
     private final CourseSubmissionService courseSubmissionService;
+    private final CourseCompletionService courseCompletionService;
 
     public CourseController(CourseCatalogService courseCatalogService) {
-        this(courseCatalogService, null, null);
+        this(courseCatalogService, null, null, null);
     }
 
     public CourseController(
             CourseCatalogService courseCatalogService,
             CoursePreviewService coursePreviewService) {
-        this(courseCatalogService, coursePreviewService, null);
+        this(courseCatalogService, coursePreviewService, null, null);
+    }
+
+    public CourseController(
+            CourseCatalogService courseCatalogService,
+            CoursePreviewService coursePreviewService,
+            CourseSubmissionService courseSubmissionService) {
+        this(courseCatalogService, coursePreviewService, courseSubmissionService, null);
     }
 
     @Autowired
     public CourseController(
             CourseCatalogService courseCatalogService,
             @Autowired(required = false) CoursePreviewService coursePreviewService,
-            @Autowired(required = false) CourseSubmissionService courseSubmissionService) {
+            @Autowired(required = false) CourseSubmissionService courseSubmissionService,
+            @Autowired(required = false) CourseCompletionService courseCompletionService) {
         this.courseCatalogService = courseCatalogService;
         this.coursePreviewService = coursePreviewService;
         this.courseSubmissionService = courseSubmissionService;
+        this.courseCompletionService = courseCompletionService;
     }
 
     /**
@@ -218,5 +231,37 @@ public class CourseController {
         CourseSubmissionResponse response = courseSubmissionService.resubmitCourse(
                 currentUser, id, request != null ? request : new CourseSubmissionRequest());
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/courses/{id}/certificate-eligibility
+     * FR-I56 / FR-S77: Check certificate eligibility and completion criteria for authenticated student.
+     */
+    @GetMapping("/{id:\\d+}/certificate-eligibility")
+    public ResponseEntity<CompletionEvaluationResult> checkCertificateEligibility(
+            @PathVariable Integer id,
+            Authentication authentication) {
+        User currentUser = courseCatalogService.resolveUser(authentication);
+        if (courseCompletionService == null) {
+            return ResponseEntity.notFound().build();
+        }
+        CompletionEvaluationResult result = courseCompletionService.evaluate(currentUser.getId(), id);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * POST /api/courses/{id}/claim-certificate
+     * FR-I56 / FR-S77: Claim course certificate if all completion criteria are satisfied (DR-03).
+     */
+    @PostMapping("/{id:\\d+}/claim-certificate")
+    public ResponseEntity<CertificateResponse> claimCertificate(
+            @PathVariable Integer id,
+            Authentication authentication) {
+        User currentUser = courseCatalogService.resolveUser(authentication);
+        if (courseCompletionService == null) {
+            return ResponseEntity.notFound().build();
+        }
+        CertificateResponse cert = courseCompletionService.issueCertificate(currentUser.getId(), id);
+        return ResponseEntity.ok(cert);
     }
 }

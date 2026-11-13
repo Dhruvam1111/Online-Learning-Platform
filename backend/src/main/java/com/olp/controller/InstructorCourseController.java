@@ -1,7 +1,10 @@
 package com.olp.controller;
 
 import com.olp.dto.ApiResponse;
+import com.olp.dto.CompletionEvaluationResult;
 import com.olp.dto.CourseAuditResponse;
+import com.olp.dto.CourseCompletionCriteriaRequest;
+import com.olp.dto.CourseCompletionCriteriaResponse;
 import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CoursePreviewResponse;
@@ -17,8 +20,10 @@ import com.olp.dto.PageResponse;
 import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
 import com.olp.entity.User;
+import com.olp.service.CourseCompletionService;
 import com.olp.service.InstructorCourseService;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -34,9 +39,18 @@ import java.util.List;
 public class InstructorCourseController {
 
     private final InstructorCourseService instructorCourseService;
+    private final CourseCompletionService courseCompletionService;
 
     public InstructorCourseController(InstructorCourseService instructorCourseService) {
+        this(instructorCourseService, null);
+    }
+
+    @Autowired
+    public InstructorCourseController(
+            InstructorCourseService instructorCourseService,
+            @Autowired(required = false) CourseCompletionService courseCompletionService) {
         this.instructorCourseService = instructorCourseService;
+        this.courseCompletionService = courseCompletionService;
     }
 
     /**
@@ -426,5 +440,55 @@ public class InstructorCourseController {
         User currentUser = instructorCourseService.resolveUser(authentication);
         List<CourseAuditResponse> response = instructorCourseService.getCourseAudits(currentUser, courseId);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}/completion-criteria
+     * FR-I56: Retrieve configured certificate completion criteria for a course.
+     */
+    @GetMapping("/{courseId:\\d+}/completion-criteria")
+    public ResponseEntity<CourseCompletionCriteriaResponse> getCompletionCriteria(
+            Authentication authentication,
+            @PathVariable Integer courseId) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        if (courseCompletionService == null) {
+            return ResponseEntity.notFound().build();
+        }
+        CourseCompletionCriteriaResponse response = courseCompletionService.getCompletionCriteria(courseId, currentUser);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * PUT / POST /api/instructor/courses/{courseId}/completion-criteria
+     * FR-I56: Configure or update certificate completion criteria (DR-03).
+     */
+    @RequestMapping(value = "/{courseId:\\d+}/completion-criteria", method = { RequestMethod.PUT, RequestMethod.POST })
+    public ResponseEntity<CourseCompletionCriteriaResponse> configureCompletionCriteria(
+            Authentication authentication,
+            @PathVariable Integer courseId,
+            @Valid @RequestBody CourseCompletionCriteriaRequest request) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        if (courseCompletionService == null) {
+            return ResponseEntity.notFound().build();
+        }
+        CourseCompletionCriteriaResponse response = courseCompletionService.configureCompletionCriteria(currentUser, courseId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}/completion-evaluation/{studentId}
+     * FR-I56 / FR-S77: Evaluate a student's completion eligibility for the course.
+     */
+    @GetMapping("/{courseId:\\d+}/completion-evaluation/{studentId:\\d+}")
+    public ResponseEntity<CompletionEvaluationResult> evaluateStudentCompletion(
+            Authentication authentication,
+            @PathVariable Integer courseId,
+            @PathVariable Integer studentId) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        if (courseCompletionService == null) {
+            return ResponseEntity.notFound().build();
+        }
+        CompletionEvaluationResult result = courseCompletionService.evaluate(studentId, courseId);
+        return ResponseEntity.ok(result);
     }
 }
