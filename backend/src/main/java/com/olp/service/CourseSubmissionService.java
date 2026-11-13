@@ -256,6 +256,47 @@ public class CourseSubmissionService {
     }
 
     /**
+     * FR-I09: Trigger administrative re-review when major alterations (e.g., pricing, curriculum structure)
+     * are made to a published course. Transitions status to PENDING_REVIEW, creates an immutable
+     * snapshot and submission record.
+     */
+    @Transactional
+    public CourseSubmissionResponse triggerReReview(User currentUser, Course course, String reason) {
+        validateInstructorOrAdmin(currentUser);
+
+        if (course == null || course.getId() == null) {
+            throw new IllegalArgumentException("Course cannot be null when triggering re-review");
+        }
+
+        List<CourseModule> modules = courseModuleRepository != null
+                ? courseModuleRepository.findByCourseIdOrderByOrderIndexAsc(course.getId())
+                : (course.getModules() != null ? course.getModules() : Collections.emptyList());
+
+        List<Lecture> lectures = lectureRepository != null
+                ? lectureRepository.findByCourseIdOrderByOrderIndexAsc(course.getId())
+                : Collections.emptyList();
+
+        String snapshotData = generateCourseSnapshot(course, modules, lectures);
+
+        CourseSubmission submission = new CourseSubmission(
+                course,
+                currentUser,
+                CourseStatus.PENDING_REVIEW.name(),
+                reason != null ? reason : "Course re-review triggered due to major alterations",
+                snapshotData
+        );
+        CourseSubmission savedSubmission = courseSubmissionRepository.save(submission);
+
+        course.setStatus(CourseStatus.PENDING_REVIEW);
+        course.setRejectionReason(null);
+        course.setReviewComments(null);
+        courseRepository.save(course);
+
+        long submissionCount = courseSubmissionRepository.countByCourseId(course.getId());
+        return CourseSubmissionResponse.fromEntity(savedSubmission, submissionCount);
+    }
+
+    /**
      * Validates that all required fields and minimum content requirements are met.
      */
     public void validateCourseForSubmission(Course course) {

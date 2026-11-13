@@ -136,5 +136,11 @@ CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz_student ON quiz_attempts(quiz_
 -- Step 35 / FR-I71: Course Review Status Indexes
 CREATE INDEX IF NOT EXISTS idx_course_submissions_reviewed_at ON course_submissions(reviewed_at);
 
+-- Step 36 / FR-I09: Course Audit Indexes
+CREATE INDEX IF NOT EXISTS idx_course_audits_course_id ON course_audits(course_id);
+CREATE INDEX IF NOT EXISTS idx_course_audits_actor_id ON course_audits(actor_id);
+CREATE INDEX IF NOT EXISTS idx_course_audits_created_at ON course_audits(created_at DESC);
+
+
 
 

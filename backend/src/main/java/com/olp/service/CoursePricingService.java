@@ -27,16 +27,31 @@ public class CoursePricingService {
     private final EnrollmentRepository enrollmentRepository;
     private final CourseInstructorRepository courseInstructorRepository;
     private final PaymentPolicyService paymentPolicyService;
+    private final CourseSubmissionService courseSubmissionService;
+    private final CourseAuditService courseAuditService;
 
     public CoursePricingService(
             CourseRepository courseRepository,
             EnrollmentRepository enrollmentRepository,
             @Autowired(required = false) CourseInstructorRepository courseInstructorRepository,
             @Autowired(required = false) PaymentPolicyService paymentPolicyService) {
+        this(courseRepository, enrollmentRepository, courseInstructorRepository, paymentPolicyService, null, null);
+    }
+
+    @Autowired
+    public CoursePricingService(
+            CourseRepository courseRepository,
+            EnrollmentRepository enrollmentRepository,
+            @Autowired(required = false) CourseInstructorRepository courseInstructorRepository,
+            @Autowired(required = false) PaymentPolicyService paymentPolicyService,
+            @Autowired(required = false) CourseSubmissionService courseSubmissionService,
+            @Autowired(required = false) CourseAuditService courseAuditService) {
         this.courseRepository = courseRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.courseInstructorRepository = courseInstructorRepository;
         this.paymentPolicyService = paymentPolicyService;
+        this.courseSubmissionService = courseSubmissionService;
+        this.courseAuditService = courseAuditService;
     }
 
     /**
@@ -106,9 +121,13 @@ public class CoursePricingService {
         BigDecimal discountedPrice = basePrice.subtract(discountAmount).max(BigDecimal.ZERO);
 
         // Tax calculation according to DR-PY03: price - discount + tax
-        BigDecimal taxRate = paymentPolicyService != null && course.getId() != null
-                ? paymentPolicyService.getTaxRateForCourse(course.getId())
-                : new BigDecimal("0.18");
+        BigDecimal taxRate = null;
+        if (paymentPolicyService != null && course.getId() != null) {
+            taxRate = paymentPolicyService.getTaxRateForCourse(course.getId());
+        }
+        if (taxRate == null) {
+            taxRate = new BigDecimal("0.18");
+        }
 
         BigDecimal taxAmount = isFree ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
                 : discountedPrice.multiply(taxRate).setScale(2, RoundingMode.HALF_UP);
@@ -197,8 +216,30 @@ public class CoursePricingService {
         }
         validatePricingRequest(request);
 
+        CourseStatus prevStatus = course.getStatus();
+        BigDecimal prevPrice = course.getPrice();
         applyPricing(course, request);
-        Course saved = courseRepository.save(course);
+
+        Course saved;
+        if (prevStatus == CourseStatus.PUBLISHED && courseSubmissionService != null) {
+            courseSubmissionService.triggerReReview(
+                    currentUser,
+                    course,
+                    "Course pricing update on published course triggered re-review");
+            saved = courseRepository.findById(courseId).orElse(course);
+        } else {
+            saved = courseRepository.save(course);
+        }
+
+        if (courseAuditService != null) {
+            courseAuditService.recordAudit(
+                    saved,
+                    currentUser,
+                    prevStatus == CourseStatus.PUBLISHED ? "COURSE_EDIT_MAJOR" : "COURSE_EDIT",
+                    "pricing",
+                    "price: " + prevPrice + ", status: " + prevStatus,
+                    "price: " + saved.getPrice() + ", status: " + saved.getStatus());
+        }
 
         return calculatePricing(saved);
     }

@@ -795,10 +795,23 @@ CREATE TABLE IF NOT EXISTS quiz_attempt_answers (
 
 -- Step 35 / FR-I71: Course Review Status and Resubmit
 ALTER TABLE courses DROP CONSTRAINT IF EXISTS chk_courses_status;
-ALTER TABLE courses ADD CONSTRAINT chk_courses_status CHECK (status IN ('draft', 'pending_review', 'published', 'archived', 'rejected', 'changes_requested'));
+ALTER TABLE courses ADD CONSTRAINT chk_courses_status CHECK (status IN ('draft', 'pending_review', 'published', 'archived', 'rejected', 'changes_requested', 'unpublished'));
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS review_comments TEXT;
 
 ALTER TABLE course_submissions ADD COLUMN IF NOT EXISTS review_comments TEXT;
 ALTER TABLE course_submissions ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP;
+
+-- Step 36 / FR-I09: Edit and Unpublish Course Audits
+CREATE TABLE IF NOT EXISTS course_audits (
+    id SERIAL PRIMARY KEY,
+    course_id INT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    actor_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    action_type VARCHAR(50) NOT NULL,
+    changed_fields TEXT,
+    previous_values TEXT,
+    new_values TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 
 

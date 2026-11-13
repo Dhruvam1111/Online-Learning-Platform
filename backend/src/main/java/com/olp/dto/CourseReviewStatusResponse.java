@@ -42,6 +42,7 @@ public class CourseReviewStatusResponse {
             case CHANGES_REQUESTED -> "CHANGES_REQUESTED";
             case DRAFT -> "DRAFT";
             case ARCHIVED -> "ARCHIVED";
+            case UNPUBLISHED -> "UNPUBLISHED";
         };
     }
 
