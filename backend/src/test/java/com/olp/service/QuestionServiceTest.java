@@ -1,6 +1,8 @@
 package com.olp.service;
 
 import com.olp.dto.ApiResponse;
+import com.olp.dto.QuestionEvaluationRequest;
+import com.olp.dto.QuestionEvaluationResult;
 import com.olp.dto.QuestionRequest;
 import com.olp.dto.QuestionResponse;
 import com.olp.entity.*;
@@ -39,6 +41,9 @@ class QuestionServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @org.mockito.Spy
+    private AutoGradingService autoGradingService = new AutoGradingService();
 
     @InjectMocks
     private QuestionService questionService;
@@ -331,6 +336,24 @@ class QuestionServiceTest {
         List<QuestionResponse> manualList = questionService.getManualGradingQuestions(owner, null);
         assertEquals(1, manualList.size());
         assertEquals(401, manualList.get(0).getId());
+    }
+
+    @Test
+    void testEvaluateQuestion_InstructorEvaluatesOptionDirectly() {
+        Question mcq = new Question(
+                course, owner, "What is 2+2?", QuestionType.MULTIPLE_CHOICE,
+                "[\"3\",\"4\"]", "4", new BigDecimal("5.00"), BigDecimal.ZERO);
+        mcq.setId(500);
+
+        when(questionRepository.findByIdWithDetails(500)).thenReturn(Optional.of(mcq));
+        when(courseRepository.findById(10)).thenReturn(Optional.of(course));
+
+        QuestionEvaluationResult res = questionService.evaluateQuestion(
+                owner, 500, new QuestionEvaluationRequest("4"));
+
+        assertNotNull(res);
+        assertEquals(EvaluationStatus.CORRECT, res.getStatus());
+        assertEquals(new BigDecimal("5.00"), res.getAwardedMarks());
     }
 }
 

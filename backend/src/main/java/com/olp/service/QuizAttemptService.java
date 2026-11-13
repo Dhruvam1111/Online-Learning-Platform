@@ -1,25 +1,33 @@
 package com.olp.service;
 
+import com.olp.dto.QuestionEvaluationResult;
 import com.olp.dto.QuizAttemptResponse;
+import com.olp.dto.QuizEvaluationSummary;
 import com.olp.dto.QuizSettingsResponse;
+import com.olp.dto.QuizSubmissionRequest;
 import com.olp.entity.*;
 import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.QuizAttemptExpiredException;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Service implementing server-side Quiz availability window checks, persistent attempt-limit enforcement,
- * and authoritative server-clock timer enforcement (FR-I20, DR-ED06) reusable by S19, S22, and S24.
+ * authoritative server-clock timer enforcement, and auto-evaluation answer grading (FR-I20, FR-I22, DR-ED06).
  */
 @Service
 public class QuizAttemptService {
@@ -30,7 +38,28 @@ public class QuizAttemptService {
     private final EnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
     private final QuizService quizService;
+    private final AutoGradingService autoGradingService;
+    private final QuizAttemptAnswerRepository quizAttemptAnswerRepository;
     private Clock clock = Clock.systemDefaultZone();
+
+    @Autowired
+    public QuizAttemptService(QuizRepository quizRepository,
+                              QuizQuestionRepository quizQuestionRepository,
+                              QuizAttemptRepository quizAttemptRepository,
+                              EnrollmentRepository enrollmentRepository,
+                              UserRepository userRepository,
+                              QuizService quizService,
+                              AutoGradingService autoGradingService,
+                              QuizAttemptAnswerRepository quizAttemptAnswerRepository) {
+        this.quizRepository = quizRepository;
+        this.quizQuestionRepository = quizQuestionRepository;
+        this.quizAttemptRepository = quizAttemptRepository;
+        this.enrollmentRepository = enrollmentRepository;
+        this.userRepository = userRepository;
+        this.quizService = quizService;
+        this.autoGradingService = autoGradingService != null ? autoGradingService : new AutoGradingService();
+        this.quizAttemptAnswerRepository = quizAttemptAnswerRepository;
+    }
 
     public QuizAttemptService(QuizRepository quizRepository,
                               QuizQuestionRepository quizQuestionRepository,
@@ -38,12 +67,9 @@ public class QuizAttemptService {
                               EnrollmentRepository enrollmentRepository,
                               UserRepository userRepository,
                               QuizService quizService) {
-        this.quizRepository = quizRepository;
-        this.quizQuestionRepository = quizQuestionRepository;
-        this.quizAttemptRepository = quizAttemptRepository;
-        this.enrollmentRepository = enrollmentRepository;
-        this.userRepository = userRepository;
-        this.quizService = quizService;
+        this(quizRepository, quizQuestionRepository, quizAttemptRepository,
+             enrollmentRepository, userRepository, quizService,
+             new AutoGradingService(), null);
     }
 
     void setClock(Clock clock) {
@@ -142,6 +168,14 @@ public class QuizAttemptService {
 
     @Transactional(noRollbackFor = QuizAttemptExpiredException.class)
     public QuizAttemptResponse submitQuizAttempt(User currentUser, Integer quizId, Integer attemptId) {
+        return submitQuizAttempt(currentUser, quizId, attemptId, null);
+    }
+
+    @Transactional(noRollbackFor = QuizAttemptExpiredException.class)
+    public QuizAttemptResponse submitQuizAttempt(User currentUser,
+                                                 Integer quizId,
+                                                 Integer attemptId,
+                                                 QuizSubmissionRequest submissionRequest) {
         validateActiveStudent(currentUser);
         QuizAttempt attempt = findAndVerifyStudentAttempt(quizId, attemptId, currentUser);
         Quiz quiz = attempt.getQuiz();
@@ -161,9 +195,134 @@ public class QuizAttemptService {
 
         attempt.setStatus(QuizAttemptStatus.SUBMITTED);
         attempt.setSubmittedAt(serverNow);
+
+        QuizEvaluationSummary summary = null;
+        if (submissionRequest != null && submissionRequest.getAnswers() != null && !submissionRequest.getAnswers().isEmpty()) {
+            List<QuizQuestion> linkedQuestions = quizQuestionRepository.findByQuizIdOrderByOrderIndexAsc(quiz.getId());
+            summary = autoGradingService.evaluateQuizSubmission(
+                    quiz, linkedQuestions, submissionRequest.getAnswers(), submissionRequest.getPolicy());
+
+            attempt.setObtainedMarks(summary.getTotalAwardedMarks());
+
+            if (quizAttemptAnswerRepository != null) {
+                Map<Integer, Question> questionMap = new HashMap<>();
+                for (QuizQuestion qq : linkedQuestions) {
+                    if (qq.getQuestion() != null) {
+                        questionMap.put(qq.getQuestion().getId(), qq.getQuestion());
+                    }
+                }
+
+                for (QuestionEvaluationResult result : summary.getResults()) {
+                    Question question = questionMap.get(result.getQuestionId());
+                    if (question != null) {
+                        QuizAttemptAnswer attemptAnswer = new QuizAttemptAnswer(
+                                attempt,
+                                question,
+                                result.getSubmittedAnswer(),
+                                result.getAwardedMarks(),
+                                result.getMaxMarks(),
+                                result.getStatus(),
+                                result.getFeedback(),
+                                serverNow
+                        );
+                        quizAttemptAnswerRepository.save(attemptAnswer);
+                    }
+                }
+            }
+        }
+
         QuizAttempt saved = quizAttemptRepository.save(attempt);
         long usedAttempts = quizAttemptRepository.countByQuizIdAndStudentId(quiz.getId(), currentUser.getId());
-        return mapToAttemptResponse(saved, quiz, serverNow, usedAttempts);
+        QuizAttemptResponse response = mapToAttemptResponse(saved, quiz, serverNow, usedAttempts);
+        if (summary != null) {
+            response.setEvaluationSummary(summary);
+        }
+        return response;
+    }
+
+    @Transactional(readOnly = true)
+    public QuizEvaluationSummary getAttemptEvaluation(User currentUser, Integer quizId, Integer attemptId) {
+        if (currentUser == null) {
+            throw new InvalidCredentialsException("User is not authenticated");
+        }
+        if (quizId == null || attemptId == null) {
+            throw new IllegalArgumentException("Quiz ID and Attempt ID cannot be null");
+        }
+
+        QuizAttempt attempt = quizAttemptRepository.findByIdAndQuizId(attemptId, quizId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Quiz attempt not found with id: " + attemptId + " for quiz: " + quizId));
+
+        Quiz quiz = attempt.getQuiz();
+
+        boolean isStudent = "student".equalsIgnoreCase(currentUser.getRole());
+        boolean isAdmin = "admin".equalsIgnoreCase(currentUser.getRole());
+        if (isStudent) {
+            if (!attempt.getStudent().getId().equals(currentUser.getId())) {
+                throw new AccessDeniedException("Access denied: you do not own this quiz attempt");
+            }
+        } else if (!isAdmin) {
+            quizService.verifyCourseAssociation(quiz.getCourse().getId(), currentUser);
+        }
+
+        List<QuizAttemptAnswer> storedAnswers = quizAttemptAnswerRepository != null
+                ? quizAttemptAnswerRepository.findByAttemptId(attemptId)
+                : List.of();
+
+        QuizEvaluationSummary summary = new QuizEvaluationSummary();
+        summary.setQuizId(quiz.getId());
+        summary.setAttemptId(attempt.getId());
+        summary.setPassingMarks(quiz.getPassingMarks());
+
+        BigDecimal totalAwarded = attempt.getObtainedMarks() != null ? attempt.getObtainedMarks() : BigDecimal.ZERO;
+        BigDecimal totalMax = quiz.getTotalMarks() != null ? quiz.getTotalMarks() : BigDecimal.ZERO;
+        int correct = 0;
+        int incorrect = 0;
+        int partial = 0;
+        int manual = 0;
+        int unanswered = 0;
+
+        List<QuestionEvaluationResult> results = new ArrayList<>();
+        for (QuizAttemptAnswer ans : storedAnswers) {
+            Question q = ans.getQuestion();
+            QuestionEvaluationResult res = new QuestionEvaluationResult(
+                    q.getId(),
+                    q.getQuestionType(),
+                    ans.getEvaluationStatus(),
+                    ans.getAwardedMarks(),
+                    ans.getMaxMarks(),
+                    ans.getSubmittedAnswer(),
+                    q.getCorrectAnswer(),
+                    q.getNumericalTolerance(),
+                    ans.getFeedback(),
+                    ans.getEvaluationStatus() == EvaluationStatus.MANUAL_GRADING_REQUIRED
+            );
+            results.add(res);
+
+            switch (ans.getEvaluationStatus()) {
+                case CORRECT -> correct++;
+                case INCORRECT -> incorrect++;
+                case PARTIALLY_CORRECT -> partial++;
+                case MANUAL_GRADING_REQUIRED -> manual++;
+                case UNANSWERED -> unanswered++;
+                case INVALID_SUBMISSION -> incorrect++;
+            }
+        }
+
+        summary.setTotalAwardedMarks(totalAwarded);
+        summary.setTotalMaxMarks(totalMax);
+        summary.setCorrectCount(correct);
+        summary.setIncorrectCount(incorrect);
+        summary.setPartiallyCorrectCount(partial);
+        summary.setManualGradingCount(manual);
+        summary.setUnansweredCount(unanswered);
+        summary.setResults(results);
+
+        if (summary.getPassingMarks() != null) {
+            summary.setPassed(totalAwarded.compareTo(summary.getPassingMarks()) >= 0);
+        }
+
+        return summary;
     }
 
     // =========================================================================

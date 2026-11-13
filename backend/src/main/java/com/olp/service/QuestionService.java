@@ -3,6 +3,9 @@ package com.olp.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.olp.dto.ApiResponse;
+import com.olp.dto.GradingPolicy;
+import com.olp.dto.QuestionEvaluationRequest;
+import com.olp.dto.QuestionEvaluationResult;
 import com.olp.dto.QuestionRequest;
 import com.olp.dto.QuestionResponse;
 import com.olp.entity.Course;
@@ -15,6 +18,7 @@ import com.olp.repository.CourseInstructorRepository;
 import com.olp.repository.CourseRepository;
 import com.olp.repository.QuestionRepository;
 import com.olp.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -25,7 +29,7 @@ import java.util.*;
 
 /**
  * Service implementing FR-I21 (Quiz Question Types CRUD, validation, manual grading routing,
- * and quiz-independent question management).
+ * and quiz-independent question management) and FR-I22 (Question auto-evaluation testing).
  */
 @Service
 public class QuestionService {
@@ -34,16 +38,27 @@ public class QuestionService {
     private final CourseRepository courseRepository;
     private final CourseInstructorRepository courseInstructorRepository;
     private final UserRepository userRepository;
+    private final AutoGradingService autoGradingService;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Autowired
+    public QuestionService(QuestionRepository questionRepository,
+                           CourseRepository courseRepository,
+                           CourseInstructorRepository courseInstructorRepository,
+                           UserRepository userRepository,
+                           AutoGradingService autoGradingService) {
+        this.questionRepository = questionRepository;
+        this.courseRepository = courseRepository;
+        this.courseInstructorRepository = courseInstructorRepository;
+        this.userRepository = userRepository;
+        this.autoGradingService = autoGradingService != null ? autoGradingService : new AutoGradingService();
+    }
 
     public QuestionService(QuestionRepository questionRepository,
                            CourseRepository courseRepository,
                            CourseInstructorRepository courseInstructorRepository,
                            UserRepository userRepository) {
-        this.questionRepository = questionRepository;
-        this.courseRepository = courseRepository;
-        this.courseInstructorRepository = courseInstructorRepository;
-        this.userRepository = userRepository;
+        this(questionRepository, courseRepository, courseInstructorRepository, userRepository, new AutoGradingService());
     }
 
     public User resolveUser(Authentication authentication) {
@@ -215,6 +230,24 @@ public class QuestionService {
         return question != null
                 && (Boolean.TRUE.equals(question.getRequiresManualGrading())
                 || question.getQuestionType() == QuestionType.DESCRIPTIVE);
+    }
+
+    @Transactional(readOnly = true)
+    public QuestionEvaluationResult evaluateQuestion(User currentUser, Integer questionId, QuestionEvaluationRequest request) {
+        validateInstructor(currentUser);
+        Question question = findAndVerifyQuestionAccess(questionId, currentUser);
+        String answer = request != null ? request.getSubmittedAnswer() : null;
+        if ((answer == null || answer.trim().isEmpty()) && request != null && request.getSelectedOptions() != null && !request.getSelectedOptions().isEmpty()) {
+            try {
+                answer = objectMapper.writeValueAsString(request.getSelectedOptions());
+            } catch (Exception ignored) {
+                answer = String.join(",", request.getSelectedOptions());
+            }
+        }
+        GradingPolicy policy = request != null && request.getPolicy() != null
+                ? request.getPolicy()
+                : GradingPolicy.defaultPolicy();
+        return autoGradingService.evaluateQuestion(question, answer, policy);
     }
 
     // =========================================================================
