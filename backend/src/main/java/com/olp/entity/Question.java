@@ -43,6 +43,15 @@ public class Question {
     @Column(name = "negative_marks", nullable = false, precision = 8, scale = 2)
     private BigDecimal negativeMarks = BigDecimal.ZERO;
 
+    @Column(name = "numerical_tolerance", precision = 8, scale = 2)
+    private BigDecimal numericalTolerance = BigDecimal.ZERO;
+
+    @Column(name = "grading_rubric", columnDefinition = "TEXT")
+    private String gradingRubric;
+
+    @Column(name = "requires_manual_grading", nullable = false)
+    private Boolean requiresManualGrading = Boolean.FALSE;
+
     @Column(length = 100)
     private String topic;
 
@@ -65,6 +74,12 @@ public class Question {
 
     public Question(Course course, User createdBy, String questionText, QuestionType questionType,
                     String optionsJson, String correctAnswer, BigDecimal defaultMarks, BigDecimal negativeMarks) {
+        this(course, createdBy, questionText, questionType, optionsJson, correctAnswer, defaultMarks, negativeMarks, BigDecimal.ZERO, null, null);
+    }
+
+    public Question(Course course, User createdBy, String questionText, QuestionType questionType,
+                    String optionsJson, String correctAnswer, BigDecimal defaultMarks, BigDecimal negativeMarks,
+                    BigDecimal numericalTolerance, String gradingRubric, Boolean requiresManualGrading) {
         this.course = course;
         this.createdBy = createdBy;
         this.questionText = questionText;
@@ -73,6 +88,11 @@ public class Question {
         this.correctAnswer = correctAnswer;
         this.defaultMarks = defaultMarks != null ? defaultMarks : BigDecimal.ONE;
         this.negativeMarks = negativeMarks != null ? negativeMarks : BigDecimal.ZERO;
+        this.numericalTolerance = numericalTolerance != null ? numericalTolerance : BigDecimal.ZERO;
+        this.gradingRubric = gradingRubric;
+        this.requiresManualGrading = requiresManualGrading != null
+                ? requiresManualGrading
+                : (this.questionType == QuestionType.DESCRIPTIVE);
     }
 
     @PrePersist
@@ -93,14 +113,25 @@ public class Question {
         if (this.negativeMarks == null) {
             this.negativeMarks = BigDecimal.ZERO;
         }
+        if (this.numericalTolerance == null) {
+            this.numericalTolerance = BigDecimal.ZERO;
+        }
         if (this.isBankQuestion == null) {
             this.isBankQuestion = Boolean.FALSE;
+        }
+        if (this.requiresManualGrading == null) {
+            this.requiresManualGrading = (this.questionType == QuestionType.DESCRIPTIVE);
+        } else if (this.questionType == QuestionType.DESCRIPTIVE) {
+            this.requiresManualGrading = Boolean.TRUE;
         }
     }
 
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
+        if (this.questionType == QuestionType.DESCRIPTIVE) {
+            this.requiresManualGrading = Boolean.TRUE;
+        }
     }
 
     public Integer getId() {
@@ -173,6 +204,38 @@ public class Question {
 
     public void setNegativeMarks(BigDecimal negativeMarks) {
         this.negativeMarks = negativeMarks;
+    }
+
+    public BigDecimal getNumericalTolerance() {
+        return numericalTolerance;
+    }
+
+    public void setNumericalTolerance(BigDecimal numericalTolerance) {
+        this.numericalTolerance = numericalTolerance;
+    }
+
+    public String getGradingRubric() {
+        return gradingRubric;
+    }
+
+    public void setGradingRubric(String gradingRubric) {
+        this.gradingRubric = gradingRubric;
+    }
+
+    public Boolean getRequiresManualGrading() {
+        return requiresManualGrading;
+    }
+
+    public void setRequiresManualGrading(Boolean requiresManualGrading) {
+        this.requiresManualGrading = requiresManualGrading;
+    }
+
+    public BigDecimal getMaxMarks() {
+        return defaultMarks;
+    }
+
+    public void setMaxMarks(BigDecimal maxMarks) {
+        this.defaultMarks = maxMarks;
     }
 
     public String getTopic() {
