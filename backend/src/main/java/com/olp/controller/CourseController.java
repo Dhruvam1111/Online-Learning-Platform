@@ -4,12 +4,15 @@ import com.olp.dto.CourseDetailResponse;
 import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CoursePreviewResponse;
 import com.olp.dto.CoursePricingResponse;
+import com.olp.dto.CourseSubmissionRequest;
+import com.olp.dto.CourseSubmissionResponse;
 import com.olp.dto.EnrollmentResponse;
 import com.olp.dto.LectureResponse;
 import com.olp.dto.PublicCourseResponse;
 import com.olp.entity.User;
 import com.olp.service.CourseCatalogService;
 import com.olp.service.CoursePreviewService;
+import com.olp.service.CourseSubmissionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -24,17 +27,26 @@ public class CourseController {
 
     private final CourseCatalogService courseCatalogService;
     private final CoursePreviewService coursePreviewService;
+    private final CourseSubmissionService courseSubmissionService;
 
     public CourseController(CourseCatalogService courseCatalogService) {
-        this(courseCatalogService, null);
+        this(courseCatalogService, null, null);
+    }
+
+    public CourseController(
+            CourseCatalogService courseCatalogService,
+            CoursePreviewService coursePreviewService) {
+        this(courseCatalogService, coursePreviewService, null);
     }
 
     @Autowired
     public CourseController(
             CourseCatalogService courseCatalogService,
-            @Autowired(required = false) CoursePreviewService coursePreviewService) {
+            @Autowired(required = false) CoursePreviewService coursePreviewService,
+            @Autowired(required = false) CourseSubmissionService courseSubmissionService) {
         this.courseCatalogService = courseCatalogService;
         this.coursePreviewService = coursePreviewService;
+        this.courseSubmissionService = courseSubmissionService;
     }
 
     /**
@@ -132,6 +144,42 @@ public class CourseController {
         CoursePreviewResponse response = coursePreviewService != null
                 ? coursePreviewService.previewCourseAsStudent(currentUser, id)
                 : null;
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/courses/{id}/submit
+     * FR-I08: Submit course for review.
+     */
+    @PostMapping("/{id:\\d+}/submit")
+    @PreAuthorize("hasRole('instructor')")
+    public ResponseEntity<CourseSubmissionResponse> submitCourse(
+            @PathVariable Integer id,
+            @RequestBody(required = false) CourseSubmissionRequest request,
+            Authentication authentication) {
+        User currentUser = courseCatalogService.resolveUser(authentication);
+        if (courseSubmissionService == null) {
+            throw new IllegalStateException("CourseSubmissionService is not configured");
+        }
+        CourseSubmissionResponse response = courseSubmissionService.submitCourseForReview(
+                currentUser, id, request != null ? request : new CourseSubmissionRequest());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/courses/{id}/submissions
+     * FR-I08: Retrieve course submission history.
+     */
+    @GetMapping("/{id:\\d+}/submissions")
+    @PreAuthorize("hasRole('instructor') or hasRole('admin')")
+    public ResponseEntity<List<CourseSubmissionResponse>> getSubmissions(
+            @PathVariable Integer id,
+            Authentication authentication) {
+        User currentUser = courseCatalogService.resolveUser(authentication);
+        if (courseSubmissionService == null) {
+            throw new IllegalStateException("CourseSubmissionService is not configured");
+        }
+        List<CourseSubmissionResponse> response = courseSubmissionService.getSubmissionHistory(currentUser, id);
         return ResponseEntity.ok(response);
     }
 }
