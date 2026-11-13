@@ -426,10 +426,11 @@ CREATE TABLE instructor_upload_history (
 -- TABLE: lecture_progress
 -- =========================
 CREATE TABLE lecture_progress (
-    id           SERIAL PRIMARY KEY,
-    student_id   INTEGER   NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    lecture_id   INTEGER   NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
-    completed_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    id                         SERIAL PRIMARY KEY,
+    student_id                 INTEGER   NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    lecture_id                 INTEGER   NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
+    completed_at               TIMESTAMP NOT NULL DEFAULT NOW(),
+    playback_position_seconds  INTEGER   NOT NULL DEFAULT 0,
     UNIQUE (student_id, lecture_id)
 );
 
@@ -714,3 +715,24 @@ CREATE TABLE quiz_attempt_answers (
     CONSTRAINT chk_attempt_answer_status
         CHECK (evaluation_status IN ('CORRECT', 'INCORRECT', 'PARTIALLY_CORRECT', 'MANUAL_GRADING_REQUIRED', 'PENDING', 'UNANSWERED', 'INVALID_SUBMISSION'))
 );
+-- Step 13 / FR-I13: Chunked and Resumable Video Uploads
+CREATE TABLE IF NOT EXISTS video_uploads (
+    id VARCHAR(64) PRIMARY KEY,
+    lesson_id INT NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+    uploader_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    filename VARCHAR(255) NOT NULL,
+    file_type VARCHAR(100) NOT NULL,
+    total_bytes BIGINT NOT NULL,
+    received_bytes BIGINT NOT NULL DEFAULT 0,
+    chunk_size BIGINT NOT NULL,
+    total_chunks INT NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'INITIATED',
+    storage_path VARCHAR(500),
+    hls_url VARCHAR(500),
+    dash_url VARCHAR(500),
+    failure_reason TEXT,
+    expires_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+

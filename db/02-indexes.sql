@@ -112,3 +112,8 @@ CREATE INDEX idx_quiz_attempts_status ON quiz_attempts(status);
 CREATE INDEX idx_quiz_attempt_answers_attempt ON quiz_attempt_answers(attempt_id);
 CREATE INDEX idx_quiz_attempt_answers_question ON quiz_attempt_answers(question_id);
 CREATE INDEX idx_quiz_attempt_answers_status ON quiz_attempt_answers(evaluation_status);
+-- Step 13 / FR-I13: Video Upload Indexes
+CREATE INDEX IF NOT EXISTS idx_video_uploads_lesson_id ON video_uploads(lesson_id);
+CREATE INDEX IF NOT EXISTS idx_video_uploads_uploader_id ON video_uploads(uploader_id);
+CREATE INDEX IF NOT EXISTS idx_video_uploads_status ON video_uploads(status);
+
