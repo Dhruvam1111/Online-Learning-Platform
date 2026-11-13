@@ -28,7 +28,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -117,7 +116,7 @@ class VideoUploadServiceTest {
         request.setFilename("lecture1.mp4");
         request.setFileType("video/mp4");
         request.setTotalBytes(15728640L); // 15 MB
-        request.setChunkSize(5242880L);  // 5 MB -> 3 chunks
+        request.setChunkSize(5242880L); // 5 MB -> 3 chunks
 
         when(lessonRepository.findById(401)).thenReturn(Optional.of(videoLesson));
         doNothing().when(contentDeclarationService).assertDeclared(401);
@@ -230,13 +229,15 @@ class VideoUploadServiceTest {
 
     @Test
     void testUploadChunk_IntermediateChunk() throws IOException {
-        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L, 3);
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L,
+                3);
         when(videoUploadRepository.findById("sess-1")).thenReturn(Optional.of(upload));
         when(videoStorageService.saveChunk(eq("sess-1"), eq(0), any(InputStream.class))).thenReturn(500L);
         when(videoStorageService.getUploadedChunkIndices("sess-1")).thenReturn(List.of(0));
         when(videoUploadRepository.save(any(VideoUpload.class))).thenAnswer(i -> i.getArgument(0));
 
-        MockMultipartFile chunkFile = new MockMultipartFile("file", "chunk0.part", "application/octet-stream", new byte[500]);
+        MockMultipartFile chunkFile = new MockMultipartFile("file", "chunk0.part", "application/octet-stream",
+                new byte[500]);
         VideoChunkResponse response = videoUploadService.uploadChunk(instructor, "sess-1", 0, chunkFile);
 
         assertNotNull(response);
@@ -249,14 +250,17 @@ class VideoUploadServiceTest {
 
     @Test
     void testUploadChunk_FinalChunkAssemblesAndTranscodes() throws IOException {
-        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1000L, 500L, 2);
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1000L, 500L,
+                2);
         when(videoUploadRepository.findById("sess-1")).thenReturn(Optional.of(upload));
         when(videoStorageService.saveChunk(eq("sess-1"), eq(1), any(InputStream.class))).thenReturn(500L);
         when(videoStorageService.getUploadedChunkIndices("sess-1")).thenReturn(List.of(0, 1));
-        when(videoStorageService.assembleChunks("sess-1", "video.mp4", 2)).thenReturn("/uploads/videos/sess-1_video.mp4");
+        when(videoStorageService.assembleChunks("sess-1", "video.mp4", 2))
+                .thenReturn("/uploads/videos/sess-1_video.mp4");
         when(videoUploadRepository.save(any(VideoUpload.class))).thenAnswer(i -> i.getArgument(0));
 
-        MockMultipartFile chunkFile = new MockMultipartFile("file", "chunk1.part", "application/octet-stream", new byte[500]);
+        MockMultipartFile chunkFile = new MockMultipartFile("file", "chunk1.part", "application/octet-stream",
+                new byte[500]);
         VideoChunkResponse response = videoUploadService.uploadChunk(instructor, "sess-1", 1, chunkFile);
 
         assertNotNull(response);
@@ -272,35 +276,45 @@ class VideoUploadServiceTest {
 
     @Test
     void testUploadChunk_Fails_AlreadyCompleted() {
-        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1000L, 500L, 2);
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1000L, 500L,
+                2);
         upload.setStatus(VideoUploadStatus.COMPLETED);
         when(videoUploadRepository.findById("sess-1")).thenReturn(Optional.of(upload));
 
-        MockMultipartFile chunkFile = new MockMultipartFile("file", "chunk0.part", "application/octet-stream", new byte[500]);
-        assertThrows(IllegalStateException.class, () -> videoUploadService.uploadChunk(instructor, "sess-1", 0, chunkFile));
+        MockMultipartFile chunkFile = new MockMultipartFile("file", "chunk0.part", "application/octet-stream",
+                new byte[500]);
+        assertThrows(IllegalStateException.class,
+                () -> videoUploadService.uploadChunk(instructor, "sess-1", 0, chunkFile));
     }
 
     @Test
     void testUploadChunk_Fails_InvalidChunkIndex() {
-        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1000L, 500L, 2);
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1000L, 500L,
+                2);
         when(videoUploadRepository.findById("sess-1")).thenReturn(Optional.of(upload));
 
-        MockMultipartFile chunkFile = new MockMultipartFile("file", "chunk0.part", "application/octet-stream", new byte[500]);
-        assertThrows(IllegalArgumentException.class, () -> videoUploadService.uploadChunk(instructor, "sess-1", 5, chunkFile));
+        MockMultipartFile chunkFile = new MockMultipartFile("file", "chunk0.part", "application/octet-stream",
+                new byte[500]);
+        assertThrows(IllegalArgumentException.class,
+                () -> videoUploadService.uploadChunk(instructor, "sess-1", 5, chunkFile));
     }
 
     @Test
     void testUploadChunk_Fails_EmptyFile() {
-        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1000L, 500L, 2);
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1000L, 500L,
+                2);
         when(videoUploadRepository.findById("sess-1")).thenReturn(Optional.of(upload));
 
-        MockMultipartFile emptyFile = new MockMultipartFile("file", "chunk0.part", "application/octet-stream", new byte[0]);
-        assertThrows(IllegalArgumentException.class, () -> videoUploadService.uploadChunk(instructor, "sess-1", 0, emptyFile));
+        MockMultipartFile emptyFile = new MockMultipartFile("file", "chunk0.part", "application/octet-stream",
+                new byte[0]);
+        assertThrows(IllegalArgumentException.class,
+                () -> videoUploadService.uploadChunk(instructor, "sess-1", 0, emptyFile));
     }
 
     @Test
     void testResumeUpload_Success() {
-        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L, 3);
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L,
+                3);
         upload.setReceivedBytes(500L);
         upload.setStatus(VideoUploadStatus.UPLOADING);
 
@@ -315,7 +329,8 @@ class VideoUploadServiceTest {
 
     @Test
     void testGetUploadStatus_Success() {
-        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L, 3);
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L,
+                3);
         upload.setReceivedBytes(1000L);
         upload.setStatus(VideoUploadStatus.UPLOADING);
 
@@ -330,7 +345,8 @@ class VideoUploadServiceTest {
 
     @Test
     void testGetVideoByLesson_Success() {
-        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L, 3);
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L,
+                3);
         when(lessonRepository.findById(401)).thenReturn(Optional.of(videoLesson));
         when(videoUploadRepository.findFirstByLessonIdOrderByCreatedAtDesc(401)).thenReturn(Optional.of(upload));
 
@@ -363,4 +379,3 @@ class VideoUploadServiceTest {
         assertEquals(instructor, resolved);
     }
 }
-

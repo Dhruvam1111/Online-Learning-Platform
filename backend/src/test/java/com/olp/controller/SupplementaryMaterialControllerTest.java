@@ -19,8 +19,6 @@ import org.springframework.security.core.Authentication;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -79,7 +77,8 @@ class SupplementaryMaterialControllerTest {
         when(materialService.resolveUser(authentication)).thenReturn(instructor);
         when(materialService.getMaterialsByLesson(instructor, 400)).thenReturn(List.of(resp));
 
-        ResponseEntity<List<SupplementaryMaterialResponse>> response = controller.getMaterialsByLesson(400, authentication);
+        ResponseEntity<List<SupplementaryMaterialResponse>> response = controller.getMaterialsByLesson(400,
+                authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -95,7 +94,8 @@ class SupplementaryMaterialControllerTest {
         when(materialService.resolveUser(authentication)).thenReturn(instructor);
         when(materialService.getMaterialsByModule(instructor, 200)).thenReturn(List.of(resp));
 
-        ResponseEntity<List<SupplementaryMaterialResponse>> response = controller.getMaterialsByModule(200, authentication);
+        ResponseEntity<List<SupplementaryMaterialResponse>> response = controller.getMaterialsByModule(200,
+                authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -160,4 +160,3 @@ class SupplementaryMaterialControllerTest {
         verify(materialService, times(1)).updateDownloadableStatus(instructor, 3, false);
     }
 }
-

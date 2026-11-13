@@ -4,6 +4,7 @@ import com.olp.dto.CourseDetailResponse;
 import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CoursePreviewResponse;
 import com.olp.dto.CoursePricingResponse;
+import com.olp.dto.CourseReviewStatusResponse;
 import com.olp.dto.CourseSubmissionRequest;
 import com.olp.dto.CourseSubmissionResponse;
 import com.olp.dto.EnrollmentResponse;
@@ -180,6 +181,42 @@ public class CourseController {
             throw new IllegalStateException("CourseSubmissionService is not configured");
         }
         List<CourseSubmissionResponse> response = courseSubmissionService.getSubmissionHistory(currentUser, id);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/courses/{id}/review-status
+     * FR-I71: Retrieve course review status.
+     */
+    @GetMapping("/{id:\\d+}/review-status")
+    @PreAuthorize("hasRole('instructor') or hasRole('admin')")
+    public ResponseEntity<CourseReviewStatusResponse> getReviewStatus(
+            @PathVariable Integer id,
+            Authentication authentication) {
+        User currentUser = courseCatalogService.resolveUser(authentication);
+        if (courseSubmissionService == null) {
+            throw new IllegalStateException("CourseSubmissionService is not configured");
+        }
+        CourseReviewStatusResponse response = courseSubmissionService.getReviewStatus(currentUser, id);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/courses/{id}/resubmit
+     * FR-I71: Resubmit course for review after changes requested.
+     */
+    @PostMapping("/{id:\\d+}/resubmit")
+    @PreAuthorize("hasRole('instructor')")
+    public ResponseEntity<CourseSubmissionResponse> resubmitCourse(
+            @PathVariable Integer id,
+            @RequestBody(required = false) CourseSubmissionRequest request,
+            Authentication authentication) {
+        User currentUser = courseCatalogService.resolveUser(authentication);
+        if (courseSubmissionService == null) {
+            throw new IllegalStateException("CourseSubmissionService is not configured");
+        }
+        CourseSubmissionResponse response = courseSubmissionService.resubmitCourse(
+                currentUser, id, request != null ? request : new CourseSubmissionRequest());
         return ResponseEntity.ok(response);
     }
 }

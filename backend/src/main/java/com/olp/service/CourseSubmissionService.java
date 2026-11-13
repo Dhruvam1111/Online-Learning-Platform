@@ -1,6 +1,7 @@
 package com.olp.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.olp.dto.CourseReviewStatusResponse;
 import com.olp.dto.CourseSubmissionRequest;
 import com.olp.dto.CourseSubmissionResponse;
 import com.olp.entity.*;
@@ -162,6 +163,96 @@ public class CourseSubmissionService {
             responses.add(CourseSubmissionResponse.fromEntity(submissions.get(i), submissionNumber));
         }
         return responses;
+    }
+
+    /**
+     * FR-I71: Retrieves the review status of a course.
+     * Exposes current review status (PENDING, APPROVED, REJECTED, CHANGES_REQUESTED),
+     * admin comments, rejection/change-request reasons, timestamps, and previous submission history.
+     */
+    @Transactional(readOnly = true)
+    public CourseReviewStatusResponse getReviewStatus(User currentUser, Integer courseId) {
+        validateInstructorOrAdmin(currentUser);
+
+        if (courseId == null) {
+            throw new IllegalArgumentException("Course ID cannot be null");
+        }
+
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
+
+        verifyCourseAccess(course, currentUser);
+
+        List<CourseSubmission> submissions = courseSubmissionRepository.findByCourseIdOrderBySubmittedAtDesc(courseId);
+        long totalSubmissions = submissions.size();
+
+        List<CourseSubmissionResponse> history = new ArrayList<>();
+        for (int i = 0; i < submissions.size(); i++) {
+            long submissionNumber = totalSubmissions - i;
+            history.add(CourseSubmissionResponse.fromEntity(submissions.get(i), submissionNumber));
+        }
+
+        CourseSubmission latestSubmission = submissions.isEmpty() ? null : submissions.get(0);
+        return CourseReviewStatusResponse.fromCourseAndSubmissions(course, latestSubmission, totalSubmissions, history);
+    }
+
+    /**
+     * FR-I71: Resubmits a course for admin review after changes have been requested.
+     * Enforces that the course status is CHANGES_REQUESTED, re-validates course content,
+     * freezes an updated course snapshot, saves a new submission history record,
+     * and transitions status back to PENDING_REVIEW.
+     */
+    @Transactional
+    public CourseSubmissionResponse resubmitCourse(User currentUser, Integer courseId, CourseSubmissionRequest request) {
+        validateInstructorOrAdmin(currentUser);
+
+        if (courseId == null) {
+            throw new IllegalArgumentException("Course ID cannot be null");
+        }
+
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
+
+        verifyCourseAccess(course, currentUser);
+
+        if (course.getStatus() != CourseStatus.CHANGES_REQUESTED) {
+            throw new IllegalStateException("Course can only be resubmitted when status is CHANGES_REQUESTED (current status: "
+                    + (course.getStatus() != null ? course.getStatus().name() : "null") + ")");
+        }
+
+        // Validate course completeness before resubmission
+        validateCourseForSubmission(course);
+
+        // Fetch modules and lectures for snapshot
+        List<CourseModule> modules = courseModuleRepository != null
+                ? courseModuleRepository.findByCourseIdOrderByOrderIndexAsc(courseId)
+                : (course.getModules() != null ? course.getModules() : Collections.emptyList());
+
+        List<Lecture> lectures = lectureRepository != null
+                ? lectureRepository.findByCourseIdOrderByOrderIndexAsc(courseId)
+                : Collections.emptyList();
+
+        String snapshotData = generateCourseSnapshot(course, modules, lectures);
+
+        // Create and persist new submission record while preserving prior submission history
+        String comments = request != null ? request.getComments() : null;
+        CourseSubmission submission = new CourseSubmission(
+                course,
+                currentUser,
+                CourseStatus.PENDING_REVIEW.name(),
+                comments,
+                snapshotData
+        );
+        CourseSubmission savedSubmission = courseSubmissionRepository.save(submission);
+
+        // Transition course back to PENDING_REVIEW and clear review comments
+        course.setStatus(CourseStatus.PENDING_REVIEW);
+        course.setRejectionReason(null);
+        course.setReviewComments(null);
+        courseRepository.save(course);
+
+        long submissionCount = courseSubmissionRepository.countByCourseId(courseId);
+        return CourseSubmissionResponse.fromEntity(savedSubmission, submissionCount);
     }
 
     /**

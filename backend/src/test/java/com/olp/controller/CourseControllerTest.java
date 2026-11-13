@@ -2,6 +2,7 @@ package com.olp.controller;
 
 import com.olp.dto.CoursePreviewResponse;
 import com.olp.dto.CoursePricingResponse;
+import com.olp.dto.CourseReviewStatusResponse;
 import com.olp.dto.CourseSubmissionRequest;
 import com.olp.dto.CourseSubmissionResponse;
 import com.olp.dto.EnrollmentResponse;
@@ -135,6 +136,44 @@ class CourseControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertEquals(1, response.getBody().size());
         verify(courseSubmissionService).getSubmissionHistory(student, 101);
+    }
+
+    @Test
+    void testGetReviewStatus_Returns200WithStatus() {
+        when(courseCatalogService.resolveUser(authentication)).thenReturn(student);
+        CourseReviewStatusResponse statusResp = new CourseReviewStatusResponse();
+        statusResp.setCourseId(101);
+        statusResp.setReviewStatus("CHANGES_REQUESTED");
+        statusResp.setCanResubmit(true);
+        when(courseSubmissionService.getReviewStatus(student, 101)).thenReturn(statusResp);
+
+        ResponseEntity<CourseReviewStatusResponse> response = controller.getReviewStatus(101, authentication);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("CHANGES_REQUESTED", response.getBody().getReviewStatus());
+        assertTrue(response.getBody().isCanResubmit());
+        verify(courseSubmissionService).getReviewStatus(student, 101);
+    }
+
+    @Test
+    void testResubmitCourse_Returns200WithSubmissionResponse() {
+        when(courseCatalogService.resolveUser(authentication)).thenReturn(student);
+        CourseSubmissionRequest request = new CourseSubmissionRequest("Fixed requested items");
+        CourseSubmissionResponse subResp = new CourseSubmissionResponse();
+        subResp.setId(2);
+        subResp.setCourseId(101);
+        subResp.setStatus("PENDING_REVIEW");
+        when(courseSubmissionService.resubmitCourse(eq(student), eq(101), any(CourseSubmissionRequest.class)))
+                .thenReturn(subResp);
+
+        ResponseEntity<CourseSubmissionResponse> response = controller.resubmitCourse(101, request, authentication);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertSame(subResp, response.getBody());
+        assertEquals("PENDING_REVIEW", response.getBody().getStatus());
+        verify(courseSubmissionService).resubmitCourse(eq(student), eq(101), any(CourseSubmissionRequest.class));
     }
 }
 

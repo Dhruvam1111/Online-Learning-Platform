@@ -22,6 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class InstructorMediaService {
@@ -58,10 +59,10 @@ public class InstructorMediaService {
     public ProfilePictureResponse uploadProfilePicture(User currentUser, MultipartFile file) {
         validateInstructorUser(currentUser);
 
-        User instructor = userRepository.findById(currentUser.getId())
+        User instructor = userRepository.findById(Objects.requireNonNull(currentUser.getId()))
                 .orElseThrow(() -> new InvalidCredentialsException("User not found"));
 
-        InstructorProfile profile = instructorProfileRepository.findByInstructorId(instructor.getId())
+        InstructorProfile profile = instructorProfileRepository.findByInstructorId(Objects.requireNonNull(instructor.getId()))
                 .orElseGet(() -> {
                     InstructorProfile newProfile = new InstructorProfile();
                     newProfile.setInstructor(instructor);
@@ -142,7 +143,7 @@ public class InstructorMediaService {
     public ApiResponse deleteProfilePicture(User currentUser) {
         validateInstructorUser(currentUser);
 
-        InstructorProfile profile = instructorProfileRepository.findByInstructorId(currentUser.getId())
+        InstructorProfile profile = instructorProfileRepository.findByInstructorId(Objects.requireNonNull(currentUser.getId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Instructor profile not found"));
 
         if (profile.getProfilePictureUrl() == null || profile.getProfilePictureUrl().isBlank()) {
@@ -189,7 +190,7 @@ public class InstructorMediaService {
     public InstructorCredentialResponse uploadCredential(User currentUser, MultipartFile file, String documentType) {
         validateInstructorUser(currentUser);
 
-        User instructor = userRepository.findById(currentUser.getId())
+        User instructor = userRepository.findById(Objects.requireNonNull(currentUser.getId()))
                 .orElseThrow(() -> new InvalidCredentialsException("User not found"));
 
         String docType = (documentType != null && !documentType.isBlank())
@@ -235,7 +236,7 @@ public class InstructorMediaService {
         validateInstructorUser(currentUser);
 
         List<InstructorCredential> credentials = instructorCredentialRepository
-                .findByInstructorIdAndStatus(currentUser.getId(), "ACTIVE");
+                .findByInstructorIdAndStatus(Objects.requireNonNull(currentUser.getId()), "ACTIVE");
 
         return credentials.stream()
                 .map(this::toCredentialResponse)
@@ -248,7 +249,10 @@ public class InstructorMediaService {
      */
     @Transactional(readOnly = true)
     public InstructorCredentialResponse getCredential(User currentUser, Integer credentialId) {
-        InstructorCredential credential = instructorCredentialRepository.findById(credentialId)
+        if (credentialId == null) {
+            throw new IllegalArgumentException("Credential ID cannot be null");
+        }
+        InstructorCredential credential = instructorCredentialRepository.findById(Objects.requireNonNull(credentialId))
                 .orElseThrow(() -> new ResourceNotFoundException("Credential not found with id: " + credentialId));
 
         assertCanAccessCredential(currentUser, credential);
@@ -261,7 +265,10 @@ public class InstructorMediaService {
      */
     @Transactional(readOnly = true)
     public Resource downloadCredential(User currentUser, Integer credentialId) {
-        InstructorCredential credential = instructorCredentialRepository.findById(credentialId)
+        if (credentialId == null) {
+            throw new IllegalArgumentException("Credential ID cannot be null");
+        }
+        InstructorCredential credential = instructorCredentialRepository.findById(Objects.requireNonNull(credentialId))
                 .orElseThrow(() -> new ResourceNotFoundException("Credential not found with id: " + credentialId));
 
         assertCanAccessCredential(currentUser, credential);
@@ -276,8 +283,11 @@ public class InstructorMediaService {
     public InstructorCredentialResponse replaceCredential(User currentUser, Integer credentialId,
                                                           MultipartFile file, String documentType) {
         validateInstructorUser(currentUser);
+        if (credentialId == null) {
+            throw new IllegalArgumentException("Credential ID cannot be null");
+        }
 
-        InstructorCredential credential = instructorCredentialRepository.findById(credentialId)
+        InstructorCredential credential = instructorCredentialRepository.findById(Objects.requireNonNull(credentialId))
                 .orElseThrow(() -> new ResourceNotFoundException("Credential not found with id: " + credentialId));
 
         if (!credential.getInstructor().getId().equals(currentUser.getId())) {
@@ -327,8 +337,11 @@ public class InstructorMediaService {
     @Transactional
     public ApiResponse deleteCredential(User currentUser, Integer credentialId) {
         validateInstructorUser(currentUser);
+        if (credentialId == null) {
+            throw new IllegalArgumentException("Credential ID cannot be null");
+        }
 
-        InstructorCredential credential = instructorCredentialRepository.findById(credentialId)
+        InstructorCredential credential = instructorCredentialRepository.findById(Objects.requireNonNull(credentialId))
                 .orElseThrow(() -> new ResourceNotFoundException("Credential not found with id: " + credentialId));
 
         if (!credential.getInstructor().getId().equals(currentUser.getId())) {
@@ -371,7 +384,7 @@ public class InstructorMediaService {
         validateInstructorUser(currentUser);
 
         List<InstructorUploadHistory> historyList = instructorUploadHistoryRepository
-                .findByInstructorIdOrderByCreatedAtDesc(currentUser.getId());
+                .findByInstructorIdOrderByCreatedAtDesc(Objects.requireNonNull(currentUser.getId()));
 
         return historyList.stream()
                 .map(h -> new UploadHistoryResponse(
@@ -400,7 +413,7 @@ public class InstructorMediaService {
         if (instructorId == null) {
             throw new IllegalArgumentException("Instructor ID cannot be null");
         }
-        return instructorCredentialRepository.findByInstructorIdAndStatus(instructorId, "ACTIVE")
+        return instructorCredentialRepository.findByInstructorIdAndStatus(Objects.requireNonNull(instructorId), "ACTIVE")
                 .stream()
                 .map(this::toCredentialResponse)
                 .toList();
@@ -411,7 +424,7 @@ public class InstructorMediaService {
     // =========================================================================
 
     private void validateInstructorUser(User user) {
-        if (user == null) {
+        if (user == null || user.getId() == null) {
             throw new InvalidCredentialsException("User is not authenticated");
         }
         if (!"instructor".equalsIgnoreCase(user.getRole())) {
@@ -420,10 +433,10 @@ public class InstructorMediaService {
     }
 
     private void assertCanAccessCredential(User user, InstructorCredential credential) {
-        if (user == null) {
+        if (user == null || user.getId() == null) {
             throw new InvalidCredentialsException("User is not authenticated");
         }
-        boolean isOwner = credential.getInstructor().getId().equals(user.getId());
+        boolean isOwner = credential.getInstructor() != null && Objects.equals(credential.getInstructor().getId(), user.getId());
         boolean isAdmin = "admin".equalsIgnoreCase(user.getRole());
 
         if (!isOwner && !isAdmin) {

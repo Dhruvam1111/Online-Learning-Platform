@@ -983,6 +983,115 @@ public class EmailService {
                 """.formatted(accentColor, decisionLabel, escapedName, summaryMessage, notesHtml);
     }
 
+    /**
+     * Sends an email notification to an instructor when their course review decision is made
+     * (approved, rejected, or changes requested) by an administrator (FR-I71).
+     */
+    public void sendCourseReviewDecisionEmail(
+            String toEmail,
+            String instructorName,
+            String courseTitle,
+            String decision,
+            String adminComments) {
+        if (toEmail == null || toEmail.isBlank()) {
+            return;
+        }
+        String displayName = (instructorName != null && !instructorName.isBlank()) ? instructorName.trim() : toEmail;
+        String safeCourseTitle = (courseTitle != null && !courseTitle.isBlank()) ? courseTitle.trim() : "Course";
+        String normalizedDecision = (decision != null && !decision.isBlank()) ? decision.trim().toUpperCase() : "REVIEWED";
+
+        String decisionLabel;
+        if ("APPROVED".equalsIgnoreCase(normalizedDecision) || "PUBLISHED".equalsIgnoreCase(normalizedDecision)) {
+            decisionLabel = "Approved";
+        } else if ("REJECTED".equalsIgnoreCase(normalizedDecision)) {
+            decisionLabel = "Rejected";
+        } else if ("CHANGES_REQUESTED".equalsIgnoreCase(normalizedDecision)) {
+            decisionLabel = "Changes Requested";
+        } else {
+            decisionLabel = normalizedDecision;
+        }
+
+        log.info("[EmailService] Dispatched Course Review {} Notification to {} for Course '{}'",
+                decisionLabel, toEmail, safeCourseTitle);
+
+        if (senderEmail == null || senderEmail.isBlank()) {
+            return;
+        }
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(senderEmail, "Focotech");
+            helper.setTo(toEmail);
+            helper.setSubject("Course Review Update: " + safeCourseTitle + " - " + decisionLabel);
+
+            String commentsHtml = (adminComments != null && !adminComments.isBlank())
+                    ? "<p style=\"color: #5a524c; font-size: 14px;\"><strong>Admin Comments / Reason:</strong> "
+                            + escapeHtml(adminComments.trim()) + "</p>"
+                    : "";
+            String html = buildCourseReviewDecisionHtml(displayName, safeCourseTitle, decisionLabel, commentsHtml);
+            helper.setText(html, true);
+
+            mailSender.send(message);
+            log.info("[EmailService] Course review decision email sent to: {}", toEmail);
+        } catch (Exception e) {
+            log.warn("[EmailService] Failed to send course review decision email via SMTP ({}), continuing.",
+                    e.getMessage());
+        }
+    }
+
+    private String buildCourseReviewDecisionHtml(
+            String displayName,
+            String courseTitle,
+            String decisionLabel,
+            String commentsHtml) {
+        String escapedName = escapeHtml(displayName);
+        String escapedTitle = escapeHtml(courseTitle);
+        String accentColor;
+        String summaryMessage;
+
+        if ("Approved".equalsIgnoreCase(decisionLabel)) {
+            accentColor = "#047857";
+            summaryMessage = "Congratulations! Your course <strong>\"" + escapedTitle + "\"</strong> has been approved and published to the student catalog.";
+        } else if ("Changes Requested".equalsIgnoreCase(decisionLabel)) {
+            accentColor = "#d97706";
+            summaryMessage = "The administrator has reviewed your course <strong>\"" + escapedTitle + "\"</strong> and requested some modifications before it can be published. You can edit the course and resubmit it when ready.";
+        } else {
+            accentColor = "#dc2626";
+            summaryMessage = "Your course <strong>\"" + escapedTitle + "\"</strong> was not approved for publication at this time.";
+        }
+
+        return """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                  <meta charset="UTF-8">
+                  <title>Course Review Decision</title>
+                </head>
+                <body style="margin: 0; padding: 0; background-color: #f7f4f1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%%" style="background-color: #f7f4f1; padding: 48px 16px;">
+                    <tr>
+                      <td align="center">
+                        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%%" style="max-width: 520px; background-color: #ffffff; border-radius: 12px; border: 1px solid #e8e2dc; padding: 32px;">
+                          <tr>
+                            <td>
+                              <h2 style="color: %s; margin-top: 0;">Course Review: %s</h2>
+                              <p style="color: #5a524c; font-size: 14px;">Hello %s,</p>
+                              <p style="color: #5a524c; font-size: 14px;">%s</p>
+                              %s
+                              <p style="color: #8a817a; font-size: 12px; margin-top: 24px;">Focotech Platform Administration</p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(accentColor, decisionLabel, escapedName, summaryMessage, commentsHtml);
+    }
+
     private String escapeHtml(String value) {
         if (value == null) {
             return "";

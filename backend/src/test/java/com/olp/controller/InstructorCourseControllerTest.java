@@ -7,6 +7,7 @@ import com.olp.dto.CoursePreviewResponse;
 import com.olp.dto.CoursePricingRequest;
 import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.CourseResponse;
+import com.olp.dto.CourseReviewStatusResponse;
 import com.olp.dto.CourseSubmissionRequest;
 import com.olp.dto.CourseSubmissionResponse;
 import com.olp.dto.CreateCourseRequest;
@@ -507,5 +508,50 @@ class InstructorCourseControllerTest {
         assertEquals(1, response.getBody().size());
         assertSame(submission, response.getBody().get(0));
         verify(instructorCourseService).getCourseSubmissions(currentUser, 10);
+    }
+
+    @Test
+    void testGetReviewStatus_Returns200WithReviewStatusResponse() {
+        givenResolvedUser();
+        CourseReviewStatusResponse statusResp = new CourseReviewStatusResponse();
+        statusResp.setCourseId(10);
+        statusResp.setStatus("CHANGES_REQUESTED");
+        statusResp.setReviewStatus("CHANGES_REQUESTED");
+        statusResp.setCanResubmit(true);
+        statusResp.setAdminComments("Please adjust exercise order.");
+
+        when(instructorCourseService.getCourseReviewStatus(currentUser, 10))
+                .thenReturn(statusResp);
+
+        ResponseEntity<CourseReviewStatusResponse> response = controller.getReviewStatus(authentication, 10);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("CHANGES_REQUESTED", response.getBody().getReviewStatus());
+        assertTrue(response.getBody().isCanResubmit());
+        assertEquals("Please adjust exercise order.", response.getBody().getAdminComments());
+        verify(instructorCourseService).getCourseReviewStatus(currentUser, 10);
+    }
+
+    @Test
+    void testResubmitCourse_Returns200WithSubmissionResponse() {
+        givenResolvedUser();
+        CourseSubmissionRequest request = new CourseSubmissionRequest("Fixed requested changes.");
+        CourseSubmissionResponse submission = new CourseSubmissionResponse();
+        submission.setId(2);
+        submission.setCourseId(10);
+        submission.setStatus("PENDING_REVIEW");
+        submission.setComments("Fixed requested changes.");
+
+        when(instructorCourseService.resubmitCourse(eq(currentUser), eq(10), any(CourseSubmissionRequest.class)))
+                .thenReturn(submission);
+
+        ResponseEntity<CourseSubmissionResponse> response = controller.resubmitCourse(authentication, 10, request);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertSame(submission, response.getBody());
+        assertEquals("PENDING_REVIEW", response.getBody().getStatus());
+        verify(instructorCourseService).resubmitCourse(eq(currentUser), eq(10), any(CourseSubmissionRequest.class));
     }
 }

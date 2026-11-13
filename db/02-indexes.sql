@@ -133,4 +133,8 @@ CREATE INDEX IF NOT EXISTS idx_course_submissions_submitted_at ON course_submiss
 CREATE INDEX IF NOT EXISTS idx_quiz_attempt_answers_attempt ON quiz_attempt_answers(attempt_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz_student ON quiz_attempts(quiz_id, student_id);
 
+-- Step 35 / FR-I71: Course Review Status Indexes
+CREATE INDEX IF NOT EXISTS idx_course_submissions_reviewed_at ON course_submissions(reviewed_at);
+
+
 

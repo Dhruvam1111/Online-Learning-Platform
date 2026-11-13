@@ -17,8 +17,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -84,7 +82,8 @@ class CoursePreviewServiceTest {
         adminUser = new User("Admin John", "admin@olp.com", "hash", "admin", "active");
         adminUser.setId(99);
 
-        draftCourse = new Course(ownerInstructor, "Intro to Quantum Computing", "Comprehensive draft guide", CourseStatus.DRAFT);
+        draftCourse = new Course(ownerInstructor, "Intro to Quantum Computing", "Comprehensive draft guide",
+                CourseStatus.DRAFT);
         draftCourse.setId(10);
         draftCourse.setCategory("Computer Science");
         draftCourse.setPrice(new BigDecimal("1200.00"));
@@ -174,7 +173,8 @@ class CoursePreviewServiceTest {
         assertEquals(1, response.getModules().get(0).getSections().size());
         assertEquals("Section 1.1: Math Foundations", response.getModules().get(0).getSections().get(0).getTitle());
         assertEquals(1, response.getModules().get(0).getSections().get(0).getLessons().size());
-        assertEquals("Lesson 1: Complex Vectors", response.getModules().get(0).getSections().get(0).getLessons().get(0).getTitle());
+        assertEquals("Lesson 1: Complex Vectors",
+                response.getModules().get(0).getSections().get(0).getLessons().get(0).getTitle());
 
         // Lectures & Quizzes
         assertEquals(1, response.getLectures().size());
@@ -267,13 +267,15 @@ class CoursePreviewServiceTest {
     void testPreview_CourseNotFound_ThrowsResourceNotFoundException() {
         when(courseRepository.findById(999)).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () -> previewService.previewCourseAsStudent(ownerInstructor, 999));
+        assertThrows(ResourceNotFoundException.class,
+                () -> previewService.previewCourseAsStudent(ownerInstructor, 999));
     }
 
     @Test
     @DisplayName("Throws IllegalArgumentException when courseId is null")
     void testPreview_NullCourseId_ThrowsIllegalArgumentException() {
-        assertThrows(IllegalArgumentException.class, () -> previewService.previewCourseAsStudent(ownerInstructor, null));
+        assertThrows(IllegalArgumentException.class,
+                () -> previewService.previewCourseAsStudent(ownerInstructor, null));
     }
 
     // =========================================================================
@@ -325,7 +327,8 @@ class CoursePreviewServiceTest {
         emptySection.setId(203);
 
         when(courseRepository.findById(10)).thenReturn(Optional.of(draftCourse));
-        when(courseModuleRepository.findByCourseIdOrderByOrderIndexAsc(10)).thenReturn(List.of(emptyModule, moduleWithEmptySection));
+        when(courseModuleRepository.findByCourseIdOrderByOrderIndexAsc(10))
+                .thenReturn(List.of(emptyModule, moduleWithEmptySection));
         when(courseSectionRepository.findByModuleIdOrderByOrderIndexAsc(102)).thenReturn(Collections.emptyList());
         when(courseSectionRepository.findByModuleIdOrderByOrderIndexAsc(103)).thenReturn(List.of(emptySection));
         when(lessonRepository.findBySectionIdOrderByOrderIndexAsc(203)).thenReturn(Collections.emptyList());
@@ -336,7 +339,8 @@ class CoursePreviewServiceTest {
         List<String> warnings = response.getMissingContentWarnings();
         assertNotNull(warnings);
         assertTrue(warnings.stream().anyMatch(w -> w.contains("Module 'Setup' has no sections")));
-        assertTrue(warnings.stream().anyMatch(w -> w.contains("Section 'Advanced Math' in module 'Deep Dive' has no lessons")));
+        assertTrue(warnings.stream()
+                .anyMatch(w -> w.contains("Section 'Advanced Math' in module 'Deep Dive' has no lessons")));
     }
 
     // =========================================================================
@@ -376,4 +380,3 @@ class CoursePreviewServiceTest {
         assertThrows(InvalidCredentialsException.class, () -> previewService.resolveUser(null));
     }
 }
-

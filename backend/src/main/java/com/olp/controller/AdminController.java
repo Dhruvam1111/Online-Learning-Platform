@@ -6,6 +6,7 @@ import com.olp.dto.ApiResponse;
 import com.olp.dto.CourseAssociationRequestResponse;
 import com.olp.dto.CourseAssociationReviewRequest;
 import com.olp.dto.CourseInstructorResponse;
+import com.olp.dto.CourseReviewRequest;
 import com.olp.dto.InstructorCredentialResponse;
 import com.olp.dto.PageResponse;
 import com.olp.dto.RejectCourseRequest;
@@ -186,6 +187,19 @@ public class AdminController {
             @Valid @RequestBody RejectCourseRequest request) {
 
         AdminCourseResponse response = adminService.rejectCourse(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Request changes on a submitted course with reasons/comments provided to the instructor.
+     * FR-I71, FR-A07: Request changes on course
+     */
+    @PutMapping("/courses/{id}/request-changes")
+    public ResponseEntity<AdminCourseResponse> requestChanges(
+            @PathVariable Integer id,
+            @RequestBody(required = false) CourseReviewRequest request) {
+
+        AdminCourseResponse response = adminService.requestChanges(id, request);
         return ResponseEntity.ok(response);
     }
 

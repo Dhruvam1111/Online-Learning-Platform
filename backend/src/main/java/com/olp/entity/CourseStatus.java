@@ -8,20 +8,21 @@ public enum CourseStatus {
     PENDING_REVIEW,
     PUBLISHED,
     ARCHIVED,
-    REJECTED;
+    REJECTED,
+    CHANGES_REQUESTED;
 
     @JsonCreator
     public static CourseStatus fromString(String value) {
         if (value == null || value.trim().isEmpty()) {
             throw new IllegalArgumentException("Course status cannot be blank");
         }
-        String normalized = value.trim().toUpperCase().replace("-", "_");
+        String normalized = value.trim().toUpperCase().replace("-", "_").replace(" ", "_");
         for (CourseStatus status : values()) {
             if (status.name().equalsIgnoreCase(normalized) || status.name().equalsIgnoreCase(value.trim())) {
                 return status;
             }
         }
-        throw new IllegalArgumentException("Invalid course status: '" + value + "'. Valid statuses are DRAFT, PENDING_REVIEW, PUBLISHED, ARCHIVED, and REJECTED");
+        throw new IllegalArgumentException("Invalid course status: '" + value + "'. Valid statuses are DRAFT, PENDING_REVIEW, PUBLISHED, ARCHIVED, REJECTED, and CHANGES_REQUESTED");
     }
 
     @JsonValue
