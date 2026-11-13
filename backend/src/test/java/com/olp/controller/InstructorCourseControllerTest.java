@@ -2,6 +2,8 @@ package com.olp.controller;
 
 import com.olp.dto.ApiResponse;
 import com.olp.dto.CourseAuditResponse;
+import com.olp.dto.CourseCompletionCriteriaRequest;
+import com.olp.dto.CourseCompletionCriteriaResponse;
 import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CoursePreviewResponse;
@@ -21,6 +23,7 @@ import com.olp.entity.CourseStatus;
 import com.olp.entity.User;
 import com.olp.exception.GlobalExceptionHandler;
 import com.olp.exception.ResourceNotFoundException;
+import com.olp.service.CourseCompletionService;
 import com.olp.service.InstructorCourseService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +55,8 @@ class InstructorCourseControllerTest {
 
     @Mock
     private InstructorCourseService instructorCourseService;
+    @Mock
+    private CourseCompletionService courseCompletionService;
 
     @InjectMocks
     private InstructorCourseController controller;
@@ -614,5 +619,36 @@ class InstructorCourseControllerTest {
         assertEquals(1, response.getBody().size());
         assertEquals("COURSE_UNPUBLISH", response.getBody().get(0).getActionType());
         verify(instructorCourseService).getCourseAudits(currentUser, 10);
+    }
+
+    @Test
+    void testGetCompletionCriteria_Returns200() {
+        givenResolvedUser();
+        CourseCompletionCriteriaResponse mockResp = new CourseCompletionCriteriaResponse();
+        mockResp.setCourseId(10);
+        when(courseCompletionService.getCompletionCriteria(10, currentUser)).thenReturn(mockResp);
+
+        ResponseEntity<CourseCompletionCriteriaResponse> response = controller.getCompletionCriteria(authentication, 10);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(10, response.getBody().getCourseId());
+        verify(courseCompletionService).getCompletionCriteria(10, currentUser);
+    }
+
+    @Test
+    void testConfigureCompletionCriteria_Returns200() {
+        givenResolvedUser();
+        CourseCompletionCriteriaRequest req = new CourseCompletionCriteriaRequest();
+        req.setMinLessonCompletionPercentage(BigDecimal.valueOf(80.0));
+        CourseCompletionCriteriaResponse mockResp = new CourseCompletionCriteriaResponse();
+        mockResp.setCourseId(10);
+        mockResp.setMinLessonCompletionPercentage(BigDecimal.valueOf(80.0));
+        when(courseCompletionService.configureCompletionCriteria(currentUser, 10, req)).thenReturn(mockResp);
+
+        ResponseEntity<CourseCompletionCriteriaResponse> response = controller.configureCompletionCriteria(authentication, 10, req);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(BigDecimal.valueOf(80.0), response.getBody().getMinLessonCompletionPercentage());
+        verify(courseCompletionService).configureCompletionCriteria(currentUser, 10, req);
     }
 }
