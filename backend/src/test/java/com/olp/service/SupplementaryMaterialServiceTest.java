@@ -352,5 +352,84 @@ class SupplementaryMaterialServiceTest {
         User resolved = materialService.resolveUser(auth);
         assertEquals(instructor, resolved);
     }
+
+    @Test
+    void testUpdateDownloadableStatus_Success_InstructorOwner() {
+        LectureMaterial mat = new LectureMaterial(400, null, null, 10, "Slides", "s.pdf", "/p/s.pdf", "pdf", "application/pdf", 100L, false);
+        mat.setId(15);
+
+        when(materialRepository.findById(15)).thenReturn(Optional.of(mat));
+        when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
+        when(materialRepository.save(any(LectureMaterial.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SupplementaryMaterialResponse resp = materialService.updateDownloadableStatus(instructor, 15, true);
+
+        assertNotNull(resp);
+        assertTrue(resp.getIsDownloadable());
+        verify(materialRepository, times(1)).save(mat);
+    }
+
+    @Test
+    void testUpdateDownloadableStatus_Success_CoInstructor() {
+        LectureMaterial mat = new LectureMaterial(400, null, null, 10, "Slides", "s.pdf", "/p/s.pdf", "pdf", "application/pdf", 100L, false);
+        mat.setId(16);
+
+        when(materialRepository.findById(16)).thenReturn(Optional.of(mat));
+        when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(100, 11)).thenReturn(true);
+        when(materialRepository.save(any(LectureMaterial.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SupplementaryMaterialResponse resp = materialService.updateDownloadableStatus(coInstructor, 16, true);
+
+        assertNotNull(resp);
+        assertTrue(resp.getIsDownloadable());
+        verify(materialRepository, times(1)).save(mat);
+    }
+
+    @Test
+    void testUpdateDownloadableStatus_Success_Admin() {
+        LectureMaterial mat = new LectureMaterial(400, null, null, 10, "Slides", "s.pdf", "/p/s.pdf", "pdf", "application/pdf", 100L, true);
+        mat.setId(17);
+
+        when(materialRepository.findById(17)).thenReturn(Optional.of(mat));
+        when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
+        when(materialRepository.save(any(LectureMaterial.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SupplementaryMaterialResponse resp = materialService.updateDownloadableStatus(admin, 17, false);
+
+        assertNotNull(resp);
+        assertFalse(resp.getIsDownloadable());
+        verify(materialRepository, times(1)).save(mat);
+    }
+
+    @Test
+    void testUpdateDownloadableStatus_Fails_UnrelatedInstructor() {
+        LectureMaterial mat = new LectureMaterial(400, null, null, 10, "Slides", "s.pdf", "/p/s.pdf", "pdf", "application/pdf", 100L, false);
+        mat.setId(18);
+
+        when(materialRepository.findById(18)).thenReturn(Optional.of(mat));
+        when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
+        when(courseInstructorRepository.existsByCourseIdAndInstructorId(100, 12)).thenReturn(false);
+
+        assertThrows(AccessDeniedException.class, () ->
+                materialService.updateDownloadableStatus(otherInstructor, 18, true));
+        verify(materialRepository, never()).save(any());
+    }
+
+    @Test
+    void testUpdateDownloadableStatus_Fails_Student() {
+        assertThrows(AccessDeniedException.class, () ->
+                materialService.updateDownloadableStatus(student, 19, true));
+        verify(materialRepository, never()).save(any());
+    }
+
+    @Test
+    void testUpdateDownloadableStatus_Fails_NotFound() {
+        when(materialRepository.findById(999)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () ->
+                materialService.updateDownloadableStatus(instructor, 999, true));
+        verify(materialRepository, never()).save(any());
+    }
 }
 

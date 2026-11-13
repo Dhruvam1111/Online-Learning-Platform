@@ -1,6 +1,7 @@
 package com.olp.controller;
 
 import com.olp.dto.SupplementaryMaterialResponse;
+import com.olp.dto.UpdateDownloadableRequest;
 import com.olp.entity.User;
 import com.olp.service.SupplementaryMaterialService;
 import org.junit.jupiter.api.BeforeEach;
@@ -123,6 +124,40 @@ class SupplementaryMaterialControllerTest {
 
         assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
         verify(materialService, times(1)).deleteMaterial(instructor, 4);
+    }
+
+    @Test
+    void testUpdateDownloadableStatus_QueryParam() {
+        SupplementaryMaterialResponse resp = sampleResponse(3, 400, "Reference Sheet");
+        resp.setIsDownloadable(true);
+
+        when(materialService.resolveUser(authentication)).thenReturn(instructor);
+        when(materialService.updateDownloadableStatus(instructor, 3, true)).thenReturn(resp);
+
+        ResponseEntity<SupplementaryMaterialResponse> response = controller.updateDownloadableStatus(
+                3, true, null, authentication);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().getIsDownloadable());
+        verify(materialService, times(1)).updateDownloadableStatus(instructor, 3, true);
+    }
+
+    @Test
+    void testUpdateDownloadableStatus_RequestBody() {
+        SupplementaryMaterialResponse resp = sampleResponse(3, 400, "Reference Sheet");
+        resp.setIsDownloadable(false);
+
+        when(materialService.resolveUser(authentication)).thenReturn(instructor);
+        when(materialService.updateDownloadableStatus(instructor, 3, false)).thenReturn(resp);
+
+        ResponseEntity<SupplementaryMaterialResponse> response = controller.updateDownloadableStatus(
+                3, null, new UpdateDownloadableRequest(false), authentication);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertFalse(response.getBody().getIsDownloadable());
+        verify(materialService, times(1)).updateDownloadableStatus(instructor, 3, false);
     }
 }
 

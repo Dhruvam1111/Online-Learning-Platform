@@ -1,6 +1,7 @@
 package com.olp.controller;
 
 import com.olp.dto.SupplementaryMaterialResponse;
+import com.olp.dto.UpdateDownloadableRequest;
 import com.olp.entity.User;
 import com.olp.service.SupplementaryMaterialService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -89,6 +90,27 @@ public class SupplementaryMaterialController {
         User user = materialService.resolveUser(authentication);
         SupplementaryMaterialResponse material = materialService.getMaterialById(user, id);
         return ResponseEntity.ok(material);
+    }
+
+    /**
+     * PUT /api/instructor/materials/{id}/downloadable
+     * PATCH /api/instructor/materials/{id}/downloadable
+     * Update the downloadable vs view-only status of a material (FR-I17, Step 16).
+     */
+    @RequestMapping(value = "/{id}/downloadable", method = {RequestMethod.PUT, RequestMethod.PATCH})
+    public ResponseEntity<SupplementaryMaterialResponse> updateDownloadableStatus(
+            @PathVariable Integer id,
+            @RequestParam(value = "downloadable", required = false) Boolean downloadable,
+            @RequestBody(required = false) UpdateDownloadableRequest request,
+            Authentication authentication) {
+
+        User user = materialService.resolveUser(authentication);
+        boolean targetDownloadable = (request != null && request.resolveDownloadable() != null)
+                ? request.resolveDownloadable()
+                : (downloadable != null ? downloadable : true);
+
+        SupplementaryMaterialResponse response = materialService.updateDownloadableStatus(user, id, targetDownloadable);
+        return ResponseEntity.ok(response);
     }
 
     /**
