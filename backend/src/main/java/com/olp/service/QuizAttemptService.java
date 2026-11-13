@@ -16,6 +16,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+
+
+import java.util.Optional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -386,6 +389,124 @@ public class QuizAttemptService {
         }
         long seconds = ChronoUnit.SECONDS.between(serverNow, effectiveExpiry);
         return Math.max(0L, seconds);
+    }
+
+
+
+        // =========================================================================
+    // STUDENT COURSE QUIZZES & IN-PROGRESS ATTEMPT HELPERS (FR-S18, FR-S21)
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public List<QuizSettingsResponse> getStudentCourseQuizzes(User currentUser, Integer courseId) {
+        validateActiveStudent(currentUser);
+        if (courseId == null) {
+            throw new IllegalArgumentException("Course ID cannot be null");
+        }
+        if (!enrollmentRepository.existsByStudentIdAndCourseId(currentUser.getId(), courseId)) {
+            throw new AccessDeniedException("Student is not enrolled in this course");
+        }
+        List<Quiz> quizzes = quizRepository.findByCourseIdAndStatusOrderByCreatedAtDesc(courseId, QuizStatus.PUBLISHED);
+        LocalDateTime serverNow = LocalDateTime.now(clock);
+        return quizzes.stream().map(q -> {
+            List<QuizQuestion> linked = quizQuestionRepository.findByQuizIdOrderByOrderIndexAsc(q.getId());
+            long used = quizAttemptRepository.countByQuizIdAndStudentId(q.getId(), currentUser.getId());
+            return quizService.buildQuizSettingsResponse(q, linked, serverNow, used);
+        }).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<com.olp.dto.StudentQuizQuestionDto> getAttemptQuestions(User currentUser, Integer quizId, Integer attemptId) {
+        validateActiveStudent(currentUser);
+        QuizAttempt attempt = findAndVerifyStudentAttempt(quizId, attemptId, currentUser);
+        Quiz quiz = attempt.getQuiz();
+        LocalDateTime serverNow = LocalDateTime.now(clock);
+
+        if (attempt.getStatus() != QuizAttemptStatus.IN_PROGRESS || isAttemptExpired(quiz, attempt, serverNow)) {
+            throw new IllegalStateException("Quiz attempt is not active (status: " + attempt.getStatus() + ")");
+        }
+
+        List<QuizQuestion> linkedQuestions = quizQuestionRepository.findByQuizIdOrderByOrderIndexAsc(quiz.getId());
+        List<QuizAttemptAnswer> savedAnswers = quizAttemptAnswerRepository != null
+                ? quizAttemptAnswerRepository.findByAttemptId(attemptId)
+                : List.of();
+
+        Map<Integer, String> savedMap = new HashMap<>();
+        for (QuizAttemptAnswer ans : savedAnswers) {
+            if (ans.getQuestion() != null) {
+                savedMap.put(ans.getQuestion().getId(), ans.getSubmittedAnswer());
+            }
+        }
+
+        List<com.olp.dto.StudentQuizQuestionDto> dtos = new ArrayList<>();
+        for (QuizQuestion qq : linkedQuestions) {
+            Question q = qq.getQuestion();
+            if (q != null) {
+                com.olp.dto.StudentQuizQuestionDto dto = new com.olp.dto.StudentQuizQuestionDto();
+                dto.setQuestionId(q.getId());
+                dto.setQuestionText(q.getQuestionText());
+                dto.setQuestionType(q.getQuestionType() != null ? q.getQuestionType().name() : null);
+                dto.setOptionsJson(q.getOptionsJson());
+                dto.setOrderIndex(qq.getOrderIndex());
+                dto.setMarks(qq.getMarks() != null ? new BigDecimal(qq.getMarks().toString()) : BigDecimal.ONE);
+                dto.setSavedAnswer(savedMap.get(q.getId()));
+                dtos.add(dto);
+            }
+        }
+        return dtos;
+    }
+
+    @Transactional
+    public void saveAttemptAnswer(User currentUser, Integer quizId, Integer attemptId, com.olp.dto.SaveAnswerRequest request) {
+        validateActiveStudent(currentUser);
+        if (request == null || request.getQuestionId() == null) {
+            throw new IllegalArgumentException("Question ID is required");
+        }
+
+        QuizAttempt attempt = findAndVerifyStudentAttempt(quizId, attemptId, currentUser);
+        Quiz quiz = attempt.getQuiz();
+        LocalDateTime serverNow = LocalDateTime.now(clock);
+
+        if (attempt.getStatus() != QuizAttemptStatus.IN_PROGRESS) {
+            throw new IllegalStateException("Quiz attempt is already " + attempt.getStatus().name());
+        }
+
+        if (isAttemptExpired(quiz, attempt, serverNow)) {
+            attempt.setStatus(QuizAttemptStatus.EXPIRED);
+            attempt.setSubmittedAt(serverNow);
+            quizAttemptRepository.save(attempt);
+            throw new QuizAttemptExpiredException(
+                    "Quiz time limit has expired according to server time (expired at " + attempt.getExpiresAt() + ")");
+        }
+
+        List<QuizQuestion> linkedQuestions = quizQuestionRepository.findByQuizIdOrderByOrderIndexAsc(quiz.getId());
+        QuizQuestion targetQQ = linkedQuestions.stream()
+                .filter(qq -> qq.getQuestion() != null && qq.getQuestion().getId().equals(request.getQuestionId()))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found in quiz: " + request.getQuestionId()));
+
+        Question question = targetQQ.getQuestion();
+
+        if (quizAttemptAnswerRepository != null) {
+            Optional<QuizAttemptAnswer> existingOpt = quizAttemptAnswerRepository.findByAttemptIdAndQuestionId(attemptId, question.getId());
+            if (existingOpt.isPresent()) {
+                QuizAttemptAnswer existing = existingOpt.get();
+                existing.setSubmittedAnswer(request.getSelectedAnswer());
+                quizAttemptAnswerRepository.save(existing);
+            } else {
+                QuizAttemptAnswer newAnswer = new QuizAttemptAnswer(
+                        attempt,
+                        question,
+                        request.getSelectedAnswer(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        serverNow
+                );
+                quizAttemptAnswerRepository.save(newAnswer);
+            }
+        }
     }
 
     private void expireStaleInProgressAttempts(Quiz quiz, Integer studentId, LocalDateTime serverNow) {

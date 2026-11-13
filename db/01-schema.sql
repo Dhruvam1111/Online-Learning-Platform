@@ -751,3 +751,23 @@ ALTER TABLE courses ADD COLUMN IF NOT EXISTS discount_end_date TIMESTAMP;
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS enrollment_limit INTEGER;
 
 
+
+-- STUDENT QUIZ SUBSYSTEM ADDITIONS (FR-S18 to FR-S26)
+
+-- Ensure quiz_attempts has grading and pass/fail summary columns
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS total_marks INT DEFAULT 0;
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS percentage DECIMAL(5,2) DEFAULT 0.00;
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS is_passed BOOLEAN DEFAULT FALSE;
+
+-- Student Selected Answers / Autosave Table (FR-S21, FR-S24)
+CREATE TABLE IF NOT EXISTS quiz_attempt_answers (
+    id SERIAL PRIMARY KEY,
+    attempt_id INT NOT NULL REFERENCES quiz_attempts(id) ON DELETE CASCADE,
+    question_id INT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    selected_answer TEXT,
+    is_correct BOOLEAN DEFAULT FALSE,
+    marks_awarded INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_attempt_question UNIQUE (attempt_id, question_id)
+);
+
