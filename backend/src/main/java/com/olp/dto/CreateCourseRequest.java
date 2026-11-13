@@ -1,7 +1,10 @@
 package com.olp.dto;
 
+import com.olp.entity.DiscountType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,6 +25,13 @@ public class CreateCourseRequest {
 
     // Optional field: if provided, must match the authenticated instructor ID
     private Integer instructorId;
+
+    private BigDecimal price = BigDecimal.ZERO;
+    private DiscountType discountType;
+    private BigDecimal discountValue = BigDecimal.ZERO;
+    private LocalDateTime discountStartDate;
+    private LocalDateTime discountEndDate;
+    private Integer enrollmentLimit;
 
     public CreateCourseRequest() {}
 
@@ -93,5 +103,53 @@ public class CreateCourseRequest {
 
     public void setInstructorId(Integer instructorId) {
         this.instructorId = instructorId;
+    }
+
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price;
+    }
+
+    public DiscountType getDiscountType() {
+        return discountType;
+    }
+
+    public void setDiscountType(DiscountType discountType) {
+        this.discountType = discountType;
+    }
+
+    public BigDecimal getDiscountValue() {
+        return discountValue;
+    }
+
+    public void setDiscountValue(BigDecimal discountValue) {
+        this.discountValue = discountValue;
+    }
+
+    public LocalDateTime getDiscountStartDate() {
+        return discountStartDate;
+    }
+
+    public void setDiscountStartDate(LocalDateTime discountStartDate) {
+        this.discountStartDate = discountStartDate;
+    }
+
+    public LocalDateTime getDiscountEndDate() {
+        return discountEndDate;
+    }
+
+    public void setDiscountEndDate(LocalDateTime discountEndDate) {
+        this.discountEndDate = discountEndDate;
+    }
+
+    public Integer getEnrollmentLimit() {
+        return enrollmentLimit;
+    }
+
+    public void setEnrollmentLimit(Integer enrollmentLimit) {
+        this.enrollmentLimit = enrollmentLimit;
     }
 }

@@ -1,7 +1,10 @@
 package com.olp.dto;
 
+import com.olp.entity.DiscountType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 public class UpdateCourseRequest {
 
@@ -14,6 +17,13 @@ public class UpdateCourseRequest {
     private String title;
 
     private String description;
+
+    private BigDecimal price;
+    private DiscountType discountType;
+    private BigDecimal discountValue;
+    private LocalDateTime discountStartDate;
+    private LocalDateTime discountEndDate;
+    private Integer enrollmentLimit;
 
     public UpdateCourseRequest() {}
 
@@ -54,5 +64,53 @@ public class UpdateCourseRequest {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price;
+    }
+
+    public DiscountType getDiscountType() {
+        return discountType;
+    }
+
+    public void setDiscountType(DiscountType discountType) {
+        this.discountType = discountType;
+    }
+
+    public BigDecimal getDiscountValue() {
+        return discountValue;
+    }
+
+    public void setDiscountValue(BigDecimal discountValue) {
+        this.discountValue = discountValue;
+    }
+
+    public LocalDateTime getDiscountStartDate() {
+        return discountStartDate;
+    }
+
+    public void setDiscountStartDate(LocalDateTime discountStartDate) {
+        this.discountStartDate = discountStartDate;
+    }
+
+    public LocalDateTime getDiscountEndDate() {
+        return discountEndDate;
+    }
+
+    public void setDiscountEndDate(LocalDateTime discountEndDate) {
+        this.discountEndDate = discountEndDate;
+    }
+
+    public Integer getEnrollmentLimit() {
+        return enrollmentLimit;
+    }
+
+    public void setEnrollmentLimit(Integer enrollmentLimit) {
+        this.enrollmentLimit = enrollmentLimit;
     }
 }

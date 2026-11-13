@@ -1,5 +1,6 @@
 package com.olp.dto;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +20,10 @@ public class PublicCourseResponse {
     private boolean enrolled;
     private boolean bookmarked;
     private List<CourseInstructorResponse> instructors = new ArrayList<>();
+    private BigDecimal price = BigDecimal.ZERO;
+    private BigDecimal finalPayableAmount = BigDecimal.ZERO;
+    private boolean isFree = true;
+    private Integer enrollmentLimit;
 
     public PublicCourseResponse() {}
 
@@ -142,5 +147,37 @@ public class PublicCourseResponse {
 
     public void setInstructors(List<CourseInstructorResponse> instructors) {
         this.instructors = instructors != null ? instructors : new ArrayList<>();
+    }
+
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price != null ? price : BigDecimal.ZERO;
+    }
+
+    public BigDecimal getFinalPayableAmount() {
+        return finalPayableAmount;
+    }
+
+    public void setFinalPayableAmount(BigDecimal finalPayableAmount) {
+        this.finalPayableAmount = finalPayableAmount != null ? finalPayableAmount : BigDecimal.ZERO;
+    }
+
+    public boolean isFree() {
+        return isFree;
+    }
+
+    public void setFree(boolean free) {
+        isFree = free;
+    }
+
+    public Integer getEnrollmentLimit() {
+        return enrollmentLimit;
+    }
+
+    public void setEnrollmentLimit(Integer enrollmentLimit) {
+        this.enrollmentLimit = enrollmentLimit;
     }
 }
