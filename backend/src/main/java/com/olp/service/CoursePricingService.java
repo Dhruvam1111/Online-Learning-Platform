@@ -109,9 +109,9 @@ public class CoursePricingService {
                 ? paymentPolicyService.getTaxRateForCourse(course.getId())
                 : new BigDecimal("0.18");
 
-        BigDecimal taxAmount = isFree ? BigDecimal.ZERO
+        BigDecimal taxAmount = isFree ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
                 : discountedPrice.multiply(taxRate).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal finalPayableAmount = isFree ? BigDecimal.ZERO
+        BigDecimal finalPayableAmount = isFree ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
                 : discountedPrice.add(taxAmount).setScale(2, RoundingMode.HALF_UP);
 
         long currentEnrollmentCount = 0L;
@@ -136,8 +136,8 @@ public class CoursePricingService {
         response.setDiscountAmount(discountAmount.setScale(2, RoundingMode.HALF_UP));
         response.setDiscountedPrice(discountedPrice.setScale(2, RoundingMode.HALF_UP));
         response.setTaxRate(taxRate);
-        response.setTaxAmount(taxAmount);
-        response.setFinalPayableAmount(finalPayableAmount);
+        response.setTaxAmount(taxAmount.setScale(2, RoundingMode.HALF_UP));
+        response.setFinalPayableAmount(finalPayableAmount.setScale(2, RoundingMode.HALF_UP));
         response.setFree(isFree);
         response.setEnrollmentLimit(course.getEnrollmentLimit());
         response.setCurrentEnrollmentCount(currentEnrollmentCount);

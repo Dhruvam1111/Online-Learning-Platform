@@ -8,18 +8,18 @@ public class CoursePricingResponse {
 
     private Integer courseId;
     private String courseTitle;
-    private BigDecimal basePrice = BigDecimal.ZERO;
-    private BigDecimal instructorPrice = BigDecimal.ZERO;
+    private BigDecimal basePrice = new BigDecimal("0.00");
+    private BigDecimal instructorPrice = new BigDecimal("0.00");
     private DiscountType discountType;
-    private BigDecimal discountValue = BigDecimal.ZERO;
+    private BigDecimal discountValue = new BigDecimal("0.00");
     private LocalDateTime discountStartDate;
     private LocalDateTime discountEndDate;
     private boolean isDiscountActive;
-    private BigDecimal discountAmount = BigDecimal.ZERO;
-    private BigDecimal discountedPrice = BigDecimal.ZERO;
+    private BigDecimal discountAmount = new BigDecimal("0.00");
+    private BigDecimal discountedPrice = new BigDecimal("0.00");
     private BigDecimal taxRate = new BigDecimal("0.18");
-    private BigDecimal taxAmount = BigDecimal.ZERO;
-    private BigDecimal finalPayableAmount = BigDecimal.ZERO;
+    private BigDecimal taxAmount = new BigDecimal("0.00");
+    private BigDecimal finalPayableAmount = new BigDecimal("0.00");
     private boolean isFree = true;
     private Integer enrollmentLimit;
     private long currentEnrollmentCount = 0L;
@@ -130,7 +130,7 @@ public class CoursePricingResponse {
     }
 
     public void setTaxAmount(BigDecimal taxAmount) {
-        this.taxAmount = taxAmount;
+        this.taxAmount = taxAmount != null ? taxAmount.setScale(2, java.math.RoundingMode.HALF_UP) : null;
     }
 
     public BigDecimal getFinalPayableAmount() {
@@ -138,7 +138,7 @@ public class CoursePricingResponse {
     }
 
     public void setFinalPayableAmount(BigDecimal finalPayableAmount) {
-        this.finalPayableAmount = finalPayableAmount;
+        this.finalPayableAmount = finalPayableAmount != null ? finalPayableAmount.setScale(2, java.math.RoundingMode.HALF_UP) : null;
     }
 
     public boolean isFree() {
