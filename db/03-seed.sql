@@ -209,9 +209,12 @@ ON CONFLICT DO NOTHING;
 INSERT INTO quizzes (course_id, module_id, lesson_id, created_by, title, description, instructions, status, total_marks, passing_marks, time_limit_minutes, number_of_questions, max_attempts, available_from, available_until) VALUES
     (1, 1, 3, 2, 'HTML Fundamentals Quick Check', 'Assess understanding of basic HTML tags and document structure', 'Answer all questions within the allotted time.', 'DRAFT', 10.00, 6.00, 15, 2, 2, NULL, NULL);
 
-INSERT INTO questions (course_id, created_by, question_text, question_type, options_json, correct_answer, default_marks, negative_marks, topic, difficulty, is_bank_question) VALUES
-    (1, 2, 'Which HTML element defines the root of an HTML document?', 'MULTIPLE_CHOICE', '["<html>","<head>","<body>","<!DOCTYPE>"]', '<html>', 5.00, 0.00, 'HTML Basics', 'EASY', TRUE),
-    (1, 2, 'The <head> element contains metadata that is directly rendered in the main browser viewport.', 'TRUE_FALSE', '["TRUE","FALSE"]', 'FALSE', 5.00, 0.00, 'HTML Basics', 'EASY', TRUE);
+INSERT INTO questions (course_id, created_by, question_text, question_type, options_json, correct_answer, default_marks, negative_marks, numerical_tolerance, grading_rubric, requires_manual_grading, topic, difficulty, is_bank_question) VALUES
+    (1, 2, 'Which HTML element defines the root of an HTML document?', 'MULTIPLE_CHOICE', '["<html>","<head>","<body>","<!DOCTYPE>"]', '<html>', 5.00, 0.00, 0.00, NULL, FALSE, 'HTML Basics', 'EASY', TRUE),
+    (1, 2, 'The <head> element contains metadata that is directly rendered in the main browser viewport.', 'TRUE_FALSE', '["TRUE","FALSE"]', 'FALSE', 5.00, 0.00, 0.00, NULL, FALSE, 'HTML Basics', 'EASY', TRUE),
+    (1, 2, 'Select all semantic HTML5 landmark tags from the list below.', 'MULTIPLE_SELECT', '["<article>","<section>","<div>","<nav>","<span>"]', '["<article>","<section>","<nav>"]', 4.00, 0.00, 0.00, NULL, FALSE, 'HTML5 Semantics', 'MEDIUM', TRUE),
+    (1, 2, 'What is the default port number used by HTTP web traffic?', 'NUMERICAL', NULL, '80', 3.00, 0.00, 0.00, NULL, FALSE, 'Web Networking', 'EASY', TRUE),
+    (1, 2, 'Explain the difference between HTML inline and block-level elements with concrete examples.', 'DESCRIPTIVE', NULL, NULL, 10.00, 0.00, 0.00, 'Score 4 marks for defining inline vs block flow, 3 marks for element examples, 3 marks for box-model impact.', TRUE, 'HTML Architecture', 'MEDIUM', TRUE);
 
 INSERT INTO quiz_questions (quiz_id, question_id, order_index, marks, negative_marks, is_required) VALUES
     (1, 1, 1, 5.00, 0.00, TRUE),

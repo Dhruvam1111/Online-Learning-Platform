@@ -622,6 +622,13 @@ public class QuizService {
             BigDecimal negativeMarks = request.getNegativeMarks() != null
                     ? request.getNegativeMarks()
                     : BigDecimal.ZERO;
+            BigDecimal numericalTolerance = request.getNumericalTolerance() != null
+                    ? request.getNumericalTolerance()
+                    : BigDecimal.ZERO;
+            validateNonNegative(numericalTolerance, "Numerical tolerance");
+            Boolean requiresManualGrading = request.getRequiresManualGrading() != null
+                    ? request.getRequiresManualGrading()
+                    : (questionType == QuestionType.DESCRIPTIVE);
 
             question = new Question(
                     quiz.getCourse(),
@@ -631,7 +638,10 @@ public class QuizService {
                     trimToNull(request.getOptionsJson()),
                     trimToNull(request.getCorrectAnswer()),
                     defaultMarks,
-                    negativeMarks
+                    negativeMarks,
+                    numericalTolerance,
+                    trimToNull(request.getGradingRubric()),
+                    requiresManualGrading
             );
             question.setTopic(trimToNull(request.getTopic()));
             question.setDifficulty(trimToNull(request.getDifficulty()));
@@ -871,6 +881,10 @@ public class QuizService {
         response.setOptionsJson(q.getOptionsJson());
         response.setCorrectAnswer(q.getCorrectAnswer());
         response.setDefaultMarks(q.getDefaultMarks());
+        response.setNumericalTolerance(q.getNumericalTolerance());
+        response.setGradingRubric(q.getGradingRubric());
+        response.setRequiresManualGrading(
+                Boolean.TRUE.equals(q.getRequiresManualGrading()) || q.getQuestionType() == QuestionType.DESCRIPTIVE);
         response.setTopic(q.getTopic());
         response.setDifficulty(q.getDifficulty());
         response.setExplanation(q.getExplanation());
