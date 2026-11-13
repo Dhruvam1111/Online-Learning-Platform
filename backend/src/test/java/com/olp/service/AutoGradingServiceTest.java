@@ -459,8 +459,7 @@ class AutoGradingServiceTest {
         assertEquals(new BigDecimal("8.00"), summary.getTotalAwardedMarks());
         // Max total: 3.00 + 2.00 + 5.00 + 10.00 = 20.00
         assertEquals(new BigDecimal("20.00"), summary.getTotalMaxMarks());
-        assertEquals(1, summary.getCorrectCount()); // Q1 (or Q1 + Q3 = 2 correct)
-        // Let's verify: Q1 is correct, Q3 is correct -> 2 correct!
+        // Q1 is correct, Q3 is correct -> 2 correct
         assertEquals(2, summary.getCorrectCount());
         assertEquals(1, summary.getIncorrectCount()); // Q2
         assertEquals(1, summary.getManualGradingCount()); // Q4
