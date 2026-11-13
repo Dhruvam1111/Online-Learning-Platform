@@ -2,6 +2,7 @@ package com.olp.service;
 
 import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseInstructorResponse;
+import com.olp.dto.CoursePreviewResponse;
 import com.olp.dto.CoursePricingRequest;
 import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.CoursePrerequisiteRequest;
@@ -62,9 +63,10 @@ public class InstructorCourseService {
     private final InstructorProfileRepository instructorProfileRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final CoursePricingService coursePricingService;
+    private final CoursePreviewService coursePreviewService;
 
     public InstructorCourseService(CourseRepository courseRepository, UserRepository userRepository) {
-        this(courseRepository, userRepository, null, null, null, null, null);
+        this(courseRepository, userRepository, null, null, null, null, null, null);
     }
 
     public InstructorCourseService(
@@ -72,7 +74,7 @@ public class InstructorCourseService {
             UserRepository userRepository,
             CourseInstructorRepository courseInstructorRepository,
             CoursePrerequisiteRepository coursePrerequisiteRepository) {
-        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository, null, null, null);
+        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository, null, null, null, null);
     }
 
     public InstructorCourseService(
@@ -82,7 +84,19 @@ public class InstructorCourseService {
             CoursePrerequisiteRepository coursePrerequisiteRepository,
             InstructorProfileRepository instructorProfileRepository) {
         this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
-                instructorProfileRepository, null, null);
+                instructorProfileRepository, null, null, null);
+    }
+
+    public InstructorCourseService(
+            CourseRepository courseRepository,
+            UserRepository userRepository,
+            CourseInstructorRepository courseInstructorRepository,
+            CoursePrerequisiteRepository coursePrerequisiteRepository,
+            InstructorProfileRepository instructorProfileRepository,
+            EnrollmentRepository enrollmentRepository,
+            CoursePricingService coursePricingService) {
+        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
+                instructorProfileRepository, enrollmentRepository, coursePricingService, null);
     }
 
     @Autowired
@@ -93,7 +107,8 @@ public class InstructorCourseService {
             @Autowired(required = false) CoursePrerequisiteRepository coursePrerequisiteRepository,
             @Autowired(required = false) InstructorProfileRepository instructorProfileRepository,
             @Autowired(required = false) EnrollmentRepository enrollmentRepository,
-            @Autowired(required = false) CoursePricingService coursePricingService) {
+            @Autowired(required = false) CoursePricingService coursePricingService,
+            @Autowired(required = false) CoursePreviewService coursePreviewService) {
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.courseInstructorRepository = courseInstructorRepository;
@@ -101,6 +116,7 @@ public class InstructorCourseService {
         this.instructorProfileRepository = instructorProfileRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.coursePricingService = coursePricingService;
+        this.coursePreviewService = coursePreviewService;
     }
 
     /**
@@ -932,6 +948,29 @@ public class InstructorCourseService {
             responses.add(dto);
         }
         return responses;
+    }
+
+    /**
+     * FR-I73: Previews a course as a student using draft data, in strictly read-only mode.
+     */
+    @Transactional(readOnly = true)
+    public CoursePreviewResponse previewCourseAsStudent(User currentUser, Integer courseId) {
+        if (coursePreviewService != null) {
+            return coursePreviewService.previewCourseAsStudent(currentUser, courseId);
+        }
+        validateInstructor(currentUser);
+        Course course = findCourseAndVerifyOwnership(courseId, currentUser);
+        CoursePreviewResponse response = new CoursePreviewResponse();
+        response.setId(course.getId());
+        response.setTitle(course.getTitle());
+        response.setDescription(course.getDescription());
+        response.setStatus(course.getStatus() != null ? course.getStatus().name() : "DRAFT");
+        response.setPreview(true);
+        response.setReadOnly(true);
+        response.setCanEnroll(false);
+        response.setEnrolled(false);
+        response.setProgressTrackingEnabled(false);
+        return response;
     }
 
     private boolean isCourseOwner(Course course, User currentUser) {

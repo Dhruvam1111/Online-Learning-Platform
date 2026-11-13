@@ -2,12 +2,15 @@ package com.olp.controller;
 
 import com.olp.dto.CourseDetailResponse;
 import com.olp.dto.CourseInstructorResponse;
+import com.olp.dto.CoursePreviewResponse;
 import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.EnrollmentResponse;
 import com.olp.dto.LectureResponse;
 import com.olp.dto.PublicCourseResponse;
 import com.olp.entity.User;
 import com.olp.service.CourseCatalogService;
+import com.olp.service.CoursePreviewService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -20,9 +23,18 @@ import java.util.List;
 public class CourseController {
 
     private final CourseCatalogService courseCatalogService;
+    private final CoursePreviewService coursePreviewService;
 
     public CourseController(CourseCatalogService courseCatalogService) {
+        this(courseCatalogService, null);
+    }
+
+    @Autowired
+    public CourseController(
+            CourseCatalogService courseCatalogService,
+            @Autowired(required = false) CoursePreviewService coursePreviewService) {
         this.courseCatalogService = courseCatalogService;
+        this.coursePreviewService = coursePreviewService;
     }
 
     /**
@@ -104,6 +116,22 @@ public class CourseController {
     @GetMapping("/{id}/pricing")
     public ResponseEntity<CoursePricingResponse> getCoursePricing(@PathVariable Integer id) {
         CoursePricingResponse response = courseCatalogService.getCoursePricing(id);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/courses/{id}/preview
+     * FR-I73: Preview course as student for authorized instructors or admins.
+     */
+    @GetMapping("/{id:\\d+}/preview")
+    @PreAuthorize("hasRole('instructor') or hasRole('admin')")
+    public ResponseEntity<CoursePreviewResponse> previewCourse(
+            @PathVariable Integer id,
+            Authentication authentication) {
+        User currentUser = courseCatalogService.resolveUser(authentication);
+        CoursePreviewResponse response = coursePreviewService != null
+                ? coursePreviewService.previewCourseAsStudent(currentUser, id)
+                : null;
         return ResponseEntity.ok(response);
     }
 }

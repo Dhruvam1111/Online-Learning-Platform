@@ -3,6 +3,7 @@ package com.olp.controller;
 import com.olp.dto.ApiResponse;
 import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseInstructorResponse;
+import com.olp.dto.CoursePreviewResponse;
 import com.olp.dto.CoursePricingRequest;
 import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.CourseResponse;
@@ -295,6 +296,20 @@ public class InstructorCourseController {
             @Valid @RequestBody CoursePricingRequest request) {
         User currentUser = instructorCourseService.resolveUser(authentication);
         CoursePricingResponse response = instructorCourseService.updateCoursePricing(currentUser, courseId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}/preview
+     * FR-I73: Preview course as student (renders draft data, modules, lessons, and pricing
+     * in strictly read-only mode with a preview indicator banner).
+     */
+    @GetMapping("/{courseId:\\d+}/preview")
+    public ResponseEntity<CoursePreviewResponse> previewCourse(
+            Authentication authentication,
+            @PathVariable Integer courseId) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        CoursePreviewResponse response = instructorCourseService.previewCourseAsStudent(currentUser, courseId);
         return ResponseEntity.ok(response);
     }
 }
