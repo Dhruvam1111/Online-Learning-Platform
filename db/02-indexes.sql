@@ -117,3 +117,8 @@ CREATE INDEX IF NOT EXISTS idx_video_uploads_lesson_id ON video_uploads(lesson_i
 CREATE INDEX IF NOT EXISTS idx_video_uploads_uploader_id ON video_uploads(uploader_id);
 CREATE INDEX IF NOT EXISTS idx_video_uploads_status ON video_uploads(status);
 
+-- FR-I10: Course Pricing & Enrollment Limits Indexes
+CREATE INDEX IF NOT EXISTS idx_courses_price ON courses(price);
+CREATE INDEX IF NOT EXISTS idx_courses_enrollment_limit ON courses(enrollment_limit);
+
+

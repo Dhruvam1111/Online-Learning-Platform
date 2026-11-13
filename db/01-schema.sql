@@ -75,6 +75,12 @@ CREATE TABLE courses (
     learning_outcomes TEXT,
     status          VARCHAR(20)  NOT NULL DEFAULT 'draft',
     rejection_reason TEXT,
+    price           NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    discount_type   VARCHAR(20),
+    discount_value  NUMERIC(10, 2) DEFAULT 0.00,
+    discount_start_date TIMESTAMP,
+    discount_end_date   TIMESTAMP,
+    enrollment_limit INTEGER,
     created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
 
     CONSTRAINT fk_courses_instructor
@@ -735,4 +741,13 @@ CREATE TABLE IF NOT EXISTS video_uploads (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- FR-I10: Course Pricing, Discounts and Enrollment Limits
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) NOT NULL DEFAULT 0.00;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS discount_type VARCHAR(20);
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS discount_value NUMERIC(10, 2) DEFAULT 0.00;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS discount_start_date TIMESTAMP;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS discount_end_date TIMESTAMP;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS enrollment_limit INTEGER;
+
 
