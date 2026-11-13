@@ -1,6 +1,7 @@
 package com.olp.controller;
 
 import com.olp.dto.ApiResponse;
+import com.olp.dto.CourseAuditResponse;
 import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CoursePreviewResponse;
@@ -248,6 +249,21 @@ public class InstructorCourseController {
     }
 
     /**
+     * POST / PATCH /api/instructor/courses/{courseId}/unpublish
+     * FR-I09: Unpublish a published course, removing it from the public catalogue while
+     * preserving access for enrolled students and blocking new enrollments.
+     */
+    @RequestMapping(value = "/{courseId:\\d+}/unpublish", method = { RequestMethod.POST, RequestMethod.PATCH })
+    public ResponseEntity<CourseResponse> unpublishCourse(
+            Authentication authentication,
+            @PathVariable Integer courseId) {
+
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        CourseResponse response = instructorCourseService.unpublishCourse(currentUser, courseId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * PATCH / POST /api/instructor/courses/{courseId}/archive
      * FR-I59: Archive a course (restricted to OWNER only).
      */
@@ -369,6 +385,19 @@ public class InstructorCourseController {
         User currentUser = instructorCourseService.resolveUser(authentication);
         CourseSubmissionResponse response = instructorCourseService.resubmitCourse(
                 currentUser, courseId, request != null ? request : new CourseSubmissionRequest());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}/audits
+     * FR-I09: Retrieve immutable course audit history tracking edits, status changes, and unpublish actions.
+     */
+    @GetMapping("/{courseId:\\d+}/audits")
+    public ResponseEntity<List<CourseAuditResponse>> getCourseAudits(
+            Authentication authentication,
+            @PathVariable Integer courseId) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        List<CourseAuditResponse> response = instructorCourseService.getCourseAudits(currentUser, courseId);
         return ResponseEntity.ok(response);
     }
 }
