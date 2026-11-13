@@ -793,3 +793,12 @@ CREATE TABLE IF NOT EXISTS quiz_attempt_answers (
     CONSTRAINT uq_attempt_question UNIQUE (attempt_id, question_id)
 );
 
+-- Step 35 / FR-I71: Course Review Status and Resubmit
+ALTER TABLE courses DROP CONSTRAINT IF EXISTS chk_courses_status;
+ALTER TABLE courses ADD CONSTRAINT chk_courses_status CHECK (status IN ('draft', 'pending_review', 'published', 'archived', 'rejected', 'changes_requested'));
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS review_comments TEXT;
+
+ALTER TABLE course_submissions ADD COLUMN IF NOT EXISTS review_comments TEXT;
+ALTER TABLE course_submissions ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP;
+
+
