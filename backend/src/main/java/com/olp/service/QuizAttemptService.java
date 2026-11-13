@@ -288,27 +288,53 @@ public class QuizAttemptService {
         List<QuestionEvaluationResult> results = new ArrayList<>();
         for (QuizAttemptAnswer ans : storedAnswers) {
             Question q = ans.getQuestion();
+            EvaluationStatus status = ans.getEvaluationStatus();
+            BigDecimal marks = ans.getAwardedMarks();
+            String feedback = ans.getFeedback();
+            boolean requiresManual = status == EvaluationStatus.MANUAL_GRADING_REQUIRED;
+
+            // Result Visibility (FR-I30 Requirement 3):
+            // Graded marks must remain unpublished and invisible to students until explicitly published.
+            if (isStudent && status == EvaluationStatus.EVALUATED_UNPUBLISHED) {
+                status = EvaluationStatus.MANUAL_GRADING_REQUIRED;
+                marks = BigDecimal.ZERO;
+                feedback = null;
+                requiresManual = true;
+            }
+
             QuestionEvaluationResult res = new QuestionEvaluationResult(
                     q.getId(),
                     q.getQuestionType(),
-                    ans.getEvaluationStatus(),
-                    ans.getAwardedMarks(),
+                    status,
+                    marks,
                     ans.getMaxMarks(),
                     ans.getSubmittedAnswer(),
                     q.getCorrectAnswer(),
                     q.getNumericalTolerance(),
-                    ans.getFeedback(),
-                    ans.getEvaluationStatus() == EvaluationStatus.MANUAL_GRADING_REQUIRED
+                    feedback,
+                    requiresManual
             );
             results.add(res);
 
-            switch (ans.getEvaluationStatus()) {
-                case CORRECT -> correct++;
-                case INCORRECT -> incorrect++;
-                case PARTIALLY_CORRECT -> partial++;
-                case MANUAL_GRADING_REQUIRED -> manual++;
-                case UNANSWERED -> unanswered++;
-                case INVALID_SUBMISSION -> incorrect++;
+            if (status != null) {
+                switch (status) {
+                    case CORRECT -> correct++;
+                    case INCORRECT -> incorrect++;
+                    case PARTIALLY_CORRECT -> partial++;
+                    case MANUAL_GRADING_REQUIRED -> manual++;
+                    case EVALUATED_UNPUBLISHED -> manual++;
+                    case PUBLISHED -> {
+                        if (marks != null && ans.getMaxMarks() != null && marks.compareTo(ans.getMaxMarks()) >= 0) {
+                            correct++;
+                        } else if (marks != null && marks.compareTo(BigDecimal.ZERO) > 0) {
+                            partial++;
+                        } else {
+                            incorrect++;
+                        }
+                    }
+                    case UNANSWERED -> unanswered++;
+                    case INVALID_SUBMISSION -> incorrect++;
+                }
             }
         }
 
