@@ -25,6 +25,7 @@ import com.olp.entity.CourseStatus;
 import com.olp.entity.User;
 import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.ResourceNotFoundException;
+import com.olp.repository.CertificateRepository;
 import com.olp.repository.CourseAuditRepository;
 import com.olp.repository.CourseInstructorRepository;
 import com.olp.repository.CoursePrerequisiteRepository;
@@ -42,6 +43,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -78,9 +80,10 @@ public class InstructorCourseService {
     private final CourseSubmissionService courseSubmissionService;
     private final CourseAuditService courseAuditService;
     private final CourseAuditRepository courseAuditRepository;
+    private final CertificateRepository certificateRepository;
 
     public InstructorCourseService(CourseRepository courseRepository, UserRepository userRepository) {
-        this(courseRepository, userRepository, null, null, null, null, null, null, null, null, null);
+        this(courseRepository, userRepository, null, null, null, null, null, null, null, null, null, null);
     }
 
     public InstructorCourseService(
@@ -88,7 +91,7 @@ public class InstructorCourseService {
             UserRepository userRepository,
             CourseInstructorRepository courseInstructorRepository,
             CoursePrerequisiteRepository coursePrerequisiteRepository) {
-        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository, null, null, null, null, null, null, null);
+        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository, null, null, null, null, null, null, null, null);
     }
 
     public InstructorCourseService(
@@ -98,7 +101,7 @@ public class InstructorCourseService {
             CoursePrerequisiteRepository coursePrerequisiteRepository,
             InstructorProfileRepository instructorProfileRepository) {
         this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
-                instructorProfileRepository, null, null, null, null, null, null);
+                instructorProfileRepository, null, null, null, null, null, null, null);
     }
 
     public InstructorCourseService(
@@ -110,7 +113,7 @@ public class InstructorCourseService {
             EnrollmentRepository enrollmentRepository,
             CoursePricingService coursePricingService) {
         this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
-                instructorProfileRepository, enrollmentRepository, coursePricingService, null, null, null, null);
+                instructorProfileRepository, enrollmentRepository, coursePricingService, null, null, null, null, null);
     }
 
     public InstructorCourseService(
@@ -123,7 +126,7 @@ public class InstructorCourseService {
             CoursePricingService coursePricingService,
             CoursePreviewService coursePreviewService) {
         this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
-                instructorProfileRepository, enrollmentRepository, coursePricingService, coursePreviewService, null, null, null);
+                instructorProfileRepository, enrollmentRepository, coursePricingService, coursePreviewService, null, null, null, null);
     }
 
     public InstructorCourseService(
@@ -138,7 +141,24 @@ public class InstructorCourseService {
             CourseSubmissionService courseSubmissionService) {
         this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
                 instructorProfileRepository, enrollmentRepository, coursePricingService, coursePreviewService,
-                courseSubmissionService, null, null);
+                courseSubmissionService, null, null, null);
+    }
+
+    public InstructorCourseService(
+            CourseRepository courseRepository,
+            UserRepository userRepository,
+            CourseInstructorRepository courseInstructorRepository,
+            CoursePrerequisiteRepository coursePrerequisiteRepository,
+            InstructorProfileRepository instructorProfileRepository,
+            EnrollmentRepository enrollmentRepository,
+            CoursePricingService coursePricingService,
+            CoursePreviewService coursePreviewService,
+            CourseSubmissionService courseSubmissionService,
+            CourseAuditService courseAuditService,
+            CourseAuditRepository courseAuditRepository) {
+        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
+                instructorProfileRepository, enrollmentRepository, coursePricingService, coursePreviewService,
+                courseSubmissionService, courseAuditService, courseAuditRepository, null);
     }
 
     @Autowired
@@ -153,7 +173,8 @@ public class InstructorCourseService {
             @Autowired(required = false) CoursePreviewService coursePreviewService,
             @Autowired(required = false) CourseSubmissionService courseSubmissionService,
             @Autowired(required = false) CourseAuditService courseAuditService,
-            @Autowired(required = false) CourseAuditRepository courseAuditRepository) {
+            @Autowired(required = false) CourseAuditRepository courseAuditRepository,
+            @Autowired(required = false) CertificateRepository certificateRepository) {
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.courseInstructorRepository = courseInstructorRepository;
@@ -165,6 +186,7 @@ public class InstructorCourseService {
         this.courseSubmissionService = courseSubmissionService;
         this.courseAuditService = courseAuditService;
         this.courseAuditRepository = courseAuditRepository;
+        this.certificateRepository = certificateRepository;
     }
 
     /**
@@ -905,6 +927,10 @@ public class InstructorCourseService {
             return unpublishCourse(currentUser, courseId);
         }
 
+        if (newStatus == CourseStatus.ARCHIVED) {
+            return archiveCourse(currentUser, courseId);
+        }
+
         CourseStatus previousStatus = course.getStatus();
         course.setStatus(newStatus);
 
@@ -922,28 +948,102 @@ public class InstructorCourseService {
     }
 
     /**
-     * FR-I59 — Archive a course (restricted to OWNER only).
+     * FR-I12 / FR-I59 — Archive a course (restricted to OWNER only).
+     * Hides the course from the public catalogue while preserving all course data,
+     * student enrollments, progress, and issued certificates.
      */
     @Transactional
     public CourseResponse archiveCourse(User currentUser, Integer courseId) {
         validateInstructor(currentUser);
         Course course = findCourseAndVerifyOwnerOnly(courseId, currentUser);
+        if (course.isDeleted()) {
+            throw new ResourceNotFoundException("Course not found with id: " + courseId);
+        }
+        if (course.getStatus() == CourseStatus.PENDING_REVIEW) {
+            throw new IllegalStateException("Cannot archive course while it is under review (status is PENDING_REVIEW)");
+        }
+
+        CourseStatus previousStatus = course.getStatus();
         course.setStatus(CourseStatus.ARCHIVED);
         Course updated = courseRepository.save(course);
+
+        if (courseAuditService != null) {
+            courseAuditService.recordAudit(
+                    updated,
+                    currentUser,
+                    "COURSE_ARCHIVE",
+                    "status",
+                    Map.of("status", previousStatus != null ? previousStatus.name() : "null"),
+                    Map.of("status", CourseStatus.ARCHIVED.name()));
+        }
         return enrichCourseResponse(updated);
     }
 
     /**
-     * FR-I59 — Delete a course (restricted to OWNER only).
+     * FR-I12 / FR-I59 — Delete a course (restricted to OWNER only).
+     * Performs soft deletion per DR-ED09 if the course has no enrollments and no issued certificates.
      */
     @Transactional
     public void deleteCourse(User currentUser, Integer courseId) {
+        deleteCourse(currentUser, courseId, true, null);
+    }
+
+    @Transactional
+    public void deleteCourse(User currentUser, Integer courseId, Boolean confirmation) {
+        deleteCourse(currentUser, courseId, confirmation, null);
+    }
+
+    @Transactional
+    public void deleteCourse(User currentUser, Integer courseId, Boolean confirmation, String reason) {
         validateInstructor(currentUser);
         Course course = findCourseAndVerifyOwnerOnly(courseId, currentUser);
+        if (course.isDeleted()) {
+            throw new ResourceNotFoundException("Course not found with id: " + courseId);
+        }
         if (course.getStatus() == CourseStatus.PENDING_REVIEW) {
             throw new IllegalStateException("Cannot delete course while it is under review (status is PENDING_REVIEW)");
         }
-        courseRepository.delete(course);
+        if (Boolean.FALSE.equals(confirmation)) {
+            throw new IllegalArgumentException("Course deletion must be confirmed with confirmation=true");
+        }
+
+        long enrollmentCount = enrollmentRepository != null ? enrollmentRepository.countByCourseId(courseId) : 0;
+        if (enrollmentCount > 0) {
+            throw new IllegalStateException(
+                    "Cannot delete course: Course has " + enrollmentCount + " active enrollment(s). " +
+                    "Under data retention policy (DR-ED09), courses with active student enrollments cannot be deleted. " +
+                    "Please archive the course instead to preserve student access and learning progress.");
+        }
+
+        long certificateCount = certificateRepository != null ? certificateRepository.countByCourseId(courseId) : 0;
+        if (certificateCount > 0) {
+            throw new IllegalStateException(
+                    "Cannot delete course: Course has " + certificateCount + " issued certificate(s). " +
+                    "Under data retention policy (DR-ED09), courses with issued certificates cannot be deleted. " +
+                    "Please archive the course instead to preserve student credential verification.");
+        }
+
+        // Soft deletion per DR-ED09
+        course.setDeleted(true);
+        course.setDeletedAt(LocalDateTime.now());
+        Course saved = courseRepository.save(course);
+
+        if (courseAuditService != null) {
+            Map<String, String> prevVal = Map.of("is_deleted", "false");
+            Map<String, String> newVal = new HashMap<>();
+            newVal.put("is_deleted", "true");
+            newVal.put("deleted_at", saved.getDeletedAt() != null ? saved.getDeletedAt().toString() : LocalDateTime.now().toString());
+            if (reason != null && !reason.trim().isEmpty()) {
+                newVal.put("reason", reason.trim());
+            }
+            courseAuditService.recordAudit(
+                    saved,
+                    currentUser,
+                    "COURSE_DELETE",
+                    "is_deleted",
+                    prevVal,
+                    newVal);
+        }
     }
 
     /**
@@ -966,7 +1066,7 @@ public class InstructorCourseService {
         List<Course> primaryCourses = courseRepository.findByInstructorIdOrderByIdAsc(currentUser.getId());
         if (primaryCourses != null) {
             for (Course c : primaryCourses) {
-                if (c != null && c.getId() != null) {
+                if (c != null && c.getId() != null && !c.isDeleted()) {
                     uniqueCourses.put(c.getId(), c);
                 }
             }
@@ -975,7 +1075,7 @@ public class InstructorCourseService {
             List<CourseInstructor> associations = courseInstructorRepository.findByInstructorId(currentUser.getId());
             if (associations != null) {
                 for (CourseInstructor ci : associations) {
-                    if (ci != null && ci.getCourse() != null && ci.getCourse().getId() != null) {
+                    if (ci != null && ci.getCourse() != null && ci.getCourse().getId() != null && !ci.getCourse().isDeleted()) {
                         uniqueCourses.putIfAbsent(ci.getCourse().getId(), ci.getCourse());
                     }
                 }
@@ -1281,6 +1381,10 @@ public class InstructorCourseService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
 
+        if (course.isDeleted()) {
+            throw new ResourceNotFoundException("Course not found with id: " + courseId);
+        }
+
         verifyOwnerOnly(course, currentUser, "archive, delete, or manage owners of");
         return course;
     }
@@ -1299,6 +1403,10 @@ public class InstructorCourseService {
 
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
+
+        if (course.isDeleted()) {
+            throw new ResourceNotFoundException("Course not found with id: " + courseId);
+        }
 
         boolean isOwner = course.getInstructor() != null && currentUser.getId().equals(course.getInstructor().getId());
         if (!isOwner && (courseInstructorRepository == null

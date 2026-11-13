@@ -12,6 +12,7 @@ import com.olp.dto.CourseReviewStatusResponse;
 import com.olp.dto.CourseSubmissionRequest;
 import com.olp.dto.CourseSubmissionResponse;
 import com.olp.dto.CreateCourseRequest;
+import com.olp.dto.DeleteCourseRequest;
 import com.olp.dto.PageResponse;
 import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
@@ -278,16 +279,42 @@ public class InstructorCourseController {
     }
 
     /**
-     * DELETE /api/instructor/courses/{courseId}
-     * FR-I59: Delete a course (restricted to OWNER only).
+     * Overloaded method for direct service/controller invocations without query/body parameters.
      */
-    @DeleteMapping("/{courseId:\\d+}")
     public ResponseEntity<ApiResponse> deleteCourse(
             Authentication authentication,
-            @PathVariable Integer courseId) {
+            Integer courseId) {
+        return deleteCourse(authentication, courseId, null, null, null);
+    }
+
+    /**
+     * DELETE /api/instructor/courses/{courseId}
+     * POST /api/instructor/courses/{courseId}/delete
+     * FR-I12 / FR-I59: Soft-delete a course (restricted to OWNER only).
+     */
+    @RequestMapping(value = { "/{courseId:\\d+}", "/{courseId:\\d+}/delete" }, method = { RequestMethod.DELETE, RequestMethod.POST })
+    public ResponseEntity<ApiResponse> deleteCourse(
+            Authentication authentication,
+            @PathVariable Integer courseId,
+            @RequestParam(value = "confirm", required = false) Boolean confirm,
+            @RequestParam(value = "confirmed", required = false) Boolean confirmed,
+            @RequestBody(required = false) DeleteCourseRequest request) {
 
         User currentUser = instructorCourseService.resolveUser(authentication);
-        instructorCourseService.deleteCourse(currentUser, courseId);
+        Boolean isConfirmed = confirm != null ? confirm : confirmed;
+        String reason = null;
+        if (request != null) {
+            if (isConfirmed == null) {
+                isConfirmed = request.getConfirm();
+            }
+            reason = request.getReason();
+        }
+
+        if (isConfirmed != null || reason != null) {
+            instructorCourseService.deleteCourse(currentUser, courseId, isConfirmed, reason);
+        } else {
+            instructorCourseService.deleteCourse(currentUser, courseId);
+        }
         return ResponseEntity.ok(new ApiResponse(true, "Course deleted successfully"));
     }
 
