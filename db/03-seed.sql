@@ -4,6 +4,7 @@
 -- ============================================================
 
 -- Clear existing data (safe to re-run)
+DELETE FROM quiz_attempt_answers;
 DELETE FROM quiz_attempts;
 DELETE FROM quiz_questions;
 DELETE FROM questions;
@@ -34,6 +35,7 @@ ALTER SEQUENCE quizzes_id_seq RESTART WITH 1;
 ALTER SEQUENCE questions_id_seq RESTART WITH 1;
 ALTER SEQUENCE quiz_questions_id_seq RESTART WITH 1;
 ALTER SEQUENCE quiz_attempts_id_seq RESTART WITH 1;
+ALTER SEQUENCE quiz_attempt_answers_id_seq RESTART WITH 1;
 
 -- =========================
 -- USERS

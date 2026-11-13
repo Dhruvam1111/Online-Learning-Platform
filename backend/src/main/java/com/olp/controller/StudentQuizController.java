@@ -1,7 +1,9 @@
 package com.olp.controller;
 
 import com.olp.dto.QuizAttemptResponse;
+import com.olp.dto.QuizEvaluationSummary;
 import com.olp.dto.QuizSettingsResponse;
+import com.olp.dto.QuizSubmissionRequest;
 import com.olp.entity.User;
 import com.olp.service.QuizAttemptService;
 import org.springframework.http.HttpStatus;
@@ -65,9 +67,19 @@ public class StudentQuizController {
     public ResponseEntity<QuizAttemptResponse> submitQuizAttempt(
             @PathVariable Integer quizId,
             @PathVariable Integer attemptId,
+            @RequestBody(required = false) QuizSubmissionRequest submissionRequest,
             Authentication authentication) {
         User currentUser = quizAttemptService.resolveUser(authentication);
-        return ResponseEntity.ok(quizAttemptService.submitQuizAttempt(currentUser, quizId, attemptId));
+        return ResponseEntity.ok(quizAttemptService.submitQuizAttempt(currentUser, quizId, attemptId, submissionRequest));
+    }
+
+    @GetMapping("/{quizId}/attempts/{attemptId}/evaluation")
+    public ResponseEntity<QuizEvaluationSummary> getAttemptEvaluation(
+            @PathVariable Integer quizId,
+            @PathVariable Integer attemptId,
+            Authentication authentication) {
+        User currentUser = quizAttemptService.resolveUser(authentication);
+        return ResponseEntity.ok(quizAttemptService.getAttemptEvaluation(currentUser, quizId, attemptId));
     }
 }
 

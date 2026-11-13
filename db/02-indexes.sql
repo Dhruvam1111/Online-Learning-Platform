@@ -108,6 +108,10 @@ CREATE INDEX idx_quizzes_available_window ON quizzes(available_from, available_u
 CREATE INDEX idx_quiz_attempts_quiz_student ON quiz_attempts(quiz_id, student_id);
 CREATE INDEX idx_quiz_attempts_status ON quiz_attempts(status);
 
+-- FR-I22: Auto-Graded and Evaluated Attempt Answers Indexes
+CREATE INDEX idx_quiz_attempt_answers_attempt ON quiz_attempt_answers(attempt_id);
+CREATE INDEX idx_quiz_attempt_answers_question ON quiz_attempt_answers(question_id);
+CREATE INDEX idx_quiz_attempt_answers_status ON quiz_attempt_answers(evaluation_status);
 -- Step 13 / FR-I13: Video Upload Indexes
 CREATE INDEX IF NOT EXISTS idx_video_uploads_lesson_id ON video_uploads(lesson_id);
 CREATE INDEX IF NOT EXISTS idx_video_uploads_uploader_id ON video_uploads(uploader_id);

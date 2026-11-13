@@ -23,6 +23,7 @@ public class QuizAttemptResponse {
     private Long remainingSeconds;
     private BigDecimal obtainedMarks;
     private BigDecimal totalMarks;
+    private QuizEvaluationSummary evaluationSummary;
 
     public QuizAttemptResponse() {}
 
@@ -144,6 +145,14 @@ public class QuizAttemptResponse {
 
     public void setTotalMarks(BigDecimal totalMarks) {
         this.totalMarks = totalMarks;
+    }
+
+    public QuizEvaluationSummary getEvaluationSummary() {
+        return evaluationSummary;
+    }
+
+    public void setEvaluationSummary(QuizEvaluationSummary evaluationSummary) {
+        this.evaluationSummary = evaluationSummary;
     }
 }
 
