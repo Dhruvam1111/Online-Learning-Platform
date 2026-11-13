@@ -2,6 +2,7 @@ package com.olp.controller;
 
 import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
+import com.olp.dto.CourseReviewRequest;
 import com.olp.dto.PageResponse;
 import com.olp.dto.RejectCourseRequest;
 import com.olp.service.AdminService;
@@ -189,6 +190,22 @@ class AdminControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertEquals("rejected", response.getBody().getStatus());
         assertEquals("Audio quality needs improvement", response.getBody().getRejectionReason());
+    }
+
+    @Test
+    void testRequestChanges() {
+        sampleCourseResponse.setStatus("changes_requested");
+        sampleCourseResponse.setRejectionReason("Add exercise links");
+        CourseReviewRequest request = new CourseReviewRequest("Add exercise links");
+        when(adminService.requestChanges(eq(10), any(CourseReviewRequest.class))).thenReturn(sampleCourseResponse);
+
+        ResponseEntity<AdminCourseResponse> response = adminController.requestChanges(10, request);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("changes_requested", response.getBody().getStatus());
+        assertEquals("Add exercise links", response.getBody().getRejectionReason());
+        verify(adminService).requestChanges(eq(10), any(CourseReviewRequest.class));
     }
 
     @Test

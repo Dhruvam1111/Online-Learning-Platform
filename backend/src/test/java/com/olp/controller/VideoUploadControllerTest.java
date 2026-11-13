@@ -19,8 +19,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -69,13 +67,16 @@ class VideoUploadControllerTest {
 
     @Test
     void testUploadChunk() {
-        MockMultipartFile file = new MockMultipartFile("file", "chunk0.part", "application/octet-stream", new byte[500]);
-        VideoChunkResponse expected = new VideoChunkResponse("upload-123", 0, 500L, 1000L, 50.0, VideoUploadStatus.UPLOADING, false, 1);
+        MockMultipartFile file = new MockMultipartFile("file", "chunk0.part", "application/octet-stream",
+                new byte[500]);
+        VideoChunkResponse expected = new VideoChunkResponse("upload-123", 0, 500L, 1000L, 50.0,
+                VideoUploadStatus.UPLOADING, false, 1);
 
         when(videoUploadService.resolveUser(authentication)).thenReturn(instructor);
         when(videoUploadService.uploadChunk(instructor, "upload-123", 0, file)).thenReturn(expected);
 
-        ResponseEntity<VideoChunkResponse> response = videoUploadController.uploadChunk("upload-123", 0, file, authentication);
+        ResponseEntity<VideoChunkResponse> response = videoUploadController.uploadChunk("upload-123", 0, file,
+                authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -86,7 +87,8 @@ class VideoUploadControllerTest {
 
     @Test
     void testResumeUpload() {
-        VideoChunkResponse expected = new VideoChunkResponse("upload-123", 0, 500L, 1000L, 50.0, VideoUploadStatus.UPLOADING, false, 1);
+        VideoChunkResponse expected = new VideoChunkResponse("upload-123", 0, 500L, 1000L, 50.0,
+                VideoUploadStatus.UPLOADING, false, 1);
 
         when(videoUploadService.resolveUser(authentication)).thenReturn(instructor);
         when(videoUploadService.resumeUpload(instructor, "upload-123")).thenReturn(expected);
@@ -108,7 +110,8 @@ class VideoUploadControllerTest {
         when(videoUploadService.resolveUser(authentication)).thenReturn(instructor);
         when(videoUploadService.getUploadStatus(instructor, "upload-123")).thenReturn(expected);
 
-        ResponseEntity<VideoUploadResponse> response = videoUploadController.getUploadStatus("upload-123", authentication);
+        ResponseEntity<VideoUploadResponse> response = videoUploadController.getUploadStatus("upload-123",
+                authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -132,4 +135,3 @@ class VideoUploadControllerTest {
         assertEquals("upload-123", response.getBody().getUploadId());
     }
 }
-

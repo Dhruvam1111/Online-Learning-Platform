@@ -25,6 +25,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -260,7 +261,8 @@ class InstructorMediaServiceTest {
 
         MockMultipartFile newFile = new MockMultipartFile("file", "updated.pdf", "application/pdf", "%PDF".getBytes());
         when(fileStorageService.storeCredential(10, newFile)).thenReturn("credentials/10/updated.pdf");
-        when(instructorCredentialRepository.save(any(InstructorCredential.class))).thenAnswer(i -> i.getArgument(0));
+        when(instructorCredentialRepository.save(any(InstructorCredential.class)))
+                .thenAnswer(i -> Objects.requireNonNull(i.getArgument(0)));
 
         InstructorCredentialResponse res = service.replaceCredential(instructor, 99, newFile, "CERTIFICATE");
 
@@ -283,6 +285,32 @@ class InstructorMediaServiceTest {
         assertEquals("DELETED", c.getStatus());
         verify(fileStorageService).deleteFile("credentials/10/doc.pdf");
         verify(instructorUploadHistoryRepository).save(any(InstructorUploadHistory.class));
+    }
+
+    @Test
+    void testDownloadCredential_NullId_ThrowsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class, () -> service.downloadCredential(instructor, null));
+    }
+
+    @Test
+    void testGetCredential_NullId_ThrowsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class, () -> service.getCredential(instructor, null));
+    }
+
+    @Test
+    void testReplaceCredential_NullId_ThrowsIllegalArgumentException() {
+        MockMultipartFile file = new MockMultipartFile("file", "test.pdf", "application/pdf", new byte[]{1});
+        assertThrows(IllegalArgumentException.class, () -> service.replaceCredential(instructor, null, file, "DEGREE"));
+    }
+
+    @Test
+    void testDeleteCredential_NullId_ThrowsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class, () -> service.deleteCredential(instructor, null));
+    }
+
+    @Test
+    void testGetCredentialsForAdmin_NullId_ThrowsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class, () -> service.getCredentialsForAdmin(null));
     }
 
     // =========================================================================
