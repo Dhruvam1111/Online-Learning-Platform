@@ -297,7 +297,7 @@ public class CoursePreviewService {
                 }
             }
         }
-        if (course.getPrice() == null) {
+        if (course.getPrice() == null || course.getPrice().compareTo(BigDecimal.ZERO) == 0) {
             warnings.add("Course price is not configured (defaults to Free)");
         }
         response.setMissingContentWarnings(warnings);
