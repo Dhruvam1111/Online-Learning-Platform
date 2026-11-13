@@ -151,6 +151,10 @@ CREATE INDEX IF NOT EXISTS idx_course_completion_criteria_course_id ON course_co
 CREATE INDEX IF NOT EXISTS idx_lesson_progress_student_id ON lesson_progress(student_id);
 CREATE INDEX IF NOT EXISTS idx_lesson_progress_lesson_id ON lesson_progress(lesson_id);
 
+-- Step 45 / FR-I57: View Certificates Issued Indexes
+CREATE INDEX IF NOT EXISTS idx_certificates_issued_at ON certificates(issued_at DESC);
+CREATE INDEX IF NOT EXISTS idx_certificates_course_issued_at ON certificates(course_id, issued_at DESC);
+
 
 
 
