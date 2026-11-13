@@ -1,5 +1,6 @@
 package com.olp.service;
 
+import com.olp.dto.CertificateResponse;
 import com.olp.dto.CourseDetailResponse;
 import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CoursePricingResponse;
@@ -35,6 +36,7 @@ public class CourseCatalogService {
     private final CourseInstructorRepository courseInstructorRepository;
     private final InstructorProfileRepository instructorProfileRepository;
     private final CoursePricingService coursePricingService;
+    private final CertificateRepository certificateRepository;
 
     public CourseCatalogService(CourseRepository courseRepository,
                                 LectureRepository lectureRepository,
@@ -43,7 +45,7 @@ public class CourseCatalogService {
                                 EnrollmentRepository enrollmentRepository,
                                 UserRepository userRepository) {
         this(courseRepository, lectureRepository, reviewRepository, bookmarkRepository,
-                enrollmentRepository, userRepository, null, null, null);
+                enrollmentRepository, userRepository, null, null, null, null);
     }
 
     public CourseCatalogService(CourseRepository courseRepository,
@@ -54,7 +56,7 @@ public class CourseCatalogService {
                                 UserRepository userRepository,
                                 CourseInstructorRepository courseInstructorRepository) {
         this(courseRepository, lectureRepository, reviewRepository, bookmarkRepository,
-                enrollmentRepository, userRepository, courseInstructorRepository, null, null);
+                enrollmentRepository, userRepository, courseInstructorRepository, null, null, null);
     }
 
     public CourseCatalogService(CourseRepository courseRepository,
@@ -66,7 +68,20 @@ public class CourseCatalogService {
                                 CourseInstructorRepository courseInstructorRepository,
                                 InstructorProfileRepository instructorProfileRepository) {
         this(courseRepository, lectureRepository, reviewRepository, bookmarkRepository,
-                enrollmentRepository, userRepository, courseInstructorRepository, instructorProfileRepository, null);
+                enrollmentRepository, userRepository, courseInstructorRepository, instructorProfileRepository, null, null);
+    }
+
+    public CourseCatalogService(CourseRepository courseRepository,
+                                LectureRepository lectureRepository,
+                                ReviewRepository reviewRepository,
+                                BookmarkRepository bookmarkRepository,
+                                EnrollmentRepository enrollmentRepository,
+                                UserRepository userRepository,
+                                CourseInstructorRepository courseInstructorRepository,
+                                InstructorProfileRepository instructorProfileRepository,
+                                CoursePricingService coursePricingService) {
+        this(courseRepository, lectureRepository, reviewRepository, bookmarkRepository,
+                enrollmentRepository, userRepository, courseInstructorRepository, instructorProfileRepository, coursePricingService, null);
     }
 
     @Autowired
@@ -78,7 +93,8 @@ public class CourseCatalogService {
                                 UserRepository userRepository,
                                 @Autowired(required = false) CourseInstructorRepository courseInstructorRepository,
                                 @Autowired(required = false) InstructorProfileRepository instructorProfileRepository,
-                                @Autowired(required = false) CoursePricingService coursePricingService) {
+                                @Autowired(required = false) CoursePricingService coursePricingService,
+                                @Autowired(required = false) CertificateRepository certificateRepository) {
         this.courseRepository = courseRepository;
         this.lectureRepository = lectureRepository;
         this.reviewRepository = reviewRepository;
@@ -88,6 +104,7 @@ public class CourseCatalogService {
         this.courseInstructorRepository = courseInstructorRepository;
         this.instructorProfileRepository = instructorProfileRepository;
         this.coursePricingService = coursePricingService;
+        this.certificateRepository = certificateRepository;
     }
 
     /**
@@ -128,12 +145,14 @@ public class CourseCatalogService {
 
         if (search != null && !search.trim().isEmpty()) {
             courses = courseRepository.findAll().stream()
+                    .filter(c -> !c.isDeleted())
                     .filter(c -> c.getStatus() == CourseStatus.PUBLISHED)
                     .filter(c -> c.getTitle().toLowerCase().contains(search.trim().toLowerCase()) ||
                             (c.getDescription() != null && c.getDescription().toLowerCase().contains(search.trim().toLowerCase())))
                     .toList();
         } else {
             courses = courseRepository.findAll().stream()
+                    .filter(c -> !c.isDeleted())
                     .filter(c -> c.getStatus() == CourseStatus.PUBLISHED)
                     .toList();
         }
@@ -268,7 +287,7 @@ public class CourseCatalogService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
 
-        if (course.getStatus() != CourseStatus.PUBLISHED) {
+        if (course.isDeleted() || course.getStatus() != CourseStatus.PUBLISHED) {
             throw new AccessDeniedException("Cannot enroll in a course that is not published");
         }
 
@@ -310,18 +329,21 @@ public class CourseCatalogService {
     }
 
     /**
-     * FR-I07 & FR-I09: Non-published courses are visible only to associated instructors
-     * and authorized admins. However, for UNPUBLISHED courses, already-enrolled students
-     * retain access to course details and learning materials.
+     * FR-I07, FR-I09 & FR-I12: Non-published courses are visible only to associated instructors
+     * and authorized admins. However, for UNPUBLISHED and ARCHIVED courses, already-enrolled students
+     * retain access to course details and learning materials. Deleted courses are inaccessible to all.
      */
     private void verifyCourseVisibleToUser(Course course, User currentUser) {
+        if (course.isDeleted()) {
+            throw new AccessDeniedException("Access denied: this course has been deleted");
+        }
         if (course.getStatus() == CourseStatus.PUBLISHED) {
             return;
         }
         if (isAssociatedInstructorOrAdmin(course, currentUser)) {
             return;
         }
-        if (currentUser != null && course.getStatus() == CourseStatus.UNPUBLISHED
+        if (currentUser != null && (course.getStatus() == CourseStatus.UNPUBLISHED || course.getStatus() == CourseStatus.ARCHIVED)
                 && enrollmentRepository != null
                 && enrollmentRepository.existsByStudentIdAndCourseId(currentUser.getId(), course.getId())) {
             return;
@@ -352,6 +374,9 @@ public class CourseCatalogService {
         if (currentUser == null) {
             return false;
         }
+        if (course.isDeleted()) {
+            return false;
+        }
         if (isAssociatedInstructorOrAdmin(course, currentUser)) {
             return true;
         }
@@ -359,6 +384,35 @@ public class CourseCatalogService {
             return false;
         }
         return enrollmentRepository.existsByStudentIdAndCourseId(currentUser.getId(), course.getId());
+    }
+
+    /**
+     * FR-I12: Retrieve issued certificates for the authenticated student.
+     */
+    @Transactional(readOnly = true)
+    public List<CertificateResponse> getStudentCertificates(User currentUser) {
+        if (currentUser == null || certificateRepository == null) {
+            return List.of();
+        }
+        return certificateRepository.findByStudentId(currentUser.getId()).stream()
+                .map(CertificateResponse::fromEntity)
+                .toList();
+    }
+
+    /**
+     * FR-I12: Retrieve certificates issued for a course (subject to course visibility checks).
+     */
+    @Transactional(readOnly = true)
+    public List<CertificateResponse> getCourseCertificates(Integer courseId, User currentUser) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
+        verifyCourseVisibleToUser(course, currentUser);
+        if (certificateRepository == null) {
+            return List.of();
+        }
+        return certificateRepository.findByCourseId(courseId).stream()
+                .map(CertificateResponse::fromEntity)
+                .toList();
     }
 
     /**

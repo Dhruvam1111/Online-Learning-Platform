@@ -77,7 +77,7 @@ public class CourseAuditService {
      */
     @Transactional
     public CourseAudit recordAudit(Course course, User actor, String actionType,
-                                   String changedFields, Map<String, Object> prevMap, Map<String, Object> newMap) {
+                                   String changedFields, Map<String, ?> prevMap, Map<String, ?> newMap) {
         String prevJson = toJson(prevMap);
         String newJson = toJson(newMap);
         return recordAudit(course, actor, actionType, changedFields, prevJson, newJson);
@@ -118,7 +118,7 @@ public class CourseAuditService {
         }
     }
 
-    private String toJson(Map<String, Object> map) {
+    private String toJson(Map<String, ?> map) {
         if (map == null || map.isEmpty()) {
             return "{}";
         }
