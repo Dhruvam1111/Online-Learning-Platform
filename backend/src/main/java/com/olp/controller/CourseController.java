@@ -2,6 +2,7 @@ package com.olp.controller;
 
 import com.olp.dto.CourseDetailResponse;
 import com.olp.dto.CourseInstructorResponse;
+import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.EnrollmentResponse;
 import com.olp.dto.LectureResponse;
 import com.olp.dto.PublicCourseResponse;
@@ -92,6 +93,17 @@ public class CourseController {
 
         User currentUser = courseCatalogService.resolveUser(authentication);
         EnrollmentResponse response = courseCatalogService.enrollCourse(currentUser, id);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/courses/{id}/pricing
+     * FR-I10: Calculate and expose the final payable amount (price − discount + tax)
+     * before payment, following DR-PY03.
+     */
+    @GetMapping("/{id}/pricing")
+    public ResponseEntity<CoursePricingResponse> getCoursePricing(@PathVariable Integer id) {
+        CoursePricingResponse response = courseCatalogService.getCoursePricing(id);
         return ResponseEntity.ok(response);
     }
 }

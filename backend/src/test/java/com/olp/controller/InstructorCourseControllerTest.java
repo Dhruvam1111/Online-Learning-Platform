@@ -3,6 +3,8 @@ package com.olp.controller;
 import com.olp.dto.ApiResponse;
 import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseInstructorResponse;
+import com.olp.dto.CoursePricingRequest;
+import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.CourseResponse;
 import com.olp.dto.CreateCourseRequest;
 import com.olp.dto.PageResponse;
@@ -29,6 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -398,5 +401,43 @@ class InstructorCourseControllerTest {
                         .principal(authentication))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void testGetCoursePricing_Returns200WithPricingBreakdown() {
+        givenResolvedUser();
+        CoursePricingResponse pricing = new CoursePricingResponse();
+        pricing.setCourseId(10);
+        pricing.setCourseTitle("Spring API");
+        pricing.setBasePrice(new BigDecimal("999.00"));
+        pricing.setFinalPayableAmount(new BigDecimal("1178.82"));
+
+        when(instructorCourseService.getCoursePricing(currentUser, 10)).thenReturn(pricing);
+
+        ResponseEntity<CoursePricingResponse> response = controller.getCoursePricing(authentication, 10);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertSame(pricing, response.getBody());
+        verify(instructorCourseService).getCoursePricing(currentUser, 10);
+    }
+
+    @Test
+    void testUpdateCoursePricing_Returns200WithPricingBreakdown() {
+        givenResolvedUser();
+        CoursePricingRequest request = new CoursePricingRequest(
+                new BigDecimal("500.00"), null, null, null, null, 100
+        );
+        CoursePricingResponse pricing = new CoursePricingResponse();
+        pricing.setCourseId(10);
+        pricing.setBasePrice(new BigDecimal("500.00"));
+        pricing.setEnrollmentLimit(100);
+
+        when(instructorCourseService.updateCoursePricing(currentUser, 10, request)).thenReturn(pricing);
+
+        ResponseEntity<CoursePricingResponse> response = controller.updateCoursePricing(authentication, 10, request);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertSame(pricing, response.getBody());
+        verify(instructorCourseService).updateCoursePricing(currentUser, 10, request);
     }
 }

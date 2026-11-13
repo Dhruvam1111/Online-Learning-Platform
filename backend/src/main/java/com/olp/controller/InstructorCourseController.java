@@ -3,6 +3,8 @@ package com.olp.controller;
 import com.olp.dto.ApiResponse;
 import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseInstructorResponse;
+import com.olp.dto.CoursePricingRequest;
+import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.CourseResponse;
 import com.olp.dto.CreateCourseRequest;
 import com.olp.dto.PageResponse;
@@ -267,5 +269,32 @@ public class InstructorCourseController {
         User currentUser = instructorCourseService.resolveUser(authentication);
         instructorCourseService.deleteCourse(currentUser, courseId);
         return ResponseEntity.ok(new ApiResponse(true, "Course deleted successfully"));
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}/pricing
+     * FR-I10: Retrieve pricing breakdown, active discounts, taxes, and final payable amount.
+     */
+    @GetMapping("/{courseId:\\d+}/pricing")
+    public ResponseEntity<CoursePricingResponse> getCoursePricing(
+            Authentication authentication,
+            @PathVariable Integer courseId) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        CoursePricingResponse response = instructorCourseService.getCoursePricing(currentUser, courseId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * PUT /api/instructor/courses/{courseId}/pricing
+     * FR-I10: Configure course price, discount rules, validity dates, and enrollment limits.
+     */
+    @PutMapping("/{courseId:\\d+}/pricing")
+    public ResponseEntity<CoursePricingResponse> updateCoursePricing(
+            Authentication authentication,
+            @PathVariable Integer courseId,
+            @Valid @RequestBody CoursePricingRequest request) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        CoursePricingResponse response = instructorCourseService.updateCoursePricing(currentUser, courseId, request);
+        return ResponseEntity.ok(response);
     }
 }
