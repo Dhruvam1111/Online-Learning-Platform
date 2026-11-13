@@ -750,4 +750,18 @@ ALTER TABLE courses ADD COLUMN IF NOT EXISTS discount_start_date TIMESTAMP;
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS discount_end_date TIMESTAMP;
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS enrollment_limit INTEGER;
 
+-- Step 34 / FR-I08: Course Submission History
+CREATE TABLE IF NOT EXISTS course_submissions (
+    id SERIAL PRIMARY KEY,
+    course_id INT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    instructor_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status VARCHAR(50) NOT NULL DEFAULT 'PENDING_REVIEW',
+    comments TEXT,
+    snapshot_data TEXT,
+    submitted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+
 
