@@ -3,6 +3,7 @@ package com.olp.service;
 import com.olp.dto.CoursePricingRequest;
 import com.olp.dto.CoursePricingResponse;
 import com.olp.entity.Course;
+import com.olp.entity.CourseStatus;
 import com.olp.entity.DiscountType;
 import com.olp.entity.User;
 import com.olp.exception.ResourceNotFoundException;
@@ -191,6 +192,9 @@ public class CoursePricingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
 
         verifyInstructorAccess(currentUser, course);
+        if (course.getStatus() == CourseStatus.PENDING_REVIEW) {
+            throw new IllegalStateException("Cannot update course pricing while it is under review (status is PENDING_REVIEW)");
+        }
         validatePricingRequest(request);
 
         applyPricing(course, request);

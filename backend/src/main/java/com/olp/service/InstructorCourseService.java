@@ -7,6 +7,8 @@ import com.olp.dto.CoursePricingRequest;
 import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.CoursePrerequisiteRequest;
 import com.olp.dto.CourseResponse;
+import com.olp.dto.CourseSubmissionRequest;
+import com.olp.dto.CourseSubmissionResponse;
 import com.olp.dto.CreateCourseRequest;
 import com.olp.dto.PageResponse;
 import com.olp.dto.UpdateCourseRequest;
@@ -64,9 +66,10 @@ public class InstructorCourseService {
     private final EnrollmentRepository enrollmentRepository;
     private final CoursePricingService coursePricingService;
     private final CoursePreviewService coursePreviewService;
+    private final CourseSubmissionService courseSubmissionService;
 
     public InstructorCourseService(CourseRepository courseRepository, UserRepository userRepository) {
-        this(courseRepository, userRepository, null, null, null, null, null, null);
+        this(courseRepository, userRepository, null, null, null, null, null, null, null);
     }
 
     public InstructorCourseService(
@@ -74,7 +77,7 @@ public class InstructorCourseService {
             UserRepository userRepository,
             CourseInstructorRepository courseInstructorRepository,
             CoursePrerequisiteRepository coursePrerequisiteRepository) {
-        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository, null, null, null, null);
+        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository, null, null, null, null, null);
     }
 
     public InstructorCourseService(
@@ -84,7 +87,7 @@ public class InstructorCourseService {
             CoursePrerequisiteRepository coursePrerequisiteRepository,
             InstructorProfileRepository instructorProfileRepository) {
         this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
-                instructorProfileRepository, null, null, null);
+                instructorProfileRepository, null, null, null, null);
     }
 
     public InstructorCourseService(
@@ -96,7 +99,20 @@ public class InstructorCourseService {
             EnrollmentRepository enrollmentRepository,
             CoursePricingService coursePricingService) {
         this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
-                instructorProfileRepository, enrollmentRepository, coursePricingService, null);
+                instructorProfileRepository, enrollmentRepository, coursePricingService, null, null);
+    }
+
+    public InstructorCourseService(
+            CourseRepository courseRepository,
+            UserRepository userRepository,
+            CourseInstructorRepository courseInstructorRepository,
+            CoursePrerequisiteRepository coursePrerequisiteRepository,
+            InstructorProfileRepository instructorProfileRepository,
+            EnrollmentRepository enrollmentRepository,
+            CoursePricingService coursePricingService,
+            CoursePreviewService coursePreviewService) {
+        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
+                instructorProfileRepository, enrollmentRepository, coursePricingService, coursePreviewService, null);
     }
 
     @Autowired
@@ -108,7 +124,8 @@ public class InstructorCourseService {
             @Autowired(required = false) InstructorProfileRepository instructorProfileRepository,
             @Autowired(required = false) EnrollmentRepository enrollmentRepository,
             @Autowired(required = false) CoursePricingService coursePricingService,
-            @Autowired(required = false) CoursePreviewService coursePreviewService) {
+            @Autowired(required = false) CoursePreviewService coursePreviewService,
+            @Autowired(required = false) CourseSubmissionService courseSubmissionService) {
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.courseInstructorRepository = courseInstructorRepository;
@@ -117,6 +134,7 @@ public class InstructorCourseService {
         this.enrollmentRepository = enrollmentRepository;
         this.coursePricingService = coursePricingService;
         this.coursePreviewService = coursePreviewService;
+        this.courseSubmissionService = courseSubmissionService;
     }
 
     /**
@@ -617,6 +635,10 @@ public class InstructorCourseService {
 
         Course course = findCourseAndVerifyOwnership(courseId, currentUser);
 
+        if (course.getStatus() == CourseStatus.PENDING_REVIEW) {
+            throw new IllegalStateException("Cannot edit course while it is under review (status is PENDING_REVIEW)");
+        }
+
         if (request.getTitle() == null || request.getTitle().trim().isEmpty()) {
             throw new IllegalArgumentException("Title cannot be blank");
         }
@@ -665,6 +687,9 @@ public class InstructorCourseService {
             return coursePricingService.updateCoursePricing(currentUser, courseId, request);
         }
         Course course = findCourseAndVerifyOwnership(courseId, currentUser);
+        if (course.getStatus() == CourseStatus.PENDING_REVIEW) {
+            throw new IllegalStateException("Cannot update course pricing while it is under review (status is PENDING_REVIEW)");
+        }
         if (request.getPrice() != null) {
             course.setPrice(request.getPrice());
         }
@@ -714,6 +739,10 @@ public class InstructorCourseService {
 
         Course course = findCourseAndVerifyOwnership(courseId, currentUser);
 
+        if (course.getStatus() == CourseStatus.PENDING_REVIEW) {
+            throw new IllegalStateException("Cannot change status of a course while it is under review (status is PENDING_REVIEW)");
+        }
+
         if (request == null || request.getStatus() == null || request.getStatus().trim().isEmpty()) {
             throw new IllegalArgumentException("Course status cannot be blank");
         }
@@ -748,6 +777,9 @@ public class InstructorCourseService {
     public void deleteCourse(User currentUser, Integer courseId) {
         validateInstructor(currentUser);
         Course course = findCourseAndVerifyOwnerOnly(courseId, currentUser);
+        if (course.getStatus() == CourseStatus.PENDING_REVIEW) {
+            throw new IllegalStateException("Cannot delete course while it is under review (status is PENDING_REVIEW)");
+        }
         courseRepository.delete(course);
     }
 
@@ -971,6 +1003,30 @@ public class InstructorCourseService {
         response.setEnrolled(false);
         response.setProgressTrackingEnabled(false);
         return response;
+    }
+
+    /**
+     * FR-I08: Submit a course for admin review.
+     */
+    @Transactional
+    public CourseSubmissionResponse submitCourseForReview(User currentUser, Integer courseId, CourseSubmissionRequest request) {
+        validateInstructor(currentUser);
+        if (courseSubmissionService != null) {
+            return courseSubmissionService.submitCourseForReview(currentUser, courseId, request);
+        }
+        throw new IllegalStateException("CourseSubmissionService is not configured");
+    }
+
+    /**
+     * FR-I08: Retrieve submission history for an associated course.
+     */
+    @Transactional(readOnly = true)
+    public List<CourseSubmissionResponse> getCourseSubmissions(User currentUser, Integer courseId) {
+        validateInstructor(currentUser);
+        if (courseSubmissionService != null) {
+            return courseSubmissionService.getSubmissionHistory(currentUser, courseId);
+        }
+        throw new IllegalStateException("CourseSubmissionService is not configured");
     }
 
     private boolean isCourseOwner(Course course, User currentUser) {

@@ -63,6 +63,8 @@ class InstructorCourseServiceTest {
     private CoursePricingService coursePricingService;
     @Mock
     private CoursePreviewService coursePreviewService;
+    @Mock
+    private CourseSubmissionService courseSubmissionService;
 
     @InjectMocks
     private InstructorCourseService service;
@@ -1182,5 +1184,79 @@ class InstructorCourseServiceTest {
         assertTrue(result.isPreview());
         assertTrue(result.isReadOnly());
         verify(coursePreviewService).previewCourseAsStudent(owner, 10);
+    }
+
+    @Test
+    void testSubmitCourseForReview_DelegatesToSubmissionService() {
+        User owner = instructor(1);
+        com.olp.dto.CourseSubmissionRequest request = new com.olp.dto.CourseSubmissionRequest("Ready");
+        com.olp.dto.CourseSubmissionResponse resp = new com.olp.dto.CourseSubmissionResponse();
+        resp.setId(1);
+        resp.setCourseId(10);
+        resp.setStatus("PENDING_REVIEW");
+
+        when(courseSubmissionService.submitCourseForReview(owner, 10, request)).thenReturn(resp);
+
+        com.olp.dto.CourseSubmissionResponse result = service.submitCourseForReview(owner, 10, request);
+
+        assertNotNull(result);
+        assertEquals(1, result.getId());
+        assertEquals("PENDING_REVIEW", result.getStatus());
+        verify(courseSubmissionService).submitCourseForReview(owner, 10, request);
+    }
+
+    @Test
+    void testGetCourseSubmissions_DelegatesToSubmissionService() {
+        User owner = instructor(1);
+        com.olp.dto.CourseSubmissionResponse resp = new com.olp.dto.CourseSubmissionResponse();
+        resp.setId(1);
+        resp.setCourseId(10);
+
+        when(courseSubmissionService.getSubmissionHistory(owner, 10)).thenReturn(List.of(resp));
+
+        List<com.olp.dto.CourseSubmissionResponse> result = service.getCourseSubmissions(owner, 10);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(1, result.get(0).getId());
+        verify(courseSubmissionService).getSubmissionHistory(owner, 10);
+    }
+
+    @Test
+    void testUpdateCourse_PendingReview_ThrowsIllegalStateException() {
+        User owner = instructor(1);
+        Course course = givenOwnedCourse(10, owner);
+        course.setStatus(CourseStatus.PENDING_REVIEW);
+
+        UpdateCourseRequest request = new UpdateCourseRequest();
+        request.setTitle("New Title");
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> service.updateCourse(owner, 10, request));
+        assertTrue(ex.getMessage().contains("under review"));
+    }
+
+    @Test
+    void testUpdateCourseStatus_PendingReview_ThrowsIllegalStateException() {
+        User owner = instructor(1);
+        Course course = givenOwnedCourse(10, owner);
+        course.setStatus(CourseStatus.PENDING_REVIEW);
+
+        UpdateCourseStatusRequest request = new UpdateCourseStatusRequest("PUBLISHED");
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> service.updateCourseStatus(owner, 10, request));
+        assertTrue(ex.getMessage().contains("under review"));
+    }
+
+    @Test
+    void testDeleteCourse_PendingReview_ThrowsIllegalStateException() {
+        User owner = instructor(1);
+        Course course = givenOwnedCourse(10, owner);
+        course.setStatus(CourseStatus.PENDING_REVIEW);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> service.deleteCourse(owner, 10));
+        assertTrue(ex.getMessage().contains("under review"));
     }
 }

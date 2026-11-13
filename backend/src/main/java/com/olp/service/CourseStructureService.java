@@ -90,6 +90,7 @@ public class CourseStructureService {
     @Transactional
     public CourseModuleResponse createModule(User currentUser, Integer courseId, CourseModuleRequest request) {
         Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
 
         if (request == null || request.getTitle() == null || request.getTitle().trim().isEmpty()) {
             throw new IllegalArgumentException("Module title cannot be blank");
@@ -135,7 +136,8 @@ public class CourseStructureService {
     @Transactional
     public CourseModuleResponse updateModule(User currentUser, Integer courseId, Integer moduleId,
             CourseModuleRequest request) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         CourseModule module = findAndVerifyModule(courseId, moduleId);
 
         if (request == null || request.getTitle() == null || request.getTitle().trim().isEmpty()) {
@@ -160,7 +162,8 @@ public class CourseStructureService {
 
     @Transactional
     public ApiResponse deleteModule(User currentUser, Integer courseId, Integer moduleId) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         CourseModule module = findAndVerifyModule(courseId, moduleId);
         courseModuleRepository.delete(module);
         return new ApiResponse(true, "Module deleted successfully");
@@ -169,7 +172,8 @@ public class CourseStructureService {
     @Transactional
     public List<CourseModuleResponse> reorderModules(User currentUser, Integer courseId,
             ReorderStructureRequest request) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
 
         if (request == null || request.getOrderedIds() == null || request.getOrderedIds().isEmpty()) {
             throw new IllegalArgumentException("Ordered IDs list cannot be empty");
@@ -195,7 +199,8 @@ public class CourseStructureService {
     @Transactional
     public CourseSectionResponse createSection(User currentUser, Integer courseId, Integer moduleId,
             CourseSectionRequest request) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         CourseModule module = findAndVerifyModule(courseId, moduleId);
 
         if (request == null || request.getTitle() == null || request.getTitle().trim().isEmpty()) {
@@ -245,7 +250,8 @@ public class CourseStructureService {
     @Transactional
     public CourseSectionResponse updateSection(User currentUser, Integer courseId, Integer moduleId, Integer sectionId,
             CourseSectionRequest request) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         findAndVerifyModule(courseId, moduleId);
         CourseSection section = findAndVerifySection(moduleId, sectionId);
 
@@ -271,7 +277,8 @@ public class CourseStructureService {
 
     @Transactional
     public ApiResponse deleteSection(User currentUser, Integer courseId, Integer moduleId, Integer sectionId) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         findAndVerifyModule(courseId, moduleId);
         CourseSection section = findAndVerifySection(moduleId, sectionId);
         courseSectionRepository.delete(section);
@@ -281,7 +288,8 @@ public class CourseStructureService {
     @Transactional
     public List<CourseSectionResponse> reorderSections(User currentUser, Integer courseId, Integer moduleId,
             ReorderStructureRequest request) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         findAndVerifyModule(courseId, moduleId);
 
         if (request == null || request.getOrderedIds() == null || request.getOrderedIds().isEmpty()) {
@@ -308,7 +316,8 @@ public class CourseStructureService {
     @Transactional
     public LessonResponse createLesson(User currentUser, Integer courseId, Integer moduleId, Integer sectionId,
             LessonRequest request) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         findAndVerifyModule(courseId, moduleId);
         CourseSection section = findAndVerifySection(moduleId, sectionId);
 
@@ -368,7 +377,8 @@ public class CourseStructureService {
     @Transactional
     public LessonResponse updateLesson(User currentUser, Integer courseId, Integer moduleId, Integer sectionId,
             Integer lessonId, LessonRequest request) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         findAndVerifyModule(courseId, moduleId);
         findAndVerifySection(moduleId, sectionId);
         Lesson lesson = findAndVerifyLesson(sectionId, lessonId);
@@ -408,7 +418,8 @@ public class CourseStructureService {
     @Transactional
     public ApiResponse deleteLesson(User currentUser, Integer courseId, Integer moduleId, Integer sectionId,
             Integer lessonId) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         findAndVerifyModule(courseId, moduleId);
         findAndVerifySection(moduleId, sectionId);
         Lesson lesson = findAndVerifyLesson(sectionId, lessonId);
@@ -419,7 +430,8 @@ public class CourseStructureService {
     @Transactional
     public List<LessonResponse> reorderLessons(User currentUser, Integer courseId, Integer moduleId, Integer sectionId,
             ReorderStructureRequest request) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         findAndVerifyModule(courseId, moduleId);
         findAndVerifySection(moduleId, sectionId);
 
@@ -465,6 +477,12 @@ public class CourseStructureService {
         }
 
         return course;
+    }
+
+    private void verifyCourseNotUnderReview(Course course) {
+        if (course != null && course.getStatus() == CourseStatus.PENDING_REVIEW) {
+            throw new IllegalStateException("Cannot modify course structure while course is under review (status is PENDING_REVIEW)");
+        }
     }
 
     private CourseModule findAndVerifyModule(Integer courseId, Integer moduleId) {
