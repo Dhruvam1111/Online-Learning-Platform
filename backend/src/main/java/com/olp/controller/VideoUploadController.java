@@ -86,15 +86,31 @@ public class VideoUploadController {
 
     /**
      * GET /api/instructor/videos/lesson/{lessonId}
-     * Retrieve active video upload details attached to a lesson.
+     * GET /api/instructor/videos/lesson/{lessonId}/status
+     * Retrieve active video upload details and processing status attached to a lesson.
      */
-    @GetMapping("/lesson/{lessonId}")
+    @GetMapping({"/lesson/{lessonId}", "/lesson/{lessonId}/status"})
     public ResponseEntity<VideoUploadResponse> getVideoByLesson(
             @PathVariable Integer lessonId,
             Authentication authentication) {
         User user = videoUploadService.resolveUser(authentication);
         VideoUploadResponse response = videoUploadService.getVideoByLesson(user, lessonId);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/instructor/videos/{uploadId}/retry
+     * POST /api/instructor/videos/{uploadId}/reupload
+     * Re-uploads a video after a failure, creating a fresh upload session job (FR-I15).
+     */
+    @PostMapping({"/{uploadId}/retry", "/{uploadId}/reupload"})
+    public ResponseEntity<VideoUploadResponse> retryUploadAfterFailure(
+            @PathVariable String uploadId,
+            @RequestBody(required = false) InitiateVideoUploadRequest request,
+            Authentication authentication) {
+        User user = videoUploadService.resolveUser(authentication);
+        VideoUploadResponse response = videoUploadService.retryUploadAfterFailure(user, uploadId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }
 

@@ -134,4 +134,24 @@ class VideoUploadControllerTest {
         assertNotNull(response.getBody());
         assertEquals("upload-123", response.getBody().getUploadId());
     }
+
+    @Test
+    void testRetryUploadAfterFailure() {
+        VideoUploadResponse fresh = new VideoUploadResponse();
+        fresh.setUploadId("upload-fresh-456");
+        fresh.setLessonId(401);
+        fresh.setStatus(VideoUploadStatus.INITIATED);
+        fresh.setStatusBadge("UPLOADING");
+
+        when(videoUploadService.resolveUser(authentication)).thenReturn(instructor);
+        when(videoUploadService.retryUploadAfterFailure(eq(instructor), eq("upload-123"), any())).thenReturn(fresh);
+
+        ResponseEntity<VideoUploadResponse> response = videoUploadController.retryUploadAfterFailure("upload-123", null, authentication);
+
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("upload-fresh-456", response.getBody().getUploadId());
+        assertEquals("UPLOADING", response.getBody().getStatusBadge());
+        verify(videoUploadService, times(1)).retryUploadAfterFailure(eq(instructor), eq("upload-123"), any());
+    }
 }

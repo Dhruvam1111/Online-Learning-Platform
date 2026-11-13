@@ -1,9 +1,11 @@
 package com.olp.service;
 
 import com.olp.dto.InitiateVideoUploadRequest;
+import com.olp.dto.TranscoderWebhookRequest;
 import com.olp.dto.VideoChunkResponse;
 import com.olp.dto.VideoUploadResponse;
 import com.olp.entity.*;
+import com.olp.event.VideoProcessingStatusEvent;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.CourseInstructorRepository;
 import com.olp.repository.CourseRepository;
@@ -13,6 +15,8 @@ import com.olp.repository.VideoUploadRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -41,6 +45,11 @@ public class VideoUploadService {
     private final VideoStorageService videoStorageService;
     private final VideoTranscodeService videoTranscodeService;
     private final ContentDeclarationService contentDeclarationService;
+    private final EmailService emailService;
+    private final ApplicationEventPublisher eventPublisher;
+
+    @Value("${app.transcoder.webhook-secret:olp-transcoder-secret-2026}")
+    private String webhookSecret = "olp-transcoder-secret-2026";
 
     @Autowired
     public VideoUploadService(
@@ -51,7 +60,9 @@ public class VideoUploadService {
             UserRepository userRepository,
             VideoStorageService videoStorageService,
             VideoTranscodeService videoTranscodeService,
-            ContentDeclarationService contentDeclarationService) {
+            ContentDeclarationService contentDeclarationService,
+            EmailService emailService,
+            ApplicationEventPublisher eventPublisher) {
         this.videoUploadRepository = videoUploadRepository;
         this.lessonRepository = lessonRepository;
         this.courseRepository = courseRepository;
@@ -60,6 +71,12 @@ public class VideoUploadService {
         this.videoStorageService = videoStorageService;
         this.videoTranscodeService = videoTranscodeService;
         this.contentDeclarationService = contentDeclarationService;
+        this.emailService = emailService;
+        this.eventPublisher = eventPublisher;
+    }
+
+    public void setWebhookSecret(String webhookSecret) {
+        this.webhookSecret = webhookSecret;
     }
 
     /**
@@ -266,6 +283,122 @@ public class VideoUploadService {
                 .orElseThrow(() -> new ResourceNotFoundException("No video upload found for lesson id: " + lessonId));
 
         return VideoUploadResponse.fromEntity(upload);
+    }
+
+    /**
+     * Processes an incoming authenticated transcoding webhook update (FR-I15).
+     * Enforces signature/secret authentication, strict state transition validation, and idempotency.
+     */
+    public VideoUploadResponse processTranscoderWebhook(String incomingSecret, TranscoderWebhookRequest request) {
+        if (incomingSecret == null || !incomingSecret.trim().equals(this.webhookSecret.trim())) {
+            logger.warn("Transcoder webhook authentication failed. Provided secret did not match.");
+            throw new AccessDeniedException("Invalid or missing transcoder webhook secret");
+        }
+
+        if (request == null || request.getUploadId() == null || request.getStatus() == null) {
+            throw new IllegalArgumentException("Webhook request must contain uploadId and status");
+        }
+
+        VideoUpload upload = videoUploadRepository.findById(request.getUploadId())
+                .orElseThrow(() -> new ResourceNotFoundException("Video upload session not found: " + request.getUploadId()));
+
+        VideoUploadStatus currentStatus = upload.getStatus();
+        VideoUploadStatus newStatus = request.getStatus();
+
+        // Idempotency: Duplicate delivery of identical state returns current state safely
+        if (currentStatus == newStatus) {
+            logger.info("Idempotent webhook replay for uploadId: {}, status already {}", upload.getId(), currentStatus);
+            return VideoUploadResponse.fromEntity(upload);
+        }
+
+        // Validate state transitions (e.g. no jump from FAILED to READY without re-upload)
+        if (!currentStatus.canTransitionTo(newStatus)) {
+            logger.error("Illegal state transition attempted for upload {}: {} -> {}", upload.getId(), currentStatus, newStatus);
+            throw new IllegalStateException(String.format("Invalid state transition: cannot transition upload from %s to %s",
+                    currentStatus, newStatus));
+        }
+
+        upload.setStatus(newStatus);
+
+        if (request.getHlsUrl() != null && !request.getHlsUrl().isBlank()) {
+            upload.setHlsUrl(request.getHlsUrl());
+        }
+        if (request.getDashUrl() != null && !request.getDashUrl().isBlank()) {
+            upload.setDashUrl(request.getDashUrl());
+        }
+        if (request.getFailureReason() != null && !request.getFailureReason().isBlank()) {
+            upload.setFailureReason(request.getFailureReason());
+        }
+
+        // If newly ready, update lesson's content URL
+        if (newStatus == VideoUploadStatus.READY && upload.getLesson() != null) {
+            Lesson lesson = upload.getLesson();
+            String streamUrl = (upload.getHlsUrl() != null) ? upload.getHlsUrl() : upload.getStoragePath();
+            lesson.setContentUrl(streamUrl);
+            lessonRepository.save(lesson);
+        }
+
+        VideoUpload saved = videoUploadRepository.save(upload);
+        logger.info("Transcoder webhook transitioned upload {} from {} to {}", saved.getId(), currentStatus, newStatus);
+
+        notifyInstructorAndPublishEvent(saved, currentStatus, newStatus, saved.getFailureReason());
+
+        return VideoUploadResponse.fromEntity(saved);
+    }
+
+    /**
+     * Re-uploads a video after a failure, creating a fresh upload session job (FR-I15).
+     */
+    public VideoUploadResponse retryUploadAfterFailure(User instructor, String failedUploadId, InitiateVideoUploadRequest newRequest) {
+        validateInstructorRole(instructor);
+
+        VideoUpload failedUpload = videoUploadRepository.findById(failedUploadId)
+                .orElseThrow(() -> new ResourceNotFoundException("Upload session not found with id: " + failedUploadId));
+
+        if (failedUpload.getStatus() != VideoUploadStatus.FAILED && failedUpload.getStatus() != VideoUploadStatus.CANCELLED) {
+            throw new IllegalStateException("Only failed or cancelled uploads can be re-uploaded. Current status: " + failedUpload.getStatus());
+        }
+
+        Course course = extractCourseFromLesson(failedUpload.getLesson());
+        assertInstructorAccess(course, instructor);
+
+        InitiateVideoUploadRequest request = (newRequest != null) ? newRequest : new InitiateVideoUploadRequest();
+        if (request.getLessonId() == null) {
+            request.setLessonId(failedUpload.getLesson().getId());
+        }
+        if (request.getFilename() == null) {
+            request.setFilename(failedUpload.getFilename());
+        }
+        if (request.getFileType() == null) {
+            request.setFileType(failedUpload.getFileType());
+        }
+        if (request.getTotalBytes() == null || request.getTotalBytes() <= 0L) {
+            request.setTotalBytes(failedUpload.getTotalBytes());
+        }
+        if (request.getChunkSize() == null || request.getChunkSize() <= 0L) {
+            request.setChunkSize(failedUpload.getChunkSize());
+        }
+
+        logger.info("Initiating fresh re-upload job after failure for failed uploadId: {} on lesson: {}",
+                failedUploadId, request.getLessonId());
+
+        return initiateUpload(instructor, request);
+    }
+
+    private void notifyInstructorAndPublishEvent(VideoUpload upload, VideoUploadStatus oldStatus, VideoUploadStatus newStatus, String failureReason) {
+        if (newStatus == VideoUploadStatus.READY || newStatus == VideoUploadStatus.FAILED) {
+            if (upload.getUploader() != null && upload.getUploader().getEmail() != null) {
+                emailService.sendVideoProcessingStatusEmail(
+                        upload.getUploader().getEmail(),
+                        upload.getUploader().getName(),
+                        upload.getFilename(),
+                        upload.getLesson() != null ? upload.getLesson().getTitle() : null,
+                        newStatus.name(),
+                        failureReason
+                );
+            }
+        }
+        eventPublisher.publishEvent(new VideoProcessingStatusEvent(this, upload, oldStatus, newStatus, failureReason));
     }
 
     private void validateInstructorRole(User user) {
