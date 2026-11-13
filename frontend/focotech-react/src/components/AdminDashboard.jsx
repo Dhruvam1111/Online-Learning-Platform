@@ -66,7 +66,7 @@ export default function AdminDashboard({ onNavigateHome }) {
     maxDiscountAmount: 200,
     minOrderAmount: 0,
     usageLimit: 500,
-    validUntil: '2027-12-31T23:59:59'
+    validUntil: ''
   });
 
   const showToast = (msg) => {
@@ -284,7 +284,7 @@ export default function AdminDashboard({ onNavigateHome }) {
         maxDiscountAmount: 200,
         minOrderAmount: 0,
         usageLimit: 500,
-        validUntil: '2027-12-31T23:59:59'
+        validUntil: ''
       });
       loadCoupons();
     } catch (err) {
@@ -1278,6 +1278,16 @@ export default function AdminDashboard({ onNavigateHome }) {
                 </div>
               </div>
 
+              <label className="block text-xs font-bold text-[#554a43]">
+                Campaign expiry
+                <input
+                  type="datetime-local"
+                  value={newCoupon.validUntil}
+                  onChange={(e) => setNewCoupon({ ...newCoupon, validUntil: e.target.value })}
+                  className="mt-1 w-full rounded-xl border border-[#faeae0] p-2.5"
+                  required
+                />
+              </label>
               <div className="flex items-center gap-2 mt-2">
                 <button
                   type="button"

@@ -442,16 +442,24 @@ CREATE TABLE lecture_progress (
 
 
 -- =========================
--- TABLE: lecture_materials (FR-S14)
+-- TABLE: lecture_materials (FR-S14, FR-I14)
 -- =========================
 CREATE TABLE IF NOT EXISTS lecture_materials (
     id                SERIAL PRIMARY KEY,
-    lecture_id        INTEGER NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
+    lecture_id        INTEGER REFERENCES lectures(id) ON DELETE CASCADE,
+    lesson_id         INTEGER REFERENCES lessons(id) ON DELETE CASCADE,
+    module_id         INTEGER REFERENCES course_modules(id) ON DELETE CASCADE,
+    uploader_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,
     title             VARCHAR(255) NOT NULL,
+    original_filename VARCHAR(255),
     file_url          VARCHAR(500) NOT NULL,
     file_type         VARCHAR(50) NOT NULL DEFAULT 'pdf',
-    is_downloadable   BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at        TIMESTAMP NOT NULL DEFAULT NOW()
+    mime_type         VARCHAR(100),
+    file_size_bytes   BIGINT,
+    is_downloadable   BOOLEAN NOT NULL DEFAULT FALSE,
+    scan_status       VARCHAR(30) NOT NULL DEFAULT 'CLEAN',
+    created_at        TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 -- =========================
@@ -764,4 +772,24 @@ CREATE TABLE IF NOT EXISTS course_submissions (
 );
 
 
+
+
+-- STUDENT QUIZ SUBSYSTEM ADDITIONS (FR-S18 to FR-S26)
+
+-- Ensure quiz_attempts has grading and pass/fail summary columns
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS total_marks INT DEFAULT 0;
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS percentage DECIMAL(5,2) DEFAULT 0.00;
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS is_passed BOOLEAN DEFAULT FALSE;
+
+-- Student Selected Answers / Autosave Table (FR-S21, FR-S24)
+CREATE TABLE IF NOT EXISTS quiz_attempt_answers (
+    id SERIAL PRIMARY KEY,
+    attempt_id INT NOT NULL REFERENCES quiz_attempts(id) ON DELETE CASCADE,
+    question_id INT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    selected_answer TEXT,
+    is_correct BOOLEAN DEFAULT FALSE,
+    marks_awarded INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_attempt_question UNIQUE (attempt_id, question_id)
+);
 
