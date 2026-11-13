@@ -310,14 +310,20 @@ public class CourseCatalogService {
     }
 
     /**
-     * FR-I07: Non-published courses (especially DRAFT) are visible only to associated instructors
-     * and authorized admins. Students and anonymous users can never access draft courses.
+     * FR-I07 & FR-I09: Non-published courses are visible only to associated instructors
+     * and authorized admins. However, for UNPUBLISHED courses, already-enrolled students
+     * retain access to course details and learning materials.
      */
     private void verifyCourseVisibleToUser(Course course, User currentUser) {
         if (course.getStatus() == CourseStatus.PUBLISHED) {
             return;
         }
         if (isAssociatedInstructorOrAdmin(course, currentUser)) {
+            return;
+        }
+        if (currentUser != null && course.getStatus() == CourseStatus.UNPUBLISHED
+                && enrollmentRepository != null
+                && enrollmentRepository.existsByStudentIdAndCourseId(currentUser.getId(), course.getId())) {
             return;
         }
         throw new AccessDeniedException("Access denied: this course is not publicly available");
