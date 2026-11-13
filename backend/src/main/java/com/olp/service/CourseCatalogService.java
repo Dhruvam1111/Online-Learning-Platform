@@ -226,7 +226,7 @@ public class CourseCatalogService {
                 course.getId(),
                 course.getTitle(),
                 course.getDescription(),
-                course.getStatus().name(),
+                course.getStatus() != null ? course.getStatus().name() : null,
                 course.getInstructor() != null ? course.getInstructor().getId() : null,
                 course.getInstructor() != null ? course.getInstructor().getName() : "Instructor",
                 course.getCreatedAt(),

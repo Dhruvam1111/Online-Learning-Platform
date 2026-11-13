@@ -1,6 +1,5 @@
 package com.olp.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.olp.dto.CourseAuditResponse;
 import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseInstructorResponse;
@@ -55,8 +54,6 @@ import java.util.regex.Pattern;
 
 @Service
 public class InstructorCourseService {
-
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private static final List<Pattern> MISLEADING_CLAIM_PATTERNS = List.of(
             Pattern.compile("\\baccredited\\s+(degree|university|college|institution)\\b", Pattern.CASE_INSENSITIVE),
@@ -430,8 +427,8 @@ public class InstructorCourseService {
             course.setLearningOutcomesList(cleanOutcomes);
         }
 
-        if (request.getPrice() != null || request.getDiscountValue() != null || request.getEnrollmentLimit() != null
-                || request.getDiscountType() != null) {
+        if (request != null && (request.getPrice() != null || request.getDiscountValue() != null || request.getEnrollmentLimit() != null
+                || request.getDiscountType() != null)) {
             CoursePricingRequest pricingReq = new CoursePricingRequest(
                     request.getPrice(),
                     request.getDiscountType(),
@@ -546,8 +543,8 @@ public class InstructorCourseService {
             course.setLearningOutcomesList(cleanOutcomes);
         }
 
-        if (request.getPrice() != null || request.getDiscountValue() != null || request.getEnrollmentLimit() != null
-                || request.getDiscountType() != null) {
+        if (request != null && (request.getPrice() != null || request.getDiscountValue() != null || request.getEnrollmentLimit() != null
+                || request.getDiscountType() != null)) {
             CoursePricingRequest pricingReq = new CoursePricingRequest(
                     request.getPrice(),
                     request.getDiscountType(),
@@ -1342,7 +1339,7 @@ public class InstructorCourseService {
                     currentUser,
                     "COURSE_UNPUBLISH",
                     "status",
-                    Map.of("status", previousStatus.name()),
+                    Map.of("status", previousStatus != null ? previousStatus.name() : "null"),
                     Map.of("status", CourseStatus.UNPUBLISHED.name()));
         }
 
@@ -1358,6 +1355,11 @@ public class InstructorCourseService {
         findCourseAndVerifyOwnership(courseId, currentUser);
         if (courseAuditService != null) {
             return courseAuditService.getAuditsForCourse(currentUser, courseId);
+        }
+        if (courseAuditRepository != null) {
+            return courseAuditRepository.findByCourseIdOrderByCreatedAtDesc(courseId).stream()
+                    .map(CourseAuditResponse::fromEntity)
+                    .toList();
         }
         return Collections.emptyList();
     }

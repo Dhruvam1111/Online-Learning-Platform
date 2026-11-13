@@ -9,6 +9,7 @@ import com.olp.repository.ReviewRepository;
 import com.olp.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -36,6 +37,7 @@ public class ReviewService {
      * 1. Student must be enrolled in the course.
      * 2. Student can only submit one review per course.
      */
+    @Transactional
     public ReviewResponse addReview(Integer courseId, Integer studentId, CreateReviewRequest request) {
         if (courseId == null || studentId == null) {
             throw new IllegalArgumentException("Course ID and Student ID cannot be null");
