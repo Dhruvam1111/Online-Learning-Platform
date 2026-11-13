@@ -12,6 +12,7 @@ import com.olp.dto.CourseReviewStatusResponse;
 import com.olp.dto.CourseSubmissionRequest;
 import com.olp.dto.CourseSubmissionResponse;
 import com.olp.dto.CreateCourseRequest;
+import com.olp.dto.DeleteCourseRequest;
 import com.olp.dto.PageResponse;
 import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
@@ -337,6 +338,29 @@ class InstructorCourseControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertTrue(response.getBody().isSuccess());
         verify(instructorCourseService).deleteCourse(currentUser, 10);
+    }
+
+    @Test
+    void testDeleteCourse_WithConfirmParam_PassesConfirmationToService() {
+        givenResolvedUser();
+
+        ResponseEntity<ApiResponse> response = controller.deleteCourse(authentication, 10, true, null, null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertTrue(response.getBody().isSuccess());
+        verify(instructorCourseService).deleteCourse(currentUser, 10, true, null);
+    }
+
+    @Test
+    void testDeleteCourse_WithRequestBody_PassesConfirmationAndReasonToService() {
+        givenResolvedUser();
+        DeleteCourseRequest req = new DeleteCourseRequest(true, "Retiring course");
+
+        ResponseEntity<ApiResponse> response = controller.deleteCourse(authentication, 10, null, null, req);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertTrue(response.getBody().isSuccess());
+        verify(instructorCourseService).deleteCourse(currentUser, 10, true, "Retiring course");
     }
 
     @Test
