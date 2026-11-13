@@ -2,12 +2,14 @@ package com.olp.service;
 
 import com.olp.dto.CourseDetailResponse;
 import com.olp.dto.CourseInstructorResponse;
+import com.olp.dto.EnrollmentResponse;
 import com.olp.dto.LectureResponse;
 import com.olp.dto.PublicCourseResponse;
 import com.olp.entity.Course;
 import com.olp.entity.CourseInstructor;
 import com.olp.entity.CourseInstructorRole;
 import com.olp.entity.CourseStatus;
+import com.olp.entity.Enrollment;
 import com.olp.entity.InstructorProfile;
 import com.olp.entity.Lecture;
 import com.olp.entity.User;
@@ -37,6 +39,7 @@ class CourseCatalogServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private CourseInstructorRepository courseInstructorRepository;
     @Mock private InstructorProfileRepository instructorProfileRepository;
+    @Mock private CoursePricingService coursePricingService;
 
     @InjectMocks
     private CourseCatalogService service;
@@ -221,5 +224,45 @@ class CourseCatalogServiceTest {
 
         assertThrows(AccessDeniedException.class, () -> service.getCourseInstructors(1, null));
         assertThrows(AccessDeniedException.class, () -> service.getCourseInstructors(1, student));
+    }
+
+    @Test
+    void enrollCourse_ThrowsWhenEnrollmentLimitReached() {
+        course.setEnrollmentLimit(10);
+        User student = new User("Sam", "sam@olp.com", "hash", "student", "active");
+        student.setId(20);
+
+        when(coursePricingService.isEnrollmentLimitReached(course)).thenReturn(true);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> service.enrollCourse(student, 1));
+        assertTrue(ex.getMessage().contains("enrollment limit has been reached"));
+    }
+
+    @Test
+    void enrollCourse_SucceedsWhenBelowEnrollmentLimit() {
+        course.setEnrollmentLimit(10);
+        User student = new User("Sam", "sam@olp.com", "hash", "student", "active");
+        student.setId(20);
+
+        when(coursePricingService.isEnrollmentLimitReached(course)).thenReturn(false);
+        when(enrollmentRepository.existsByStudentIdAndCourseId(20, 1)).thenReturn(false);
+
+        EnrollmentResponse resp = service.enrollCourse(student, 1);
+        assertNotNull(resp);
+        assertTrue(resp.success());
+        verify(enrollmentRepository).save(any(Enrollment.class));
+    }
+
+    @Test
+    void getCoursePricing_DelegatesToPricingService() {
+        com.olp.dto.CoursePricingResponse mockResp = new com.olp.dto.CoursePricingResponse();
+        mockResp.setCourseId(1);
+        mockResp.setBasePrice(new java.math.BigDecimal("500.00"));
+        when(coursePricingService.calculatePricing(1)).thenReturn(mockResp);
+
+        com.olp.dto.CoursePricingResponse result = service.getCoursePricing(1);
+        assertNotNull(result);
+        assertEquals(new java.math.BigDecimal("500.00"), result.getBasePrice());
     }
 }

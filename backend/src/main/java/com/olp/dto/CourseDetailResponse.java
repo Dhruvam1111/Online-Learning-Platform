@@ -1,5 +1,7 @@
 package com.olp.dto;
 
+import com.olp.entity.DiscountType;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +22,19 @@ public class CourseDetailResponse {
     private boolean bookmarked;
     private List<LectureResponse> lectures = new ArrayList<>();
     private List<CourseInstructorResponse> instructors = new ArrayList<>();
+    private BigDecimal price = BigDecimal.ZERO;
+    private DiscountType discountType;
+    private BigDecimal discountValue = BigDecimal.ZERO;
+    private LocalDateTime discountStartDate;
+    private LocalDateTime discountEndDate;
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+    private BigDecimal discountedPrice = BigDecimal.ZERO;
+    private BigDecimal taxRate = new BigDecimal("0.18");
+    private BigDecimal taxAmount = BigDecimal.ZERO;
+    private BigDecimal finalPayableAmount = BigDecimal.ZERO;
+    private boolean isFree = true;
+    private Integer enrollmentLimit;
+    private boolean isEnrollmentLimitReached = false;
 
     public CourseDetailResponse() {}
 
@@ -152,5 +167,109 @@ public class CourseDetailResponse {
 
     public void setInstructors(List<CourseInstructorResponse> instructors) {
         this.instructors = instructors != null ? instructors : new ArrayList<>();
+    }
+
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price != null ? price : BigDecimal.ZERO;
+    }
+
+    public DiscountType getDiscountType() {
+        return discountType;
+    }
+
+    public void setDiscountType(DiscountType discountType) {
+        this.discountType = discountType;
+    }
+
+    public BigDecimal getDiscountValue() {
+        return discountValue;
+    }
+
+    public void setDiscountValue(BigDecimal discountValue) {
+        this.discountValue = discountValue != null ? discountValue : BigDecimal.ZERO;
+    }
+
+    public LocalDateTime getDiscountStartDate() {
+        return discountStartDate;
+    }
+
+    public void setDiscountStartDate(LocalDateTime discountStartDate) {
+        this.discountStartDate = discountStartDate;
+    }
+
+    public LocalDateTime getDiscountEndDate() {
+        return discountEndDate;
+    }
+
+    public void setDiscountEndDate(LocalDateTime discountEndDate) {
+        this.discountEndDate = discountEndDate;
+    }
+
+    public BigDecimal getDiscountAmount() {
+        return discountAmount;
+    }
+
+    public void setDiscountAmount(BigDecimal discountAmount) {
+        this.discountAmount = discountAmount;
+    }
+
+    public BigDecimal getDiscountedPrice() {
+        return discountedPrice;
+    }
+
+    public void setDiscountedPrice(BigDecimal discountedPrice) {
+        this.discountedPrice = discountedPrice;
+    }
+
+    public BigDecimal getTaxRate() {
+        return taxRate;
+    }
+
+    public void setTaxRate(BigDecimal taxRate) {
+        this.taxRate = taxRate;
+    }
+
+    public BigDecimal getTaxAmount() {
+        return taxAmount;
+    }
+
+    public void setTaxAmount(BigDecimal taxAmount) {
+        this.taxAmount = taxAmount;
+    }
+
+    public BigDecimal getFinalPayableAmount() {
+        return finalPayableAmount;
+    }
+
+    public void setFinalPayableAmount(BigDecimal finalPayableAmount) {
+        this.finalPayableAmount = finalPayableAmount;
+    }
+
+    public boolean isFree() {
+        return isFree;
+    }
+
+    public void setFree(boolean free) {
+        isFree = free;
+    }
+
+    public Integer getEnrollmentLimit() {
+        return enrollmentLimit;
+    }
+
+    public void setEnrollmentLimit(Integer enrollmentLimit) {
+        this.enrollmentLimit = enrollmentLimit;
+    }
+
+    public boolean isEnrollmentLimitReached() {
+        return isEnrollmentLimitReached;
+    }
+
+    public void setEnrollmentLimitReached(boolean enrollmentLimitReached) {
+        isEnrollmentLimitReached = enrollmentLimitReached;
     }
 }

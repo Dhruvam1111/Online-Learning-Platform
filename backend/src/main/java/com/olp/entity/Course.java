@@ -3,6 +3,7 @@ package com.olp.entity;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +41,25 @@ public class Course {
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
 
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal price = BigDecimal.ZERO;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "discount_type", length = 20)
+    private DiscountType discountType;
+
+    @Column(name = "discount_value", precision = 10, scale = 2)
+    private BigDecimal discountValue = BigDecimal.ZERO;
+
+    @Column(name = "discount_start_date")
+    private LocalDateTime discountStartDate;
+
+    @Column(name = "discount_end_date")
+    private LocalDateTime discountEndDate;
+
+    @Column(name = "enrollment_limit")
+    private Integer enrollmentLimit;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -63,6 +83,12 @@ public class Course {
         }
         if (this.category == null || this.category.trim().isEmpty()) {
             this.category = "General";
+        }
+        if (this.price == null) {
+            this.price = BigDecimal.ZERO;
+        }
+        if (this.discountValue == null) {
+            this.discountValue = BigDecimal.ZERO;
         }
     }
 
@@ -248,5 +274,57 @@ public class Course {
 
     public void setModules(List<CourseModule> modules) {
         this.modules = modules != null ? modules : new ArrayList<>();
+    }
+
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price != null ? price : BigDecimal.ZERO;
+    }
+
+    public DiscountType getDiscountType() {
+        return discountType;
+    }
+
+    public void setDiscountType(DiscountType discountType) {
+        this.discountType = discountType;
+    }
+
+    public BigDecimal getDiscountValue() {
+        return discountValue;
+    }
+
+    public void setDiscountValue(BigDecimal discountValue) {
+        this.discountValue = discountValue != null ? discountValue : BigDecimal.ZERO;
+    }
+
+    public LocalDateTime getDiscountStartDate() {
+        return discountStartDate;
+    }
+
+    public void setDiscountStartDate(LocalDateTime discountStartDate) {
+        this.discountStartDate = discountStartDate;
+    }
+
+    public LocalDateTime getDiscountEndDate() {
+        return discountEndDate;
+    }
+
+    public void setDiscountEndDate(LocalDateTime discountEndDate) {
+        this.discountEndDate = discountEndDate;
+    }
+
+    public Integer getEnrollmentLimit() {
+        return enrollmentLimit;
+    }
+
+    public void setEnrollmentLimit(Integer enrollmentLimit) {
+        this.enrollmentLimit = enrollmentLimit;
+    }
+
+    public boolean isFree() {
+        return price == null || price.compareTo(BigDecimal.ZERO) == 0;
     }
 }

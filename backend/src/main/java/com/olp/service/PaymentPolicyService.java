@@ -31,9 +31,37 @@ public class PaymentPolicyService {
         if(value==null || value.signum()<0 || value.compareTo(BigDecimal.ONE)>0 || value.stripTrailingZeros().scale()>4) throw new IllegalArgumentException("Rates must be between 0 and 1, with at most four decimal places.");
     }
     public BigDecimal value(Map<String,Object> data,String key) {return new BigDecimal(data.get(key).toString());}
+
+    public Optional<BigDecimal> getAdminOverridePrice(Integer courseId) {
+        if (courseId == null) return Optional.empty();
+        var rows = audit.list("course.policy");
+        for (int i = rows.size() - 1; i >= 0; i--) {
+            if (((Number) rows.get(i).get("courseId")).intValue() == courseId) {
+                return Optional.of(value(rows.get(i), "price"));
+            }
+        }
+        return Optional.empty();
+    }
+
+    public BigDecimal getTaxRateForCourse(Integer courseId) {
+        if (courseId != null) {
+            var rows = audit.list("course.policy");
+            for (int i = rows.size() - 1; i >= 0; i--) {
+                if (((Number) rows.get(i).get("courseId")).intValue() == courseId && rows.get(i).containsKey("taxRate")) {
+                    return value(rows.get(i), "taxRate");
+                }
+            }
+        }
+        return value(current(), "taxRate");
+    }
+
     public BigDecimal price(com.olp.entity.Course course) {
+        if (course == null) return value(current(), "defaultPrice");
         var rows=audit.list("course.policy");
-        for(int i=rows.size()-1;i>=0;i--)if(((Number)rows.get(i).get("courseId")).intValue()==course.getId())return value(rows.get(i),"price");
+        if (course.getId() != null) {
+            for(int i=rows.size()-1;i>=0;i--)if(((Number)rows.get(i).get("courseId")).intValue()==course.getId())return value(rows.get(i),"price");
+        }
+        if (course.getPrice() != null && course.getPrice().compareTo(BigDecimal.ZERO) >= 0) return course.getPrice();
         var catalog=PaymentService.catalogPrice(course);
         return catalog.compareTo(new BigDecimal("499"))==0?value(current(),"defaultPrice"):catalog;
     }

@@ -2,6 +2,7 @@ package com.olp.service;
 
 import com.olp.dto.CourseDetailResponse;
 import com.olp.dto.CourseInstructorResponse;
+import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.EnrollmentResponse;
 import com.olp.dto.LectureResponse;
 import com.olp.dto.PublicCourseResponse;
@@ -19,6 +20,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -32,6 +34,7 @@ public class CourseCatalogService {
     private final UserRepository userRepository;
     private final CourseInstructorRepository courseInstructorRepository;
     private final InstructorProfileRepository instructorProfileRepository;
+    private final CoursePricingService coursePricingService;
 
     public CourseCatalogService(CourseRepository courseRepository,
                                 LectureRepository lectureRepository,
@@ -40,7 +43,7 @@ public class CourseCatalogService {
                                 EnrollmentRepository enrollmentRepository,
                                 UserRepository userRepository) {
         this(courseRepository, lectureRepository, reviewRepository, bookmarkRepository,
-                enrollmentRepository, userRepository, null, null);
+                enrollmentRepository, userRepository, null, null, null);
     }
 
     public CourseCatalogService(CourseRepository courseRepository,
@@ -51,7 +54,19 @@ public class CourseCatalogService {
                                 UserRepository userRepository,
                                 CourseInstructorRepository courseInstructorRepository) {
         this(courseRepository, lectureRepository, reviewRepository, bookmarkRepository,
-                enrollmentRepository, userRepository, courseInstructorRepository, null);
+                enrollmentRepository, userRepository, courseInstructorRepository, null, null);
+    }
+
+    public CourseCatalogService(CourseRepository courseRepository,
+                                LectureRepository lectureRepository,
+                                ReviewRepository reviewRepository,
+                                BookmarkRepository bookmarkRepository,
+                                EnrollmentRepository enrollmentRepository,
+                                UserRepository userRepository,
+                                CourseInstructorRepository courseInstructorRepository,
+                                InstructorProfileRepository instructorProfileRepository) {
+        this(courseRepository, lectureRepository, reviewRepository, bookmarkRepository,
+                enrollmentRepository, userRepository, courseInstructorRepository, instructorProfileRepository, null);
     }
 
     @Autowired
@@ -62,7 +77,8 @@ public class CourseCatalogService {
                                 EnrollmentRepository enrollmentRepository,
                                 UserRepository userRepository,
                                 @Autowired(required = false) CourseInstructorRepository courseInstructorRepository,
-                                @Autowired(required = false) InstructorProfileRepository instructorProfileRepository) {
+                                @Autowired(required = false) InstructorProfileRepository instructorProfileRepository,
+                                @Autowired(required = false) CoursePricingService coursePricingService) {
         this.courseRepository = courseRepository;
         this.lectureRepository = lectureRepository;
         this.reviewRepository = reviewRepository;
@@ -71,6 +87,7 @@ public class CourseCatalogService {
         this.userRepository = userRepository;
         this.courseInstructorRepository = courseInstructorRepository;
         this.instructorProfileRepository = instructorProfileRepository;
+        this.coursePricingService = coursePricingService;
     }
 
     /**
@@ -148,6 +165,15 @@ public class CourseCatalogService {
             );
             item.setInstructors(CourseInstructorResponse.resolveInstructorsForCourse(
                     c, courseInstructorRepository, instructorProfileRepository));
+            item.setPrice(c.getPrice() != null ? c.getPrice() : BigDecimal.ZERO);
+            item.setFree(c.isFree());
+            item.setEnrollmentLimit(c.getEnrollmentLimit());
+            if (coursePricingService != null) {
+                CoursePricingResponse pr = coursePricingService.calculatePricing(c);
+                if (pr != null) {
+                    item.setFinalPayableAmount(pr.getFinalPayableAmount());
+                }
+            }
             return item;
         }).toList();
     }
@@ -194,6 +220,24 @@ public class CourseCatalogService {
         );
         detail.setInstructors(CourseInstructorResponse.resolveInstructorsForCourse(
                 course, courseInstructorRepository, instructorProfileRepository));
+        detail.setPrice(course.getPrice() != null ? course.getPrice() : BigDecimal.ZERO);
+        detail.setFree(course.isFree());
+        detail.setDiscountType(course.getDiscountType());
+        detail.setDiscountValue(course.getDiscountValue());
+        detail.setDiscountStartDate(course.getDiscountStartDate());
+        detail.setDiscountEndDate(course.getDiscountEndDate());
+        detail.setEnrollmentLimit(course.getEnrollmentLimit());
+        if (coursePricingService != null) {
+            CoursePricingResponse pr = coursePricingService.calculatePricing(course);
+            if (pr != null) {
+                detail.setDiscountAmount(pr.getDiscountAmount());
+                detail.setDiscountedPrice(pr.getDiscountedPrice());
+                detail.setTaxRate(pr.getTaxRate());
+                detail.setTaxAmount(pr.getTaxAmount());
+                detail.setFinalPayableAmount(pr.getFinalPayableAmount());
+                detail.setEnrollmentLimitReached(pr.isEnrollmentLimitReached());
+            }
+        }
         return detail;
     }
 
@@ -226,6 +270,16 @@ public class CourseCatalogService {
 
         if (course.getStatus() != CourseStatus.PUBLISHED) {
             throw new AccessDeniedException("Cannot enroll in a course that is not published");
+        }
+
+        // FR-I10: Prevent enrollment when course enrollment limit is reached
+        if (coursePricingService != null && coursePricingService.isEnrollmentLimitReached(course)) {
+            throw new IllegalStateException("Course enrollment limit has been reached");
+        } else if (course.getEnrollmentLimit() != null && course.getEnrollmentLimit() > 0) {
+            long currentCount = enrollmentRepository.countByCourseId(course.getId());
+            if (currentCount >= course.getEnrollmentLimit()) {
+                throw new IllegalStateException("Course enrollment limit has been reached");
+            }
         }
 
         if (enrollmentRepository.existsByStudentIdAndCourseId(currentUser.getId(), courseId)) {
@@ -299,5 +353,25 @@ public class CourseCatalogService {
             return false;
         }
         return enrollmentRepository.existsByStudentIdAndCourseId(currentUser.getId(), course.getId());
+    }
+
+    /**
+     * FR-I10 — Retrieve pricing breakdown, active discounts, taxes, and final payable amount (DR-PY03).
+     */
+    @Transactional(readOnly = true)
+    public CoursePricingResponse getCoursePricing(Integer courseId) {
+        if (coursePricingService != null) {
+            return coursePricingService.calculatePricing(courseId);
+        }
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
+        CoursePricingResponse resp = new CoursePricingResponse();
+        resp.setCourseId(course.getId());
+        resp.setCourseTitle(course.getTitle());
+        resp.setBasePrice(course.getPrice() != null ? course.getPrice() : BigDecimal.ZERO);
+        resp.setInstructorPrice(course.getPrice() != null ? course.getPrice() : BigDecimal.ZERO);
+        resp.setFree(course.isFree());
+        resp.setEnrollmentLimit(course.getEnrollmentLimit());
+        return resp;
     }
 }
