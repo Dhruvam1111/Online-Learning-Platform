@@ -1,14 +1,18 @@
 package com.olp.service;
 
+import com.olp.exception.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -102,6 +106,35 @@ public class MaterialStorageService {
         }
 
         return targetPath.toString().replace('\\', '/');
+    }
+
+    /**
+     * Loads a stored material file as a Spring Resource for viewing or downloading (FR-I17).
+     */
+    public Resource loadMaterialAsResource(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            throw new IllegalArgumentException("Material file reference cannot be empty");
+        }
+        try {
+            Path filePath = Paths.get(fileUrl).normalize();
+            if (!filePath.isAbsolute()) {
+                filePath = materialsLocation.resolve(filePath).normalize();
+            }
+
+            // Path traversal guard
+            if (!filePath.toAbsolutePath().startsWith(materialsLocation.toAbsolutePath())) {
+                throw new IllegalArgumentException("Cannot access files outside designated materials storage directory");
+            }
+
+            Resource resource = new UrlResource(filePath.toUri());
+            if (resource.exists() && resource.isReadable()) {
+                return resource;
+            } else {
+                throw new ResourceNotFoundException("Material file not found or unreadable on disk: " + fileUrl);
+            }
+        } catch (MalformedURLException e) {
+            throw new IllegalArgumentException("Invalid file path URI: " + fileUrl, e);
+        }
     }
 
     /**

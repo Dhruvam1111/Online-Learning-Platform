@@ -207,6 +207,26 @@ public class SupplementaryMaterialService {
     }
 
     /**
+     * Toggles or updates the downloadable vs view-only status of a material (FR-I17, Step 16).
+     */
+    public SupplementaryMaterialResponse updateDownloadableStatus(User instructor, Integer materialId, boolean isDownloadable) {
+        validateInstructorRole(instructor);
+
+        LectureMaterial material = materialRepository.findById(materialId)
+                .orElseThrow(() -> new ResourceNotFoundException("Material not found with id: " + materialId));
+
+        Course course = resolveCourseFromMaterial(material);
+        assertInstructorAccess(course, instructor);
+
+        material.setIsDownloadable(isDownloadable);
+        LectureMaterial saved = materialRepository.save(material);
+        logger.info("Updated material ID {} downloadable status to {} by user ID {}",
+                materialId, isDownloadable, instructor.getId());
+
+        return SupplementaryMaterialResponse.fromEntity(saved);
+    }
+
+    /**
      * Delete material and remove file from disk.
      */
     public void deleteMaterial(User instructor, Integer id) {
