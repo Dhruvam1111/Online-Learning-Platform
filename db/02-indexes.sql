@@ -146,6 +146,11 @@ CREATE INDEX IF NOT EXISTS idx_courses_is_deleted ON courses(is_deleted);
 CREATE INDEX IF NOT EXISTS idx_certificates_course_id ON certificates(course_id);
 CREATE INDEX IF NOT EXISTS idx_certificates_student_id ON certificates(student_id);
 
+-- Step 44 / FR-I56: Certificate Completion Criteria Indexes
+CREATE INDEX IF NOT EXISTS idx_course_completion_criteria_course_id ON course_completion_criteria(course_id);
+CREATE INDEX IF NOT EXISTS idx_lesson_progress_student_id ON lesson_progress(student_id);
+CREATE INDEX IF NOT EXISTS idx_lesson_progress_lesson_id ON lesson_progress(lesson_id);
+
 
 
 

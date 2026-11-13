@@ -827,5 +827,29 @@ CREATE TABLE IF NOT EXISTS certificates (
     issued_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Step 44 / FR-I56: Certificate Completion Criteria and Rules (DR-03)
+CREATE TABLE IF NOT EXISTS course_completion_criteria (
+    id SERIAL PRIMARY KEY,
+    course_id INT NOT NULL UNIQUE REFERENCES courses(id) ON DELETE CASCADE,
+    min_lesson_completion_percentage NUMERIC(5, 2) NOT NULL DEFAULT 100.00,
+    min_quiz_passing_marks NUMERIC(8, 2),
+    min_quiz_passing_percentage NUMERIC(5, 2),
+    require_all_quizzes_passed BOOLEAN NOT NULL DEFAULT FALSE,
+    mandatory_lesson_ids TEXT,
+    mandatory_quiz_ids TEXT,
+    is_locked BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS lesson_progress (
+    id SERIAL PRIMARY KEY,
+    student_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    lesson_id INT NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+    completed_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    is_completed BOOLEAN NOT NULL DEFAULT TRUE,
+    UNIQUE (student_id, lesson_id)
+);
+
 
 
