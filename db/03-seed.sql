@@ -219,3 +219,10 @@ INSERT INTO questions (course_id, created_by, question_text, question_type, opti
 INSERT INTO quiz_questions (quiz_id, question_id, order_index, marks, negative_marks, is_required) VALUES
     (1, 1, 1, 5.00, 0.00, TRUE),
     (1, 2, 2, 5.00, 0.00, TRUE);
+
+-- Step 13 / FR-I13: Video Uploads Seed
+INSERT INTO video_uploads (id, lesson_id, uploader_id, filename, file_type, total_bytes, received_bytes, chunk_size, total_chunks, status, storage_path, hls_url, dash_url)
+VALUES
+    ('seed-upload-uuid-001', 1, 2, 'intro_to_web_dev.mp4', 'video/mp4', 52428800, 52428800, 5242880, 10, 'READY', '/uploads/videos/seed-upload-uuid-001.mp4', '/uploads/videos/seed-upload-uuid-001/master.m3u8', '/uploads/videos/seed-upload-uuid-001/manifest.mpd')
+ON CONFLICT (id) DO NOTHING;
+
