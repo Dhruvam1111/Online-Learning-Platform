@@ -279,8 +279,8 @@ public class CoursePreviewService {
         if (course.getDescription() == null || course.getDescription().trim().isEmpty()) {
             warnings.add("Course description is missing");
         }
-        if (course.getCategory() == null || course.getCategory().trim().isEmpty()) {
-            warnings.add("Course category is missing");
+        if (course.getCategory() == null || course.getCategory().trim().isEmpty() || "General".equalsIgnoreCase(course.getCategory().trim())) {
+            warnings.add("Course category is not set (defaulting to General)");
         }
         if (moduleResponses.isEmpty() && lectureResponses.isEmpty()) {
             warnings.add("Course has no modules or lectures configured");
