@@ -68,6 +68,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/auth/verify-email").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/certificates", "/api/certificates/**").permitAll()
                         .requestMatchers("/api/payments/webhook", "/api/webhooks/**", "/api/videos/webhook/**").permitAll()
                         .requestMatchers("/api/payments/simulator/**", "/api/payments/wallet/add-reward").hasRole("admin")
                         .requestMatchers("/api/payments/**").authenticated()

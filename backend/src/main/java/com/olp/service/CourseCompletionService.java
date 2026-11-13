@@ -4,18 +4,29 @@ import com.olp.dto.CertificateResponse;
 import com.olp.dto.CompletionEvaluationResult;
 import com.olp.dto.CourseCompletionCriteriaRequest;
 import com.olp.dto.CourseCompletionCriteriaResponse;
+import com.olp.dto.PageResponse;
 import com.olp.entity.*;
 import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -39,6 +50,9 @@ public class CourseCompletionService {
     private final QuizAttemptRepository quizAttemptRepository;
     private final CourseInstructorRepository courseInstructorRepository;
     private final CourseAuditService courseAuditService;
+
+    @Autowired(required = false)
+    private StudentProfileRepository studentProfileRepository;
 
     @Autowired
     public CourseCompletionService(
@@ -570,5 +584,197 @@ public class CourseCompletionService {
                 }
             }
         }
+    }
+
+    public void setStudentProfileRepository(StudentProfileRepository studentProfileRepository) {
+        this.studentProfileRepository = studentProfileRepository;
+    }
+
+    // =========================================================================
+    // FR-I57: View Certificates Issued (DR-05, Read-Only)
+    // =========================================================================
+
+    /**
+     * FR-I57: Retrieve certificates issued for courses associated with the authenticated instructor (DR-05).
+     * Supports filtering by course and issue-date range, with pagination.
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<CertificateResponse> getIssuedCertificates(
+            User currentUser,
+            Integer courseId,
+            String startDateStr,
+            String endDateStr,
+            int page,
+            int size) {
+
+        validateInstructor(currentUser);
+        Set<Integer> targetCourseIds = resolveAndVerifyCourseIds(currentUser, courseId);
+        if (targetCourseIds.isEmpty()) {
+            return new PageResponse<>(Collections.emptyList(), page, size, 0, 0, true);
+        }
+
+        LocalDateTime startDate = parseDateTime(startDateStr, false);
+        LocalDateTime endDate = parseDateTime(endDateStr, true);
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("Start date must be before or equal to end date");
+        }
+
+        if (certificateRepository == null) {
+            return new PageResponse<>(Collections.emptyList(), page, size, 0, 0, true);
+        }
+
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by(Sort.Direction.DESC, "issuedAt"));
+        Page<Certificate> certPage = certificateRepository.findIssuedCertificates(targetCourseIds, startDate, endDate, pageable);
+
+        List<CertificateResponse> dtoList = certPage.getContent().stream()
+                .map(this::mapToCertificateResponse)
+                .toList();
+
+        return new PageResponse<>(dtoList, certPage.getNumber(), certPage.getSize(), certPage.getTotalElements(), certPage.getTotalPages(), certPage.isLast());
+    }
+
+    /**
+     * FR-I57: Retrieve certificates issued for courses associated with the authenticated instructor (unpaginated list).
+     */
+    @Transactional(readOnly = true)
+    public List<CertificateResponse> getIssuedCertificatesList(
+            User currentUser,
+            Integer courseId,
+            String startDateStr,
+            String endDateStr) {
+
+        validateInstructor(currentUser);
+        Set<Integer> targetCourseIds = resolveAndVerifyCourseIds(currentUser, courseId);
+        if (targetCourseIds.isEmpty() || certificateRepository == null) {
+            return Collections.emptyList();
+        }
+
+        LocalDateTime startDate = parseDateTime(startDateStr, false);
+        LocalDateTime endDate = parseDateTime(endDateStr, true);
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("Start date must be before or equal to end date");
+        }
+
+        List<Certificate> certList = certificateRepository.findIssuedCertificatesList(targetCourseIds, startDate, endDate);
+        return certList.stream()
+                .map(this::mapToCertificateResponse)
+                .toList();
+    }
+
+    /**
+     * DR-02: Public certificate verification by certificate code.
+     */
+    @Transactional(readOnly = true)
+    public CertificateResponse verifyCertificate(String certificateCode) {
+        if (certificateCode == null || certificateCode.trim().isEmpty()) {
+            throw new IllegalArgumentException("Certificate code cannot be empty");
+        }
+        if (certificateRepository == null) {
+            throw new ResourceNotFoundException("Certificate not found with code: " + certificateCode);
+        }
+        Certificate cert = certificateRepository.findByCertificateCode(certificateCode.trim())
+                .orElseThrow(() -> new ResourceNotFoundException("Certificate not found with verification code: " + certificateCode.trim()));
+        return mapToCertificateResponse(cert);
+    }
+
+    /**
+     * Resolves course IDs that the user is authorized to view certificates for (DR-05).
+     * If courseId is explicitly specified, verifies association or throws AccessDeniedException.
+     * If omitted, discovers all courses where instructor is owner or co-instructor.
+     */
+    private Set<Integer> resolveAndVerifyCourseIds(User currentUser, Integer courseId) {
+        if (courseId != null) {
+            Course course = courseRepository.findById(courseId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
+            if (course.isDeleted()) {
+                throw new ResourceNotFoundException("Course not found with id: " + courseId);
+            }
+
+            boolean isOwner = course.getInstructor() != null && currentUser.getId().equals(course.getInstructor().getId());
+            boolean isAssociated = courseInstructorRepository != null &&
+                    courseInstructorRepository.existsByCourseIdAndInstructorId(courseId, currentUser.getId());
+            boolean isAdmin = "admin".equalsIgnoreCase(currentUser.getRole());
+
+            if (!isOwner && !isAssociated && !isAdmin) {
+                throw new AccessDeniedException("Access denied: You are not associated with course " + courseId + " (DR-05)");
+            }
+            return Collections.singleton(courseId);
+        }
+
+        // When courseId is omitted, collect all courses associated with the user
+        if ("admin".equalsIgnoreCase(currentUser.getRole())) {
+            return courseRepository.findAll().stream()
+                    .filter(c -> !c.isDeleted())
+                    .map(Course::getId)
+                    .collect(Collectors.toSet());
+        }
+
+        Set<Integer> courseIds = new LinkedHashSet<>();
+        List<Course> primaryCourses = courseRepository.findByInstructorIdOrderByIdAsc(currentUser.getId());
+        if (primaryCourses != null) {
+            for (Course c : primaryCourses) {
+                if (c != null && c.getId() != null && !c.isDeleted()) {
+                    courseIds.add(c.getId());
+                }
+            }
+        }
+        if (courseInstructorRepository != null) {
+            List<CourseInstructor> associations = courseInstructorRepository.findByInstructorId(currentUser.getId());
+            if (associations != null) {
+                for (CourseInstructor ci : associations) {
+                    if (ci != null && ci.getCourse() != null && ci.getCourse().getId() != null && !ci.getCourse().isDeleted()) {
+                        courseIds.add(ci.getCourse().getId());
+                    }
+                }
+            }
+        }
+        return courseIds;
+    }
+
+    private void validateInstructor(User currentUser) {
+        if (currentUser == null) {
+            throw new InvalidCredentialsException("User is not authenticated");
+        }
+        if (!"instructor".equalsIgnoreCase(currentUser.getRole()) && !"admin".equalsIgnoreCase(currentUser.getRole())) {
+            throw new AccessDeniedException("Access denied: only instructors or admins can access issued certificates");
+        }
+        if (!"admin".equalsIgnoreCase(currentUser.getRole()) && !"active".equalsIgnoreCase(currentUser.getAccountStatus())) {
+            throw new AccessDeniedException("Access denied: Instructor account is awaiting admin approval");
+        }
+    }
+
+    private CertificateResponse mapToCertificateResponse(Certificate cert) {
+        StudentProfile profile = null;
+        if (studentProfileRepository != null && cert.getStudent() != null) {
+            profile = studentProfileRepository.findByStudentId(cert.getStudent().getId()).orElse(null);
+        }
+        return CertificateResponse.fromEntity(cert, profile);
+    }
+
+    public LocalDateTime parseDateTime(String input, boolean isEndOfDay) {
+        if (input == null || input.trim().isEmpty()) {
+            return null;
+        }
+        String s = input.trim();
+        try {
+            LocalDate date = LocalDate.parse(s);
+            return isEndOfDay ? date.atTime(LocalTime.MAX) : date.atStartOfDay();
+        } catch (DateTimeParseException ignored) {}
+
+        try {
+            return LocalDateTime.parse(s);
+        } catch (DateTimeParseException ignored) {}
+
+        try {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm[:ss]");
+            return LocalDateTime.parse(s, formatter);
+        } catch (DateTimeParseException ignored) {}
+
+        try {
+            Instant instant = Instant.parse(s);
+            return LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
+        } catch (DateTimeParseException ignored) {}
+
+        throw new IllegalArgumentException("Invalid date format: " + input + ". Expected yyyy-MM-dd or ISO date-time.");
     }
 }
