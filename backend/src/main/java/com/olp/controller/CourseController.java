@@ -264,4 +264,18 @@ public class CourseController {
         CertificateResponse cert = courseCompletionService.issueCertificate(currentUser.getId(), id);
         return ResponseEntity.ok(cert);
     }
+
+    /**
+     * GET /api/courses/certificates/verify/{certificateCode}
+     * DR-02: Public certificate verification endpoint under course namespace.
+     */
+    @GetMapping({ "/certificates/verify/{certificateCode}", "/certificates/{certificateCode:[A-Za-z0-9\\-]+}" })
+    public ResponseEntity<CertificateResponse> verifyCertificate(
+            @PathVariable String certificateCode) {
+        if (courseCompletionService == null) {
+            return ResponseEntity.notFound().build();
+        }
+        CertificateResponse cert = courseCompletionService.verifyCertificate(certificateCode);
+        return ResponseEntity.ok(cert);
+    }
 }

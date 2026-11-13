@@ -1,6 +1,7 @@
 package com.olp.controller;
 
 import com.olp.dto.ApiResponse;
+import com.olp.dto.CertificateResponse;
 import com.olp.dto.CompletionEvaluationResult;
 import com.olp.dto.CourseAuditResponse;
 import com.olp.dto.CourseCompletionCriteriaRequest;
@@ -490,5 +491,42 @@ public class InstructorCourseController {
         }
         CompletionEvaluationResult result = courseCompletionService.evaluate(studentId, courseId);
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}/certificates
+     * FR-I57: Retrieve issued certificates for a specific course associated with the authenticated instructor (DR-05).
+     * Supports optional issue date range filtering and pagination.
+     */
+    @GetMapping("/{courseId:\\d+}/certificates")
+    public ResponseEntity<?> getCourseCertificates(
+            Authentication authentication,
+            @PathVariable Integer courseId,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String fromDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String toDate,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        if (courseCompletionService == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        String start = startDate != null ? startDate : fromDate;
+        String end = endDate != null ? endDate : toDate;
+
+        if (page != null || size != null) {
+            int p = page != null ? page : 0;
+            int s = size != null ? size : 10;
+            PageResponse<CertificateResponse> response = courseCompletionService.getIssuedCertificates(
+                    currentUser, courseId, start, end, p, s);
+            return ResponseEntity.ok(response);
+        } else {
+            List<CertificateResponse> response = courseCompletionService.getIssuedCertificatesList(
+                    currentUser, courseId, start, end);
+            return ResponseEntity.ok(response);
+        }
     }
 }
