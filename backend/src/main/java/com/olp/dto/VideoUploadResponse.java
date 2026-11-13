@@ -18,6 +18,7 @@ public class VideoUploadResponse {
     private Long chunkSize;
     private Integer totalChunks;
     private VideoUploadStatus status;
+    private String statusBadge;
     private Double progressPercent;
     private String storagePath;
     private String hlsUrl;
@@ -48,6 +49,17 @@ public class VideoUploadResponse {
         response.setChunkSize(entity.getChunkSize());
         response.setTotalChunks(entity.getTotalChunks());
         response.setStatus(entity.getStatus());
+        if (entity.getStatus() != null) {
+            String badge = switch (entity.getStatus()) {
+                case READY -> "READY";
+                case TRANSCODING -> "PROCESSING";
+                case COMPLETED -> "UPLOADED";
+                case UPLOADING, INITIATED -> "UPLOADING";
+                case FAILED -> "FAILED";
+                case CANCELLED -> "CANCELLED";
+            };
+            response.setStatusBadge(badge);
+        }
 
         if (entity.getTotalBytes() != null && entity.getTotalBytes() > 0 && entity.getReceivedBytes() != null) {
             double percent = ((double) entity.getReceivedBytes() / entity.getTotalBytes()) * 100.0;
@@ -152,6 +164,14 @@ public class VideoUploadResponse {
 
     public void setStatus(VideoUploadStatus status) {
         this.status = status;
+    }
+
+    public String getStatusBadge() {
+        return statusBadge;
+    }
+
+    public void setStatusBadge(String statusBadge) {
+        this.statusBadge = statusBadge;
     }
 
     public Double getProgressPercent() {

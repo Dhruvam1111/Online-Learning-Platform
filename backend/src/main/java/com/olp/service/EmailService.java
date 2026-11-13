@@ -1146,4 +1146,71 @@ public class EmailService {
                 </html>
                 """.formatted(displayName, purpose, email, otpCode, expiryMinutes);
     }
+
+    /**
+     * Dispatches an email notification to the instructor when a video upload is processed (READY or FAILED) (FR-I15).
+     */
+    public void sendVideoProcessingStatusEmail(String toEmail, String instructorName, String filename, String lessonTitle, String status, String failureReason) {
+        if (senderEmail == null || senderEmail.isBlank()) {
+            log.info("[EmailService] (Simulated) Video processing notification to {} for video '{}' (Lesson: '{}'): Status={}",
+                    toEmail, filename, lessonTitle, status);
+            return;
+        }
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
+
+            helper.setFrom(senderEmail, "Online Learning Platform");
+            helper.setTo(toEmail);
+
+            boolean isReady = "READY".equalsIgnoreCase(status);
+            String subject = isReady
+                    ? "Video Ready: " + filename + " is now available for students"
+                    : "Video Processing Alert: " + filename + " processing failed";
+            helper.setSubject(subject);
+
+            String displayName = (instructorName != null && !instructorName.isBlank()) ? instructorName : "Instructor";
+            String lessonName = (lessonTitle != null && !lessonTitle.isBlank()) ? lessonTitle : "Course Lesson";
+            String reasonText = (failureReason != null && !failureReason.isBlank()) ? failureReason : "Unknown processing error occurred.";
+
+            String reasonRow = isReady ? "" : "<tr><td style=\"padding: 8px; font-weight: bold;\">Reason:</td><td style=\"padding: 8px; color: #dc2626;\">" + reasonText + "</td></tr>";
+
+            String htmlBody = """
+                    <!DOCTYPE html>
+                    <html>
+                    <body style="font-family: Arial, sans-serif; color: #1e1b19; background-color: #faf7f4; padding: 20px;">
+                      <div style="max-width: 600px; margin: 0 auto; background: #ffffff; padding: 30px; border-radius: 8px; border: 1px solid #eee7e2;">
+                        <h2 style="color: %s;">%s</h2>
+                        <p>Hello %s,</p>
+                        <p>%s</p>
+                        <table style="width: 100%%; margin: 20px 0; border-collapse: collapse;">
+                          <tr><td style="padding: 8px; font-weight: bold; width: 140px;">Lesson:</td><td style="padding: 8px;">%s</td></tr>
+                          <tr><td style="padding: 8px; font-weight: bold;">File:</td><td style="padding: 8px;">%s</td></tr>
+                          <tr><td style="padding: 8px; font-weight: bold;">Status:</td><td style="padding: 8px;">%s</td></tr>
+                          %s
+                        </table>
+                        <p style="font-size: 12px; color: #8a817a;">&copy; 2026 Online Learning Platform. All rights reserved.</p>
+                      </div>
+                    </body>
+                    </html>
+                    """.formatted(
+                            isReady ? "#16a34a" : "#dc2626",
+                            isReady ? "Video Transcoding Complete" : "Video Processing Failed",
+                            displayName,
+                            isReady ? "Your uploaded video has been successfully transcoded into adaptive bitrate streams (HLS/DASH) and is now ready for playback."
+                                    : "We encountered an issue while processing your video. You can initiate a re-upload from your instructor dashboard.",
+                            lessonName,
+                            filename,
+                            status,
+                            reasonRow
+                    );
+
+            helper.setText(htmlBody, true);
+            mailSender.send(message);
+            log.info("[EmailService] Dispatched Video Processing Status ({}) email to {}", status, toEmail);
+        } catch (Exception e) {
+            log.warn("[EmailService] Failed to dispatch video processing notification to {}: {}", toEmail, e.getMessage());
+        }
+    }
 }
