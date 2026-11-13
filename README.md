@@ -7,7 +7,7 @@ A modern full-stack e-learning platform providing distinct, role-based workflows
 ## 🛠️ Tech Stack
 
 - **Frontend:** React 19, Vite, Tailwind CSS, Lucide Icons, Axios, React Context API
-- **Backend:** Java 17 / 21, Spring Boot 3.3.4, Spring Security, Spring Data JPA, JWT (JJWT 0.12.5)
+- **Backend:** Java 25, Spring Boot 3.5.16, Spring Security, Spring Data JPA, JWT (JJWT 0.12.5)
 - **Database:** PostgreSQL (Cloud deployment on **Neon Serverless PostgreSQL**; local fallback via Docker Compose)
 - **Containerization:** Docker & Docker Compose
 
@@ -68,7 +68,7 @@ A modern full-stack e-learning platform providing distinct, role-based workflows
 ## 🏁 Getting Started
 
 ### Prerequisites
-- **Java 17+** & **Maven**
+- **Java 25+** & **Maven**
 - **Node.js 18+** & **npm**
 - **PostgreSQL** (via Neon Cloud or local Docker)
 
