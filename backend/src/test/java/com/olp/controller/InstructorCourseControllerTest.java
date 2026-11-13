@@ -7,6 +7,8 @@ import com.olp.dto.CoursePreviewResponse;
 import com.olp.dto.CoursePricingRequest;
 import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.CourseResponse;
+import com.olp.dto.CourseSubmissionRequest;
+import com.olp.dto.CourseSubmissionResponse;
 import com.olp.dto.CreateCourseRequest;
 import com.olp.dto.PageResponse;
 import com.olp.dto.UpdateCourseRequest;
@@ -464,5 +466,46 @@ class InstructorCourseControllerTest {
         assertTrue(response.getBody().isReadOnly());
         assertFalse(response.getBody().isCanEnroll());
         verify(instructorCourseService).previewCourseAsStudent(currentUser, 10);
+    }
+
+    @Test
+    void testSubmitCourse_Returns200WithSubmissionResponse() {
+        givenResolvedUser();
+        CourseSubmissionRequest request = new CourseSubmissionRequest("Ready for review");
+        CourseSubmissionResponse submission = new CourseSubmissionResponse();
+        submission.setId(1);
+        submission.setCourseId(10);
+        submission.setStatus("PENDING_REVIEW");
+        submission.setComments("Ready for review");
+
+        when(instructorCourseService.submitCourseForReview(eq(currentUser), eq(10), any(CourseSubmissionRequest.class)))
+                .thenReturn(submission);
+
+        ResponseEntity<CourseSubmissionResponse> response = controller.submitCourse(authentication, 10, request);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertSame(submission, response.getBody());
+        assertEquals("PENDING_REVIEW", response.getBody().getStatus());
+        verify(instructorCourseService).submitCourseForReview(eq(currentUser), eq(10), any(CourseSubmissionRequest.class));
+    }
+
+    @Test
+    void testGetCourseSubmissions_Returns200WithSubmissionList() {
+        givenResolvedUser();
+        CourseSubmissionResponse submission = new CourseSubmissionResponse();
+        submission.setId(1);
+        submission.setCourseId(10);
+
+        when(instructorCourseService.getCourseSubmissions(currentUser, 10))
+                .thenReturn(List.of(submission));
+
+        ResponseEntity<List<CourseSubmissionResponse>> response = controller.getCourseSubmissions(authentication, 10);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(1, response.getBody().size());
+        assertSame(submission, response.getBody().get(0));
+        verify(instructorCourseService).getCourseSubmissions(currentUser, 10);
     }
 }

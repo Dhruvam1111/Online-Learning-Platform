@@ -124,6 +124,12 @@ CREATE INDEX IF NOT EXISTS idx_video_uploads_status ON video_uploads(status);
 CREATE INDEX IF NOT EXISTS idx_courses_price ON courses(price);
 CREATE INDEX IF NOT EXISTS idx_courses_enrollment_limit ON courses(enrollment_limit);
 
+-- Step 34 / FR-I08: Course Submission History Indexes
+CREATE INDEX IF NOT EXISTS idx_course_submissions_course_id ON course_submissions(course_id);
+CREATE INDEX IF NOT EXISTS idx_course_submissions_instructor_id ON course_submissions(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_course_submissions_status ON course_submissions(status);
+CREATE INDEX IF NOT EXISTS idx_course_submissions_submitted_at ON course_submissions(submitted_at);
+
 CREATE INDEX IF NOT EXISTS idx_quiz_attempt_answers_attempt ON quiz_attempt_answers(attempt_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz_student ON quiz_attempts(quiz_id, student_id);
 

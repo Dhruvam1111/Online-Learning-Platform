@@ -32,6 +32,7 @@ public class CourseResponse {
     private boolean isFree = true;
     private Integer enrollmentLimit;
     private boolean isEnrollmentLimitReached = false;
+    private String rejectionReason;
     private LocalDateTime createdAt;
 
     public CourseResponse() {}
@@ -104,6 +105,7 @@ public class CourseResponse {
         response.setDiscountEndDate(course.getDiscountEndDate());
         response.setFree(course.isFree());
         response.setEnrollmentLimit(course.getEnrollmentLimit());
+        response.setRejectionReason(course.getRejectionReason());
 
         return response;
     }
@@ -260,5 +262,13 @@ public class CourseResponse {
 
     public void setEnrollmentLimitReached(boolean enrollmentLimitReached) {
         isEnrollmentLimitReached = enrollmentLimitReached;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
     }
 }

@@ -497,4 +497,89 @@ class CourseStructureServiceTest {
         assertEquals(1, response.getModules().get(0).getSections().get(0).getLessons().size());
         assertEquals("Lesson 1.1.1", response.getModules().get(0).getSections().get(0).getLessons().get(0).getTitle());
     }
+
+    // =========================================================================
+    // REVIEW LOCKING TESTS (FR-I08)
+    // =========================================================================
+
+    @Test
+    void testCreateModule_WhenCourseUnderReview_ThrowsIllegalStateException() {
+        stubCourseAccess();
+        course.setStatus(CourseStatus.PENDING_REVIEW);
+
+        CourseModuleRequest req = new CourseModuleRequest("New Module", "Desc", 1);
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> service.createModule(owner, 10, req));
+        assertTrue(ex.getMessage().contains("under review"));
+        verify(courseModuleRepository, never()).save(any());
+    }
+
+    @Test
+    void testUpdateModule_WhenCourseUnderReview_ThrowsIllegalStateException() {
+        stubCourseAccess();
+        course.setStatus(CourseStatus.PENDING_REVIEW);
+
+        CourseModuleRequest req = new CourseModuleRequest("Updated Module", "Desc", 1);
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> service.updateModule(owner, 10, 101, req));
+        assertTrue(ex.getMessage().contains("under review"));
+        verify(courseModuleRepository, never()).save(any());
+    }
+
+    @Test
+    void testDeleteModule_WhenCourseUnderReview_ThrowsIllegalStateException() {
+        stubCourseAccess();
+        course.setStatus(CourseStatus.PENDING_REVIEW);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> service.deleteModule(owner, 10, 101));
+        assertTrue(ex.getMessage().contains("under review"));
+        verify(courseModuleRepository, never()).delete(any());
+    }
+
+    @Test
+    void testCreateSection_WhenCourseUnderReview_ThrowsIllegalStateException() {
+        stubCourseAccess();
+        course.setStatus(CourseStatus.PENDING_REVIEW);
+
+        CourseSectionRequest req = new CourseSectionRequest("New Section", "Desc", 1);
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> service.createSection(owner, 10, 101, req));
+        assertTrue(ex.getMessage().contains("under review"));
+        verify(courseSectionRepository, never()).save(any());
+    }
+
+    @Test
+    void testCreateLesson_WhenCourseUnderReview_ThrowsIllegalStateException() {
+        stubCourseAccess();
+        course.setStatus(CourseStatus.PENDING_REVIEW);
+
+        LessonRequest req = new LessonRequest("New Lesson", "VIDEO", "Content", null, 10, 1, null);
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> service.createLesson(owner, 10, 101, 201, req));
+        assertTrue(ex.getMessage().contains("under review"));
+        verify(lessonRepository, never()).save(any());
+    }
+
+    @Test
+    void testDeleteLesson_WhenCourseUnderReview_ThrowsIllegalStateException() {
+        stubCourseAccess();
+        course.setStatus(CourseStatus.PENDING_REVIEW);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> service.deleteLesson(owner, 10, 101, 201, 301));
+        assertTrue(ex.getMessage().contains("under review"));
+        verify(lessonRepository, never()).delete(any());
+    }
+
+    @Test
+    void testGetCourseStructure_WhenCourseUnderReview_RemainsAccessibleReadOnly() {
+        stubCourseAccess();
+        course.setStatus(CourseStatus.PENDING_REVIEW);
+        when(courseModuleRepository.findByCourseIdOrderByOrderIndexAsc(10)).thenReturn(List.of());
+
+        CourseStructureResponse response = service.getCourseStructure(owner, 10);
+        assertNotNull(response);
+        assertEquals("PENDING_REVIEW", response.getCourseStatus());
+    }
 }

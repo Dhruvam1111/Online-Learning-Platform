@@ -2,10 +2,13 @@ package com.olp.controller;
 
 import com.olp.dto.CoursePreviewResponse;
 import com.olp.dto.CoursePricingResponse;
+import com.olp.dto.CourseSubmissionRequest;
+import com.olp.dto.CourseSubmissionResponse;
 import com.olp.dto.EnrollmentResponse;
 import com.olp.entity.User;
 import com.olp.service.CourseCatalogService;
 import com.olp.service.CoursePreviewService;
+import com.olp.service.CourseSubmissionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -28,6 +32,9 @@ class CourseControllerTest {
 
     @Mock
     private CoursePreviewService coursePreviewService;
+
+    @Mock
+    private CourseSubmissionService courseSubmissionService;
 
     @Mock
     private Authentication authentication;
@@ -94,6 +101,40 @@ class CourseControllerTest {
         assertSame(preview, response.getBody());
         assertTrue(response.getBody().isPreview());
         verify(coursePreviewService).previewCourseAsStudent(student, 101);
+    }
+
+    @Test
+    void testSubmitCourse_Returns200WithSubmissionResponse() {
+        when(courseCatalogService.resolveUser(authentication)).thenReturn(student);
+        CourseSubmissionRequest request = new CourseSubmissionRequest("Ready");
+        CourseSubmissionResponse subResp = new CourseSubmissionResponse();
+        subResp.setId(1);
+        subResp.setCourseId(101);
+        subResp.setStatus("PENDING_REVIEW");
+        when(courseSubmissionService.submitCourseForReview(eq(student), eq(101), any(CourseSubmissionRequest.class)))
+                .thenReturn(subResp);
+
+        ResponseEntity<CourseSubmissionResponse> response = controller.submitCourse(101, request, authentication);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertSame(subResp, response.getBody());
+        verify(courseSubmissionService).submitCourseForReview(eq(student), eq(101), any(CourseSubmissionRequest.class));
+    }
+
+    @Test
+    void testGetSubmissions_Returns200WithList() {
+        when(courseCatalogService.resolveUser(authentication)).thenReturn(student);
+        CourseSubmissionResponse subResp = new CourseSubmissionResponse();
+        subResp.setId(1);
+        when(courseSubmissionService.getSubmissionHistory(student, 101)).thenReturn(List.of(subResp));
+
+        ResponseEntity<List<CourseSubmissionResponse>> response = controller.getSubmissions(101, authentication);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(1, response.getBody().size());
+        verify(courseSubmissionService).getSubmissionHistory(student, 101);
     }
 }
 
