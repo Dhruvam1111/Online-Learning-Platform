@@ -1,6 +1,7 @@
 package com.olp.controller;
 
 import com.olp.dto.ApiResponse;
+import com.olp.dto.CourseAuditResponse;
 import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CoursePreviewResponse;
@@ -553,5 +554,41 @@ class InstructorCourseControllerTest {
         assertSame(submission, response.getBody());
         assertEquals("PENDING_REVIEW", response.getBody().getStatus());
         verify(instructorCourseService).resubmitCourse(eq(currentUser), eq(10), any(CourseSubmissionRequest.class));
+    }
+
+    @Test
+    void testUnpublishCourse_Returns200WithUnpublishedStatus() {
+        givenResolvedUser();
+        CourseResponse unpublished = new CourseResponse();
+        unpublished.setId(10);
+        unpublished.setStatus(CourseStatus.UNPUBLISHED);
+
+        when(instructorCourseService.unpublishCourse(currentUser, 10)).thenReturn(unpublished);
+
+        ResponseEntity<CourseResponse> response = controller.unpublishCourse(authentication, 10);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("UNPUBLISHED", response.getBody().getStatus());
+        verify(instructorCourseService).unpublishCourse(currentUser, 10);
+    }
+
+    @Test
+    void testGetCourseAudits_Returns200WithAuditList() {
+        givenResolvedUser();
+        CourseAuditResponse audit = new CourseAuditResponse();
+        audit.setId(1);
+        audit.setCourseId(10);
+        audit.setActionType("COURSE_UNPUBLISH");
+
+        when(instructorCourseService.getCourseAudits(currentUser, 10)).thenReturn(List.of(audit));
+
+        ResponseEntity<List<CourseAuditResponse>> response = controller.getCourseAudits(authentication, 10);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(1, response.getBody().size());
+        assertEquals("COURSE_UNPUBLISH", response.getBody().get(0).getActionType());
+        verify(instructorCourseService).getCourseAudits(currentUser, 10);
     }
 }
