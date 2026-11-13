@@ -7,6 +7,7 @@ import com.olp.dto.CoursePricingRequest;
 import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.CoursePrerequisiteRequest;
 import com.olp.dto.CourseResponse;
+import com.olp.dto.CourseReviewStatusResponse;
 import com.olp.dto.CourseSubmissionRequest;
 import com.olp.dto.CourseSubmissionResponse;
 import com.olp.dto.CreateCourseRequest;
@@ -1025,6 +1026,30 @@ public class InstructorCourseService {
         validateInstructor(currentUser);
         if (courseSubmissionService != null) {
             return courseSubmissionService.getSubmissionHistory(currentUser, courseId);
+        }
+        throw new IllegalStateException("CourseSubmissionService is not configured");
+    }
+
+    /**
+     * FR-I71: Retrieve review status and comments for an associated course.
+     */
+    @Transactional(readOnly = true)
+    public CourseReviewStatusResponse getCourseReviewStatus(User currentUser, Integer courseId) {
+        validateInstructor(currentUser);
+        if (courseSubmissionService != null) {
+            return courseSubmissionService.getReviewStatus(currentUser, courseId);
+        }
+        throw new IllegalStateException("CourseSubmissionService is not configured");
+    }
+
+    /**
+     * FR-I71: Resubmit a course after changes have been requested.
+     */
+    @Transactional
+    public CourseSubmissionResponse resubmitCourse(User currentUser, Integer courseId, CourseSubmissionRequest request) {
+        validateInstructor(currentUser);
+        if (courseSubmissionService != null) {
+            return courseSubmissionService.resubmitCourse(currentUser, courseId, request);
         }
         throw new IllegalStateException("CourseSubmissionService is not configured");
     }

@@ -2,14 +2,18 @@ package com.olp.service;
 
 import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
+import com.olp.dto.CourseReviewRequest;
 import com.olp.dto.PageResponse;
 import com.olp.dto.RejectCourseRequest;
 import com.olp.entity.Course;
 import com.olp.entity.CourseStatus;
+import com.olp.entity.CourseSubmission;
 import com.olp.entity.User;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.CourseRepository;
+import com.olp.repository.CourseSubmissionRepository;
 import com.olp.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -17,15 +21,30 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 @Service
 public class AdminService {
 
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
+    private final CourseSubmissionRepository courseSubmissionRepository;
+    private final EmailService emailService;
 
     public AdminService(UserRepository userRepository, CourseRepository courseRepository) {
+        this(userRepository, courseRepository, null, null);
+    }
+
+    @Autowired
+    public AdminService(
+            UserRepository userRepository,
+            CourseRepository courseRepository,
+            @Autowired(required = false) CourseSubmissionRepository courseSubmissionRepository,
+            @Autowired(required = false) EmailService emailService) {
         this.userRepository = userRepository;
         this.courseRepository = courseRepository;
+        this.courseSubmissionRepository = courseSubmissionRepository;
+        this.emailService = emailService;
     }
 
     /**
@@ -190,27 +209,117 @@ public class AdminService {
 
     /**
      * Approve a course, publishing it immediately for student catalog discovery.
-     * FR-A07: Approve submitted course
+     * Updates latest submission status to APPROVED, records reviewed timestamp,
+     * and notifies instructor via email (FR-A07, FR-I71).
      */
     @Transactional
     public AdminCourseResponse approveCourse(Integer courseId) {
         Course course = findCourseById(courseId);
         course.setStatus(CourseStatus.PUBLISHED);
         course.setRejectionReason(null);
+        course.setReviewComments(null);
         course = courseRepository.save(course);
+
+        // Update latest course submission if present
+        if (courseSubmissionRepository != null) {
+            courseSubmissionRepository.findLatestByCourseId(courseId).ifPresent(sub -> {
+                sub.setStatus("APPROVED");
+                sub.setReviewedAt(LocalDateTime.now());
+                courseSubmissionRepository.save(sub);
+            });
+        }
+
+        // Notify instructor
+        if (emailService != null && course.getInstructor() != null) {
+            emailService.sendCourseReviewDecisionEmail(
+                    course.getInstructor().getEmail(),
+                    course.getInstructor().getName(),
+                    course.getTitle(),
+                    "APPROVED",
+                    null
+            );
+        }
+
         return toAdminCourseResponse(course);
     }
 
     /**
      * Reject a submitted course with structured feedback.
-     * FR-A07: Reject submitted course with reasons provided
+     * Records review comments, updates latest submission status to REJECTED,
+     * and notifies instructor via email (FR-A07, FR-I71).
      */
     @Transactional
     public AdminCourseResponse rejectCourse(Integer courseId, RejectCourseRequest request) {
         Course course = findCourseById(courseId);
+        String reason = (request != null && request.getReason() != null) ? request.getReason().trim() : "";
         course.setStatus(CourseStatus.REJECTED);
-        course.setRejectionReason(request.getReason().trim());
+        course.setRejectionReason(reason);
+        course.setReviewComments(reason);
         course = courseRepository.save(course);
+
+        // Update latest course submission if present
+        if (courseSubmissionRepository != null) {
+            courseSubmissionRepository.findLatestByCourseId(courseId).ifPresent(sub -> {
+                sub.setStatus("REJECTED");
+                sub.setReviewComments(reason);
+                sub.setReviewedAt(LocalDateTime.now());
+                courseSubmissionRepository.save(sub);
+            });
+        }
+
+        // Notify instructor
+        if (emailService != null && course.getInstructor() != null) {
+            emailService.sendCourseReviewDecisionEmail(
+                    course.getInstructor().getEmail(),
+                    course.getInstructor().getName(),
+                    course.getTitle(),
+                    "REJECTED",
+                    reason
+            );
+        }
+
+        return toAdminCourseResponse(course);
+    }
+
+    /**
+     * Request changes on a submitted course with actionable feedback for the instructor.
+     * Transitions status to CHANGES_REQUESTED, records review feedback, updates latest submission,
+     * and notifies the instructor via email (FR-I71).
+     */
+    @Transactional
+    public AdminCourseResponse requestChanges(Integer courseId, CourseReviewRequest request) {
+        Course course = findCourseById(courseId);
+        String feedback = (request != null) ? request.resolveFeedback() : "";
+        if (feedback.isBlank()) {
+            throw new IllegalArgumentException("Change request reason or comments must be provided");
+        }
+
+        course.setStatus(CourseStatus.CHANGES_REQUESTED);
+        course.setRejectionReason(feedback);
+        course.setReviewComments(feedback);
+        course = courseRepository.save(course);
+
+        // Update latest course submission if present
+        if (courseSubmissionRepository != null) {
+            courseSubmissionRepository.findLatestByCourseId(courseId).ifPresent(sub -> {
+                sub.setStatus("CHANGES_REQUESTED");
+                sub.setReviewComments(feedback);
+                sub.setReviewedAt(LocalDateTime.now());
+                courseSubmissionRepository.save(sub);
+            });
+        }
+
+        // Notify instructor
+        if (emailService != null && course.getInstructor() != null) {
+            emailService.sendCourseReviewDecisionEmail(
+                    course.getInstructor().getEmail(),
+                    course.getInstructor().getName(),
+                    course.getTitle(),
+                    "CHANGES_REQUESTED",
+                    feedback
+            );
+        }
+
         return toAdminCourseResponse(course);
     }
 
