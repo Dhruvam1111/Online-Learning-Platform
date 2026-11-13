@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface CourseSubmissionRepository extends JpaRepository<CourseSubmission, Integer> {
@@ -19,5 +20,10 @@ public interface CourseSubmissionRepository extends JpaRepository<CourseSubmissi
 
     @Query("SELECT COUNT(cs) FROM CourseSubmission cs WHERE cs.course.id = :courseId")
     long countByCourseId(@Param("courseId") Integer courseId);
+
+    default Optional<CourseSubmission> findLatestByCourseId(Integer courseId) {
+        List<CourseSubmission> list = findByCourseIdOrderBySubmittedAtDesc(courseId);
+        return (list != null && !list.isEmpty()) ? Optional.of(list.get(0)) : Optional.empty();
+    }
 }
 
