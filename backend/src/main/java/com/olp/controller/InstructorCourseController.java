@@ -7,6 +7,7 @@ import com.olp.dto.CoursePreviewResponse;
 import com.olp.dto.CoursePricingRequest;
 import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.CourseResponse;
+import com.olp.dto.CourseReviewStatusResponse;
 import com.olp.dto.CourseSubmissionRequest;
 import com.olp.dto.CourseSubmissionResponse;
 import com.olp.dto.CreateCourseRequest;
@@ -340,6 +341,34 @@ public class InstructorCourseController {
             @PathVariable Integer courseId) {
         User currentUser = instructorCourseService.resolveUser(authentication);
         List<CourseSubmissionResponse> response = instructorCourseService.getCourseSubmissions(currentUser, courseId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}/review-status
+     * FR-I71: Retrieve course review status, feedback comments, and resubmission eligibility.
+     */
+    @GetMapping("/{courseId:\\d+}/review-status")
+    public ResponseEntity<CourseReviewStatusResponse> getReviewStatus(
+            Authentication authentication,
+            @PathVariable Integer courseId) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        CourseReviewStatusResponse response = instructorCourseService.getCourseReviewStatus(currentUser, courseId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/instructor/courses/{courseId}/resubmit
+     * FR-I71: Resubmit course for admin review after changes have been requested.
+     */
+    @PostMapping("/{courseId:\\d+}/resubmit")
+    public ResponseEntity<CourseSubmissionResponse> resubmitCourse(
+            Authentication authentication,
+            @PathVariable Integer courseId,
+            @RequestBody(required = false) CourseSubmissionRequest request) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        CourseSubmissionResponse response = instructorCourseService.resubmitCourse(
+                currentUser, courseId, request != null ? request : new CourseSubmissionRequest());
         return ResponseEntity.ok(response);
     }
 }
