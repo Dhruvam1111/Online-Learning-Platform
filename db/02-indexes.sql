@@ -35,6 +35,8 @@ CREATE INDEX idx_bookmarks_student_id ON bookmarks(student_id);
 CREATE INDEX idx_lecture_progress_student_id ON lecture_progress(student_id);
 CREATE INDEX idx_lecture_progress_lecture_id ON lecture_progress(lecture_id);
 
+CREATE INDEX IF NOT EXISTS idx_materials_lecture_id ON lecture_materials(lecture_id);
+CREATE INDEX IF NOT EXISTS idx_lecture_bookmarks_student ON lecture_bookmarks(student_id);
 -- Payment simulator lookup and journal indexes.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_invoice_number ON payments(invoice_number);
 CREATE INDEX IF NOT EXISTS idx_payment_student_created ON payments(student_id, created_at);
