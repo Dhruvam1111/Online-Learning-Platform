@@ -108,6 +108,9 @@ public class QuizService {
         quiz.setAvailableUntil(request.getAvailableUntil());
         quiz.setPassingMarks(request.getPassingMarks());
         quiz.setTotalMarks(request.getTotalMarks() != null ? request.getTotalMarks() : BigDecimal.ZERO);
+        if (request.getFeedbackReleased() != null) {
+            quiz.setFeedbackReleased(request.getFeedbackReleased());
+        }
 
         Quiz saved = quizRepository.save(quiz);
 
@@ -229,6 +232,9 @@ public class QuizService {
         if (request.getPassingMarks() != null) {
             quiz.setPassingMarks(request.getPassingMarks());
         }
+        if (request.getFeedbackReleased() != null) {
+            quiz.setFeedbackReleased(request.getFeedbackReleased());
+        }
         if (request.getTimeLimitMinutes() != null) {
             quiz.setTimeLimitMinutes(request.getTimeLimitMinutes());
         }
@@ -243,6 +249,9 @@ public class QuizService {
         }
         if (request.getAvailableUntil() != null) {
             quiz.setAvailableUntil(request.getAvailableUntil());
+        }
+        if (request.getFeedbackReleased() != null) {
+            quiz.setFeedbackReleased(request.getFeedbackReleased());
         }
         if (quiz.getMaxAttempts() == null) {
             quiz.setMaxAttempts(1);
@@ -315,6 +324,9 @@ public class QuizService {
         }
         if (request.getPassingMarks() != null) {
             quiz.setPassingMarks(request.getPassingMarks());
+        }
+        if (request.getFeedbackReleased() != null) {
+            quiz.setFeedbackReleased(request.getFeedbackReleased());
         }
 
         validateAvailabilityWindowBounds(quiz.getAvailableFrom(), quiz.getAvailableUntil());
@@ -806,6 +818,7 @@ public class QuizService {
         response.setMaxAttempts(quiz.getMaxAttempts());
         response.setAvailableFrom(quiz.getAvailableFrom());
         response.setAvailableUntil(quiz.getAvailableUntil());
+        response.setFeedbackReleased(quiz.getFeedbackReleased());
         List<QuizQuestionResponse> questionResponses = questions.stream()
                 .map(this::mapToQuizQuestionResponse)
                 .toList();
@@ -839,6 +852,7 @@ public class QuizService {
         response.setMaxAttempts(maxAttempts);
         response.setAvailableFrom(quiz.getAvailableFrom());
         response.setAvailableUntil(quiz.getAvailableUntil());
+        response.setFeedbackReleased(quiz.getFeedbackReleased());
         response.setServerTime(serverNow);
 
         boolean currentlyAvailable = quiz.getStatus() == QuizStatus.PUBLISHED;
