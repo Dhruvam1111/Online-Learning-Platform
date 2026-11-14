@@ -209,6 +209,13 @@ CREATE INDEX IF NOT EXISTS idx_exam_monitoring_exam_id ON exam_monitoring_config
 -- Step 41 / FR-I66: Question Correction Policy Indexes
 CREATE INDEX IF NOT EXISTS idx_exams_correction_policy ON exams(question_correction_policy);
 
+-- Step 49 / FR-I74: Result Change History Indexes
+CREATE INDEX IF NOT EXISTS idx_result_versions_course_id ON result_versions(course_id);
+CREATE INDEX IF NOT EXISTS idx_result_versions_student_id ON result_versions(student_id);
+CREATE INDEX IF NOT EXISTS idx_result_versions_assessment ON result_versions(assessment_type, assessment_id);
+CREATE INDEX IF NOT EXISTS idx_result_versions_actor_id ON result_versions(actor_id);
+CREATE INDEX IF NOT EXISTS idx_result_versions_created_at ON result_versions(created_at DESC);
+
 
 
 

@@ -1061,6 +1061,24 @@ ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS monitoring_flags TEXT;
 -- Step 41 / FR-I66: Question Correction Policy
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS question_correction_policy VARCHAR(30) NOT NULL DEFAULT 'AWARD_FULL_MARKS';
 
+-- Step 49 / FR-I74: Result Change History
+CREATE TABLE IF NOT EXISTS result_versions (
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    assessment_type VARCHAR(30) NOT NULL,
+    assessment_id INTEGER NOT NULL,
+    assessment_title VARCHAR(255),
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    attempt_id INTEGER,
+    old_score NUMERIC(8, 2),
+    new_score NUMERIC(8, 2),
+    old_value VARCHAR(255) NOT NULL,
+    new_value VARCHAR(255) NOT NULL,
+    reason TEXT NOT NULL,
+    actor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 
 
 
