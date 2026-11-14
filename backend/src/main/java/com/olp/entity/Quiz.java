@@ -70,6 +70,15 @@ public class Quiz {
     @Column(name = "feedback_released", nullable = false)
     private Boolean feedbackReleased = true;
 
+    @Column(name = "negative_marking", nullable = false)
+    private Boolean negativeMarking = false;
+
+    @Column(name = "partial_marking", nullable = false)
+    private Boolean partialMarking = false;
+
+    @Column(name = "numeric_tolerance", precision = 8, scale = 2)
+    private BigDecimal numericTolerance = BigDecimal.ZERO;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -112,6 +121,15 @@ public class Quiz {
         }
         if (this.maxAttempts == null) {
             this.maxAttempts = 1;
+        }
+        if (this.negativeMarking == null) {
+            this.negativeMarking = false;
+        }
+        if (this.partialMarking == null) {
+            this.partialMarking = false;
+        }
+        if (this.numericTolerance == null) {
+            this.numericTolerance = BigDecimal.ZERO;
         }
     }
 
@@ -262,6 +280,46 @@ public class Quiz {
 
     public void setShowFeedback(Boolean showFeedback) {
         setFeedbackReleased(showFeedback);
+    }
+
+    public Boolean getNegativeMarking() {
+        return negativeMarking != null ? negativeMarking : false;
+    }
+
+    public void setNegativeMarking(Boolean negativeMarking) {
+        this.negativeMarking = negativeMarking != null ? negativeMarking : false;
+    }
+
+    public Boolean isNegativeMarking() {
+        return getNegativeMarking();
+    }
+
+    public Boolean getPartialMarking() {
+        return partialMarking != null ? partialMarking : false;
+    }
+
+    public void setPartialMarking(Boolean partialMarking) {
+        this.partialMarking = partialMarking != null ? partialMarking : false;
+    }
+
+    public Boolean isPartialMarking() {
+        return getPartialMarking();
+    }
+
+    public BigDecimal getNumericTolerance() {
+        return numericTolerance != null ? numericTolerance : BigDecimal.ZERO;
+    }
+
+    public void setNumericTolerance(BigDecimal numericTolerance) {
+        this.numericTolerance = numericTolerance != null ? numericTolerance : BigDecimal.ZERO;
+    }
+
+    public com.olp.dto.GradingPolicy toGradingPolicy() {
+        return new com.olp.dto.GradingPolicy(
+                isNegativeMarking(),
+                isPartialMarking(),
+                getNumericTolerance()
+        );
     }
 
     public LocalDateTime getCreatedAt() {

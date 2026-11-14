@@ -202,8 +202,14 @@ public class QuizAttemptService {
         QuizEvaluationSummary summary = null;
         if (submissionRequest != null && submissionRequest.getAnswers() != null && !submissionRequest.getAnswers().isEmpty()) {
             List<QuizQuestion> linkedQuestions = quizQuestionRepository.findByQuizIdOrderByOrderIndexAsc(quiz.getId());
+            com.olp.dto.GradingPolicy policy = submissionRequest.getPolicy();
+            if (policy == null) {
+                policy = quiz.toGradingPolicy();
+            } else if (policy.getCustomTolerance() == null && quiz.getNumericTolerance() != null && quiz.getNumericTolerance().compareTo(BigDecimal.ZERO) > 0) {
+                policy.setCustomTolerance(quiz.getNumericTolerance());
+            }
             summary = autoGradingService.evaluateQuizSubmission(
-                    quiz, linkedQuestions, submissionRequest.getAnswers(), submissionRequest.getPolicy());
+                    quiz, linkedQuestions, submissionRequest.getAnswers(), policy);
 
             attempt.setObtainedMarks(summary.getTotalAwardedMarks());
 
@@ -507,6 +513,12 @@ public class QuizAttemptService {
                 dto.setOptionsJson(q.getOptionsJson());
                 dto.setOrderIndex(qq.getOrderIndex());
                 dto.setMarks(qq.getMarks() != null ? new BigDecimal(qq.getMarks().toString()) : BigDecimal.ONE);
+                dto.setNegativeMarks(qq.getNegativeMarks() != null ? qq.getNegativeMarks() : (q.getNegativeMarks() != null ? q.getNegativeMarks() : BigDecimal.ZERO));
+                BigDecimal effectiveTolerance = (q.getNumericalTolerance() != null && q.getNumericalTolerance().compareTo(BigDecimal.ZERO) > 0)
+                        ? q.getNumericalTolerance()
+                        : (quiz.getNumericTolerance() != null ? quiz.getNumericTolerance() : BigDecimal.ZERO);
+                dto.setNumericalTolerance(effectiveTolerance);
+                dto.setPartialMarking(quiz.getPartialMarking());
                 dto.setSavedAnswer(savedMap.get(q.getId()));
                 dtos.add(dto);
             }
@@ -645,6 +657,11 @@ public class QuizAttemptService {
         response.setRemainingSeconds(calculateRemainingSeconds(quiz, attempt, serverNow));
         response.setObtainedMarks(attempt.getObtainedMarks());
         response.setTotalMarks(quiz.getTotalMarks());
+        response.setNegativeMarking(quiz.getNegativeMarking());
+        response.setPartialMarking(quiz.getPartialMarking());
+        response.setNumericTolerance(quiz.getNumericTolerance());
+        response.setMarkingRulesSummary(QuizSettingsResponse.computeMarkingRulesSummary(
+                quiz.getNegativeMarking(), quiz.getPartialMarking(), quiz.getNumericTolerance()));
         return response;
     }
 }

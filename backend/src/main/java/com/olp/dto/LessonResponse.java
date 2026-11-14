@@ -14,6 +14,11 @@ public class LessonResponse {
     private Integer durationMinutes;
     private Integer orderIndex;
     private String metadata;
+    private LocalDateTime releaseAt;
+    private Boolean isReleased;
+    private String timeZone;
+    private String timeZoneLabel;
+    private String releaseAtDisplay;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -38,7 +43,7 @@ public class LessonResponse {
     public static LessonResponse fromEntity(Lesson lesson) {
         if (lesson == null) return null;
 
-        return new LessonResponse(
+        LessonResponse resp = new LessonResponse(
                 lesson.getId(),
                 lesson.getSection() != null ? lesson.getSection().getId() : null,
                 lesson.getTitle(),
@@ -51,6 +56,11 @@ public class LessonResponse {
                 lesson.getCreatedAt(),
                 lesson.getUpdatedAt()
         );
+        resp.setReleaseAt(lesson.getReleaseAt());
+        resp.setIsReleased(lesson.getIsReleased());
+        resp.setTimeZone(lesson.getTimeZone());
+        resp.computeReleaseDisplay();
+        return resp;
     }
 
     public Integer getId() {
@@ -139,6 +149,80 @@ public class LessonResponse {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public LocalDateTime getReleaseAt() {
+        return releaseAt;
+    }
+
+    public void setReleaseAt(LocalDateTime releaseAt) {
+        this.releaseAt = releaseAt;
+        computeReleaseDisplay();
+    }
+
+    public Boolean getIsReleased() {
+        return isReleased;
+    }
+
+    public void setIsReleased(Boolean released) {
+        isReleased = released;
+    }
+
+    public String getTimeZone() {
+        return timeZone;
+    }
+
+    public void setTimeZone(String timeZone) {
+        this.timeZone = timeZone;
+        computeReleaseDisplay();
+    }
+
+    public String getTimeZoneLabel() {
+        return timeZoneLabel;
+    }
+
+    public void setTimeZoneLabel(String timeZoneLabel) {
+        this.timeZoneLabel = timeZoneLabel;
+    }
+
+    public String getReleaseAtDisplay() {
+        return releaseAtDisplay;
+    }
+
+    public void setReleaseAtDisplay(String releaseAtDisplay) {
+        this.releaseAtDisplay = releaseAtDisplay;
+    }
+
+    public void computeReleaseDisplay() {
+        if (this.releaseAt == null) {
+            this.timeZoneLabel = "IST";
+            this.releaseAtDisplay = "Immediate";
+            return;
+        }
+        java.time.ZoneId zoneId;
+        try {
+            if ("IST".equalsIgnoreCase(this.timeZone)) {
+                zoneId = java.time.ZoneId.of("Asia/Kolkata");
+            } else if ("UTC".equalsIgnoreCase(this.timeZone) || "Z".equalsIgnoreCase(this.timeZone)) {
+                zoneId = java.time.ZoneOffset.UTC;
+            } else if (this.timeZone != null && !this.timeZone.isBlank()) {
+                zoneId = java.time.ZoneId.of(this.timeZone);
+            } else {
+                zoneId = java.time.ZoneId.of("Asia/Kolkata");
+            }
+        } catch (Exception e) {
+            zoneId = java.time.ZoneId.of("Asia/Kolkata");
+        }
+
+        java.time.ZonedDateTime zdt = this.releaseAt.atZone(java.time.ZoneOffset.UTC).withZoneSameInstant(zoneId);
+        String shortLabel = zoneId.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH);
+        if ("UTC".equalsIgnoreCase(zoneId.getId()) || "Z".equalsIgnoreCase(zoneId.getId())) {
+            shortLabel = "UTC";
+        } else if ("Asia/Kolkata".equalsIgnoreCase(zoneId.getId()) || "Asia/Calcutta".equalsIgnoreCase(zoneId.getId())) {
+            shortLabel = "IST";
+        }
+        this.timeZoneLabel = shortLabel;
+        this.releaseAtDisplay = zdt.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + " " + shortLabel;
     }
 }
 

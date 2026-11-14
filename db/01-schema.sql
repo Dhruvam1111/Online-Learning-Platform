@@ -251,6 +251,9 @@ CREATE TABLE lessons (
     duration_minutes INTEGER,
     order_index      INTEGER      NOT NULL DEFAULT 0,
     metadata         TEXT,
+    release_at       TIMESTAMP,
+    is_released      BOOLEAN      NOT NULL DEFAULT TRUE,
+    time_zone        VARCHAR(50)  DEFAULT 'Asia/Kolkata',
     created_at       TIMESTAMP    NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMP    NOT NULL DEFAULT NOW(),
 
@@ -462,6 +465,9 @@ CREATE TABLE IF NOT EXISTS lecture_materials (
     scan_status       VARCHAR(30) NOT NULL DEFAULT 'CLEAN',
     order_index       INTEGER NOT NULL DEFAULT 1,
     deleted_at        TIMESTAMP,
+    release_at        TIMESTAMP,
+    is_released       BOOLEAN NOT NULL DEFAULT TRUE,
+    time_zone         VARCHAR(50) DEFAULT 'Asia/Kolkata',
     created_at        TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at        TIMESTAMP NOT NULL DEFAULT NOW()
 );
@@ -576,6 +582,9 @@ CREATE TABLE quizzes (
     max_attempts        INTEGER       NOT NULL DEFAULT 1,
     available_from      TIMESTAMP,
     available_until     TIMESTAMP,
+    negative_marking    BOOLEAN       NOT NULL DEFAULT FALSE,
+    partial_marking     BOOLEAN       NOT NULL DEFAULT FALSE,
+    numeric_tolerance   NUMERIC(8,2)  DEFAULT 0.00,
     created_at          TIMESTAMP     NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMP     NOT NULL DEFAULT NOW(),
 
@@ -862,6 +871,15 @@ ALTER TABLE quiz_attempt_answers ADD CONSTRAINT chk_attempt_answer_status
 ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS order_index INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
 
+-- Step 20 / FR-I18: Scheduled Content Release
+ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS release_at TIMESTAMP;
+ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS is_released BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS time_zone VARCHAR(50) DEFAULT 'Asia/Kolkata';
+
+ALTER TABLE lessons ADD COLUMN IF NOT EXISTS release_at TIMESTAMP;
+ALTER TABLE lessons ADD COLUMN IF NOT EXISTS is_released BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE lessons ADD COLUMN IF NOT EXISTS time_zone VARCHAR(50) DEFAULT 'Asia/Kolkata';
+
 -- Step 47 / FR-I31 & FR-I23: Feedback on Graded Work & Visibility Settings
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS feedback_released BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS overall_feedback TEXT;
@@ -889,6 +907,10 @@ CREATE TABLE IF NOT EXISTS grading_result_versions (
 ALTER TABLE quiz_attempt_answers ADD COLUMN IF NOT EXISTS is_overridden BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS is_overridden BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- Step 25 / FR-I65: Marking Rules (Negative, Partial, Tolerance)
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS negative_marking BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS partial_marking BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS numeric_tolerance NUMERIC(8,2) DEFAULT 0.00;
 
 
 

@@ -111,6 +111,9 @@ public class QuizService {
         if (request.getFeedbackReleased() != null) {
             quiz.setFeedbackReleased(request.getFeedbackReleased());
         }
+        quiz.setNegativeMarking(Boolean.TRUE.equals(request.getNegativeMarking()));
+        quiz.setPartialMarking(Boolean.TRUE.equals(request.getPartialMarking()));
+        quiz.setNumericTolerance(request.getNumericTolerance() != null ? request.getNumericTolerance() : BigDecimal.ZERO);
 
         Quiz saved = quizRepository.save(quiz);
 
@@ -253,6 +256,15 @@ public class QuizService {
         if (request.getFeedbackReleased() != null) {
             quiz.setFeedbackReleased(request.getFeedbackReleased());
         }
+        if (request.getNegativeMarking() != null) {
+            quiz.setNegativeMarking(request.getNegativeMarking());
+        }
+        if (request.getPartialMarking() != null) {
+            quiz.setPartialMarking(request.getPartialMarking());
+        }
+        if (request.getNumericTolerance() != null) {
+            quiz.setNumericTolerance(request.getNumericTolerance());
+        }
         if (quiz.getMaxAttempts() == null) {
             quiz.setMaxAttempts(1);
         }
@@ -327,6 +339,15 @@ public class QuizService {
         }
         if (request.getFeedbackReleased() != null) {
             quiz.setFeedbackReleased(request.getFeedbackReleased());
+        }
+        if (request.getNegativeMarking() != null) {
+            quiz.setNegativeMarking(request.getNegativeMarking());
+        }
+        if (request.getPartialMarking() != null) {
+            quiz.setPartialMarking(request.getPartialMarking());
+        }
+        if (request.getNumericTolerance() != null) {
+            quiz.setNumericTolerance(request.getNumericTolerance());
         }
 
         validateAvailabilityWindowBounds(quiz.getAvailableFrom(), quiz.getAvailableUntil());
@@ -698,6 +719,7 @@ public class QuizService {
     private void validateQuizNumericFields(QuizRequest request) {
         validateNonNegative(request.getTotalMarks(), "Total marks");
         validateNonNegative(request.getPassingMarks(), "Passing marks");
+        validateNonNegative(request.getNumericTolerance(), "Numeric tolerance");
         if (request.getTimeLimitMinutes() != null && request.getTimeLimitMinutes() < 1) {
             throw new IllegalArgumentException("Time limit must be at least 1 minute");
         }
@@ -712,6 +734,7 @@ public class QuizService {
     private void validateQuizSettingsFields(QuizSettingsRequest request) {
         validateNonNegative(request.getTotalMarks(), "Total marks");
         validateNonNegative(request.getPassingMarks(), "Passing marks");
+        validateNonNegative(request.getNumericTolerance(), "Numeric tolerance");
         if (request.getTimeLimitMinutes() != null && request.getTimeLimitMinutes() < 1) {
             throw new IllegalArgumentException("Duration (timeLimitMinutes) must be at least 1 minute");
         }
@@ -819,6 +842,11 @@ public class QuizService {
         response.setAvailableFrom(quiz.getAvailableFrom());
         response.setAvailableUntil(quiz.getAvailableUntil());
         response.setFeedbackReleased(quiz.getFeedbackReleased());
+        response.setNegativeMarking(quiz.getNegativeMarking());
+        response.setPartialMarking(quiz.getPartialMarking());
+        response.setNumericTolerance(quiz.getNumericTolerance());
+        response.setMarkingRulesSummary(QuizSettingsResponse.computeMarkingRulesSummary(
+                quiz.getNegativeMarking(), quiz.getPartialMarking(), quiz.getNumericTolerance()));
         List<QuizQuestionResponse> questionResponses = questions.stream()
                 .map(this::mapToQuizQuestionResponse)
                 .toList();
@@ -853,6 +881,11 @@ public class QuizService {
         response.setAvailableFrom(quiz.getAvailableFrom());
         response.setAvailableUntil(quiz.getAvailableUntil());
         response.setFeedbackReleased(quiz.getFeedbackReleased());
+        response.setNegativeMarking(quiz.getNegativeMarking());
+        response.setPartialMarking(quiz.getPartialMarking());
+        response.setNumericTolerance(quiz.getNumericTolerance());
+        response.setMarkingRulesSummary(QuizSettingsResponse.computeMarkingRulesSummary(
+                quiz.getNegativeMarking(), quiz.getPartialMarking(), quiz.getNumericTolerance()));
         response.setServerTime(serverNow);
 
         boolean currentlyAvailable = quiz.getStatus() == QuizStatus.PUBLISHED;
