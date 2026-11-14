@@ -155,6 +155,11 @@ CREATE INDEX IF NOT EXISTS idx_lesson_progress_lesson_id ON lesson_progress(less
 CREATE INDEX IF NOT EXISTS idx_certificates_issued_at ON certificates(issued_at DESC);
 CREATE INDEX IF NOT EXISTS idx_certificates_course_issued_at ON certificates(course_id, issued_at DESC);
 
+-- Step 19 / FR-I16: Content Reorder, Replace and Remove Indexes
+CREATE INDEX IF NOT EXISTS idx_materials_lesson_order ON lecture_materials(lesson_id, order_index);
+CREATE INDEX IF NOT EXISTS idx_materials_deleted_at ON lecture_materials(deleted_at);
+
+
 
 
 

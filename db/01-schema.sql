@@ -460,6 +460,8 @@ CREATE TABLE IF NOT EXISTS lecture_materials (
     file_size_bytes   BIGINT,
     is_downloadable   BOOLEAN NOT NULL DEFAULT FALSE,
     scan_status       VARCHAR(30) NOT NULL DEFAULT 'CLEAN',
+    order_index       INTEGER NOT NULL DEFAULT 1,
+    deleted_at        TIMESTAMP,
     created_at        TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at        TIMESTAMP NOT NULL DEFAULT NOW()
 );
@@ -850,6 +852,11 @@ CREATE TABLE IF NOT EXISTS lesson_progress (
     is_completed BOOLEAN NOT NULL DEFAULT TRUE,
     UNIQUE (student_id, lesson_id)
 );
+
+-- Step 19 / FR-I16: Content Reorder, Replace and Remove
+ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS order_index INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+
 
 
 

@@ -50,6 +50,12 @@ public class LectureMaterial {
     @Column(name = "scan_status", length = 30)
     private String scanStatus = "CLEAN";
 
+    @Column(name = "order_index", nullable = false)
+    private Integer orderIndex = 1;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -100,6 +106,9 @@ public class LectureMaterial {
         }
         if (this.scanStatus == null) {
             this.scanStatus = "CLEAN";
+        }
+        if (this.orderIndex == null) {
+            this.orderIndex = 1;
         }
     }
 
@@ -152,4 +161,12 @@ public class LectureMaterial {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Integer getOrderIndex() { return orderIndex; }
+    public void setOrderIndex(Integer orderIndex) { this.orderIndex = orderIndex != null ? orderIndex : 1; }
+
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+
+    public boolean isDeleted() { return deletedAt != null; }
 }

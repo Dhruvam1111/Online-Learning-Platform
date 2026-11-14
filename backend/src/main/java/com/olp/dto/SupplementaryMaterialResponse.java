@@ -19,6 +19,8 @@ public class SupplementaryMaterialResponse {
     private Long fileSizeBytes;
     private Boolean isDownloadable;
     private String scanStatus;
+    private Integer orderIndex;
+    private LocalDateTime deletedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -42,6 +44,8 @@ public class SupplementaryMaterialResponse {
         resp.setFileSizeBytes(entity.getFileSizeBytes());
         resp.setIsDownloadable(entity.getIsDownloadable());
         resp.setScanStatus(entity.getScanStatus());
+        resp.setOrderIndex(entity.getOrderIndex());
+        resp.setDeletedAt(entity.getDeletedAt());
         resp.setCreatedAt(entity.getCreatedAt());
         resp.setUpdatedAt(entity.getUpdatedAt());
         return resp;
@@ -91,5 +95,11 @@ public class SupplementaryMaterialResponse {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Integer getOrderIndex() { return orderIndex; }
+    public void setOrderIndex(Integer orderIndex) { this.orderIndex = orderIndex; }
+
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
 }
 
