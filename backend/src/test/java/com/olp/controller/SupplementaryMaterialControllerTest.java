@@ -1,5 +1,7 @@
 package com.olp.controller;
 
+import com.olp.dto.ContentRemovalResponse;
+import com.olp.dto.ReorderStructureRequest;
 import com.olp.dto.SupplementaryMaterialResponse;
 import com.olp.dto.UpdateDownloadableRequest;
 import com.olp.entity.User;
@@ -49,6 +51,7 @@ class SupplementaryMaterialControllerTest {
         resp.setFileType("pdf");
         resp.setIsDownloadable(false);
         resp.setScanStatus("CLEAN");
+        resp.setOrderIndex(1);
         return resp;
     }
 
@@ -116,14 +119,83 @@ class SupplementaryMaterialControllerTest {
     }
 
     @Test
-    void testDeleteMaterial() {
+    void testDeleteMaterial_NoProgress_HardDelete() {
+        ContentRemovalResponse removalResponse = new ContentRemovalResponse(
+                4, true, false, "Content item successfully deleted", null, false);
         when(materialService.resolveUser(authentication)).thenReturn(instructor);
-        doNothing().when(materialService).deleteMaterial(instructor, 4);
+        when(materialService.removeMaterial(instructor, 4)).thenReturn(removalResponse);
 
-        ResponseEntity<Void> response = controller.deleteMaterial(4, authentication);
+        ResponseEntity<ContentRemovalResponse> response = controller.deleteMaterial(4, authentication);
 
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(materialService, times(1)).deleteMaterial(instructor, 4);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().isDeleted());
+        assertFalse(response.getBody().isSoftDeleted());
+        assertFalse(response.getBody().isCriteriaWarning());
+        verify(materialService, times(1)).removeMaterial(instructor, 4);
+    }
+
+    @Test
+    void testDeleteMaterial_WithProgress_SoftDelete() {
+        ContentRemovalResponse removalResponse = new ContentRemovalResponse(
+                5, true, true,
+                "Content item has active student progress and was soft-deleted to preserve learner records",
+                "Content item has active student progress and was soft-deleted to preserve learner records",
+                false);
+        when(materialService.resolveUser(authentication)).thenReturn(instructor);
+        when(materialService.removeMaterial(instructor, 5)).thenReturn(removalResponse);
+
+        ResponseEntity<ContentRemovalResponse> response = controller.deleteMaterial(5, authentication);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().isDeleted());
+        assertTrue(response.getBody().isSoftDeleted());
+        assertNotNull(response.getBody().getWarning());
+        verify(materialService, times(1)).removeMaterial(instructor, 5);
+    }
+
+    @Test
+    void testReorderMaterialsInLesson() {
+        ReorderStructureRequest request = new ReorderStructureRequest(List.of(3, 1, 2));
+        SupplementaryMaterialResponse r1 = sampleResponse(3, 400, "Item 3");
+        r1.setOrderIndex(1);
+        SupplementaryMaterialResponse r2 = sampleResponse(1, 400, "Item 1");
+        r2.setOrderIndex(2);
+        SupplementaryMaterialResponse r3 = sampleResponse(2, 400, "Item 2");
+        r3.setOrderIndex(3);
+
+        when(materialService.resolveUser(authentication)).thenReturn(instructor);
+        when(materialService.reorderMaterialsInLesson(instructor, 400, List.of(3, 1, 2)))
+                .thenReturn(List.of(r1, r2, r3));
+
+        ResponseEntity<List<SupplementaryMaterialResponse>> response = controller.reorderMaterialsInLesson(
+                400, request, authentication);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(3, response.getBody().size());
+        assertEquals(3, response.getBody().get(0).getId());
+        assertEquals(1, response.getBody().get(0).getOrderIndex());
+        verify(materialService, times(1)).reorderMaterialsInLesson(instructor, 400, List.of(3, 1, 2));
+    }
+
+    @Test
+    void testReplaceMaterial() {
+        MockMultipartFile newFile = new MockMultipartFile("file", "replacement.pdf", "application/pdf", new byte[1024]);
+        SupplementaryMaterialResponse replaced = sampleResponse(1, 400, "Lesson Slides");
+        replaced.setOriginalFilename("replacement.pdf");
+        replaced.setFileUrl("/uploads/materials/replacement.pdf");
+
+        when(materialService.resolveUser(authentication)).thenReturn(instructor);
+        when(materialService.replaceMaterialFile(instructor, 1, newFile)).thenReturn(replaced);
+
+        ResponseEntity<SupplementaryMaterialResponse> response = controller.replaceMaterial(1, newFile, authentication);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("replacement.pdf", response.getBody().getOriginalFilename());
+        verify(materialService, times(1)).replaceMaterialFile(instructor, 1, newFile);
     }
 
     @Test

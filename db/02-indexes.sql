@@ -158,6 +158,10 @@ CREATE INDEX IF NOT EXISTS idx_certificates_course_issued_at ON certificates(cou
 -- Step 46 / FR-I30: Descriptive Submissions Grading Indexes
 CREATE INDEX IF NOT EXISTS idx_quiz_attempt_answers_status ON quiz_attempt_answers(evaluation_status);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempt_answers_grader ON quiz_attempt_answers(grader_id);
+-- Step 19 / FR-I16: Content Reorder, Replace and Remove Indexes
+CREATE INDEX IF NOT EXISTS idx_materials_lesson_order ON lecture_materials(lesson_id, order_index);
+CREATE INDEX IF NOT EXISTS idx_materials_deleted_at ON lecture_materials(deleted_at);
+
 
 
 

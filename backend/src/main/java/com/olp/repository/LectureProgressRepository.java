@@ -15,6 +15,10 @@ public interface LectureProgressRepository extends JpaRepository<LectureProgress
 
     boolean existsByStudentIdAndLectureId(Integer studentId, Integer lectureId);
 
+    boolean existsByLectureId(Integer lectureId);
+
+    long countByLectureId(Integer lectureId);
+
     Optional<LectureProgress> findByStudentIdAndLectureId(Integer studentId, Integer lectureId);
 
     void deleteByStudentIdAndLectureId(Integer studentId, Integer lectureId);

@@ -132,6 +132,8 @@ public class StudentLearningService {
         verifyEnrollment(studentId, courseId);
 
         return lectureMaterialRepository.findByLectureId(lectureId).stream()
+                .filter(m -> m.getDeletedAt() == null)
+                .sorted(java.util.Comparator.comparing(LectureMaterial::getOrderIndex, java.util.Comparator.nullsLast(Integer::compareTo)))
                 .map(this::toLectureMaterialResponse)
                 .collect(Collectors.toList());
     }
@@ -143,6 +145,8 @@ public class StudentLearningService {
         verifyEnrollment(studentId, courseId);
 
         return lectureMaterialRepository.findByLessonId(lessonId).stream()
+                .filter(m -> m.getDeletedAt() == null)
+                .sorted(java.util.Comparator.comparing(LectureMaterial::getOrderIndex, java.util.Comparator.nullsLast(Integer::compareTo)))
                 .map(this::toLectureMaterialResponse)
                 .collect(Collectors.toList());
     }
@@ -154,6 +158,8 @@ public class StudentLearningService {
         verifyEnrollment(studentId, courseId);
 
         return lectureMaterialRepository.findByModuleId(moduleId).stream()
+                .filter(m -> m.getDeletedAt() == null)
+                .sorted(java.util.Comparator.comparing(LectureMaterial::getOrderIndex, java.util.Comparator.nullsLast(Integer::compareTo)))
                 .map(this::toLectureMaterialResponse)
                 .collect(Collectors.toList());
     }
@@ -163,6 +169,10 @@ public class StudentLearningService {
     public ResourceAndMetadata downloadMaterial(Integer studentId, Integer materialId) {
         LectureMaterial material = lectureMaterialRepository.findById(materialId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found with id: " + materialId));
+
+        if (material.getDeletedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found with id: " + materialId);
+        }
 
         Integer courseId = getCourseIdForMaterial(material);
         verifyEnrollment(studentId, courseId);
@@ -186,6 +196,10 @@ public class StudentLearningService {
         LectureMaterial material = lectureMaterialRepository.findById(materialId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found with id: " + materialId));
 
+        if (material.getDeletedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found with id: " + materialId);
+        }
+
         Integer courseId = getCourseIdForMaterial(material);
         verifyEnrollment(studentId, courseId);
 
@@ -203,6 +217,10 @@ public class StudentLearningService {
     public MaterialViewerResponse getMaterialViewerInfo(Integer studentId, Integer materialId) {
         LectureMaterial material = lectureMaterialRepository.findById(materialId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found with id: " + materialId));
+
+        if (material.getDeletedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found with id: " + materialId);
+        }
 
         Integer courseId = getCourseIdForMaterial(material);
         verifyEnrollment(studentId, courseId);
