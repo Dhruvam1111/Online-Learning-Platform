@@ -191,5 +191,29 @@ public class ExamController {
         ExamConsentResponse response = examMonitoringService.recordStudentConsent(currentUser, examId, request);
         return ResponseEntity.ok(response);
     }
+
+    // =========================================================================
+    // QUESTION CORRECTION POLICY ENDPOINTS (FR-I66, Step 41)
+    // =========================================================================
+
+    @GetMapping("/exams/{examId}/correction-policy")
+    public ResponseEntity<QuestionCorrectionPolicyResponse> getCorrectionPolicy(
+            @PathVariable Integer examId,
+            Authentication authentication) {
+        User currentUser = examService.resolveUser(authentication);
+        QuestionCorrectionPolicyResponse response = examService.getCorrectionPolicy(currentUser, examId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping({"/instructor/exams/{examId}/correction-policy", "/exams/{examId}/correction-policy"})
+    @PreAuthorize("hasRole('instructor') or hasRole('admin')")
+    public ResponseEntity<QuestionCorrectionPolicyResponse> updateCorrectionPolicy(
+            @PathVariable Integer examId,
+            @Valid @RequestBody QuestionCorrectionPolicyRequest request,
+            Authentication authentication) {
+        User currentUser = examService.resolveUser(authentication);
+        QuestionCorrectionPolicyResponse response = examService.updateCorrectionPolicy(currentUser, examId, request);
+        return ResponseEntity.ok(response);
+    }
 }
 
