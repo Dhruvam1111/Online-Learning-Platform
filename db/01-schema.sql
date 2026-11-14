@@ -1033,6 +1033,32 @@ CREATE TABLE IF NOT EXISTS exam_blueprints (
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Step 40 / FR-I26: Examination Monitoring Rules
+CREATE TABLE IF NOT EXISTS exam_monitoring_configs (
+    id SERIAL PRIMARY KEY,
+    exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    tab_switch_detection BOOLEAN NOT NULL DEFAULT TRUE,
+    tab_switch_limit INTEGER NOT NULL DEFAULT 3,
+    require_fullscreen BOOLEAN NOT NULL DEFAULT TRUE,
+    fullscreen_exit_limit INTEGER NOT NULL DEFAULT 2,
+    require_screen_share BOOLEAN NOT NULL DEFAULT FALSE,
+    require_webcam BOOLEAN NOT NULL DEFAULT FALSE,
+    require_microphone BOOLEAN NOT NULL DEFAULT FALSE,
+    require_student_consent BOOLEAN NOT NULL DEFAULT TRUE,
+    unsupported_browser_policy VARCHAR(30) NOT NULL DEFAULT 'WARN',
+    consent_text TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_exam_monitoring_exam UNIQUE (exam_id)
+);
+
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS consent_given BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS consent_given_at TIMESTAMP;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS tab_switch_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS fullscreen_exit_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS monitoring_flags TEXT;
+
+
 
 
 
