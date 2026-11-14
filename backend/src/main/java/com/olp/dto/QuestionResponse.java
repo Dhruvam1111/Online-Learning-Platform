@@ -30,6 +30,11 @@ public class QuestionResponse {
     private String difficulty;
     private String explanation;
     private Boolean isBankQuestion;
+    private String origin;
+    private String tags;
+    private Integer version;
+    private Integer parentQuestionId;
+    private Boolean isLatest;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -202,6 +207,46 @@ public class QuestionResponse {
 
     public void setIsBankQuestion(Boolean isBankQuestion) {
         this.isBankQuestion = isBankQuestion;
+    }
+
+    public String getOrigin() {
+        return origin;
+    }
+
+    public void setOrigin(String origin) {
+        this.origin = origin;
+    }
+
+    public String getTags() {
+        return tags;
+    }
+
+    public void setTags(String tags) {
+        this.tags = tags;
+    }
+
+    public Integer getVersion() {
+        return version;
+    }
+
+    public void setVersion(Integer version) {
+        this.version = version;
+    }
+
+    public Integer getParentQuestionId() {
+        return parentQuestionId;
+    }
+
+    public void setParentQuestionId(Integer parentQuestionId) {
+        this.parentQuestionId = parentQuestionId;
+    }
+
+    public Boolean getIsLatest() {
+        return isLatest;
+    }
+
+    public void setIsLatest(Boolean isLatest) {
+        this.isLatest = isLatest;
     }
 
     public LocalDateTime getCreatedAt() {

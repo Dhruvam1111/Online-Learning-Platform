@@ -44,5 +44,18 @@ public interface QuestionRepository extends JpaRepository<Question, Integer> {
 
     @Query("SELECT q FROM Question q WHERE q.requiresManualGrading = true AND q.course.id = :courseId ORDER BY q.createdAt DESC, q.id DESC")
     List<Question> findManualGradingQuestionsByCourseId(@Param("courseId") Integer courseId);
+
+    @Query("SELECT q FROM Question q WHERE q.id = :questionId OR q.parentQuestion.id = :questionId ORDER BY q.version ASC, q.id ASC")
+    List<Question> findVersionLineage(@Param("questionId") Integer questionId);
+
+    @Query("SELECT q FROM Question q WHERE q.isBankQuestion = true AND (" +
+            "q.createdBy.id = :instructorId " +
+            "OR (q.course IS NOT NULL AND (q.course.instructor.id = :instructorId " +
+            "OR EXISTS (SELECT ci FROM CourseInstructor ci WHERE ci.course.id = q.course.id AND ci.instructor.id = :instructorId)))) " +
+            "ORDER BY q.createdAt DESC, q.id DESC")
+    List<Question> findBankQuestionsAccessibleByInstructorId(@Param("instructorId") Integer instructorId);
+
+    @Query("SELECT q FROM Question q WHERE (q.id = :rootId OR q.parentQuestion.id = :rootId) AND q.isLatest = true")
+    Optional<Question> findLatestVersionByRootId(@Param("rootId") Integer rootId);
 }
 

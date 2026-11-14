@@ -19,7 +19,8 @@ import java.util.Map;
 
 /**
  * REST Controller for quiz-independent Question CRUD, type validation,
- * and manual-grading routing for DESCRIPTIVE questions (FR-I21).
+ * manual-grading routing for DESCRIPTIVE questions (FR-I21),
+ * and Question Bank management with tag filtering, versioning, and copy reuse (FR-I24, Step 26).
  */
 @RestController
 @RequestMapping({"/api/instructor", "/api/instructors"})
@@ -122,6 +123,54 @@ public class QuestionController {
             Authentication authentication) {
         User currentUser = questionService.resolveUser(authentication);
         return ResponseEntity.ok(questionService.evaluateQuestion(currentUser, questionId, request));
+    }
+
+    // =========================================================================
+    // QUESTION BANK & VERSIONING ENDPOINTS (FR-I24, Step 26)
+    // =========================================================================
+
+    @GetMapping("/questions/bank")
+    public ResponseEntity<List<QuestionResponse>> searchQuestionBank(
+            @RequestParam(required = false) Integer courseId,
+            @RequestParam(required = false) String topic,
+            @RequestParam(required = false) String tag,
+            @RequestParam(required = false) String difficulty,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String origin,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "true") Boolean bankOnly,
+            @RequestParam(required = false, defaultValue = "true") Boolean isLatest,
+            Authentication authentication) {
+        User currentUser = questionService.resolveUser(authentication);
+        com.olp.dto.QuestionBankFilterRequest filter = new com.olp.dto.QuestionBankFilterRequest();
+        filter.setCourseId(courseId);
+        filter.setTopic(topic);
+        filter.setTag(tag);
+        filter.setDifficulty(difficulty);
+        filter.setQuestionType(type);
+        filter.setOrigin(origin);
+        filter.setSearch(search);
+        filter.setBankOnly(bankOnly);
+        filter.setIsLatest(isLatest);
+        return ResponseEntity.ok(questionService.searchQuestionBank(currentUser, filter));
+    }
+
+    @PostMapping("/questions/{questionId}/copy")
+    public ResponseEntity<QuestionResponse> copyQuestion(
+            @PathVariable Integer questionId,
+            @RequestParam(required = false) Integer targetCourseId,
+            Authentication authentication) {
+        User currentUser = questionService.resolveUser(authentication);
+        QuestionResponse response = questionService.copyQuestion(currentUser, questionId, targetCourseId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping("/questions/{questionId}/versions")
+    public ResponseEntity<List<QuestionResponse>> getQuestionVersions(
+            @PathVariable Integer questionId,
+            Authentication authentication) {
+        User currentUser = questionService.resolveUser(authentication);
+        return ResponseEntity.ok(questionService.getQuestionVersions(currentUser, questionId));
     }
 }
 

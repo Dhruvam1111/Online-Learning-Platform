@@ -632,14 +632,26 @@ public class QuizService {
 
         Question question;
         if (request.getQuestionId() != null) {
-            question = questionRepository.findById(request.getQuestionId())
+            Question sourceQuestion = questionRepository.findById(request.getQuestionId())
                     .orElseThrow(() -> new ResourceNotFoundException("Question not found with id: " + request.getQuestionId()));
-            if (question.getCourse() != null && !question.getCourse().getId().equals(quiz.getCourse().getId())) {
-                throw new AccessDeniedException("Cannot link a question from another course");
+
+            boolean isBankQuestion = Boolean.TRUE.equals(sourceQuestion.getIsBankQuestion());
+            boolean isSameCourse = sourceQuestion.getCourse() != null && sourceQuestion.getCourse().getId().equals(quiz.getCourse().getId());
+            boolean isOwnQuestion = sourceQuestion.getCreatedBy() != null && sourceQuestion.getCreatedBy().getId().equals(currentUser.getId());
+            boolean isCoInstructor = sourceQuestion.getCourse() != null && courseInstructorRepository != null
+                    && courseInstructorRepository.existsByCourseIdAndInstructorId(sourceQuestion.getCourse().getId(), currentUser.getId());
+            boolean isAdmin = "admin".equalsIgnoreCase(currentUser.getRole());
+
+            if (!isSameCourse && !isBankQuestion && !isOwnQuestion && !isCoInstructor && !isAdmin) {
+                throw new AccessDeniedException("Cannot link an unshared question from another instructor or course");
             }
-            if (question.getCourse() == null && !Boolean.TRUE.equals(question.getIsBankQuestion())
-                    && (question.getCreatedBy() == null || !question.getCreatedBy().getId().equals(currentUser.getId()))) {
-                throw new AccessDeniedException("Cannot link an unshared question from another instructor");
+
+            if (request.isCopyMode()) {
+                // Reuse by copy (FR-I24): creates an independent clone tied to this quiz's course
+                question = questionRepository.save(sourceQuestion.cloneForReuse(quiz.getCourse(), currentUser));
+            } else {
+                // Reuse by reference (FR-I24)
+                question = sourceQuestion;
             }
         } else {
             if (request.getQuestionText() == null || request.getQuestionText().trim().isEmpty()) {
