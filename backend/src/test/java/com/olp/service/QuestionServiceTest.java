@@ -10,6 +10,7 @@ import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.CourseInstructorRepository;
 import com.olp.repository.CourseRepository;
 import com.olp.repository.QuestionRepository;
+import com.olp.repository.QuizQuestionRepository;
 import com.olp.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,9 @@ class QuestionServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private QuizQuestionRepository quizQuestionRepository;
 
     @org.mockito.Spy
     private AutoGradingService autoGradingService = new AutoGradingService();
