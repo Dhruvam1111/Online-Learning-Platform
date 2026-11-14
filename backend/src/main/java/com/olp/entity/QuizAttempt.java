@@ -63,6 +63,9 @@ public class QuizAttempt {
     @Column(name = "is_published", nullable = false)
     private Boolean isPublished = false;
 
+    @Column(name = "is_overridden", nullable = false)
+    private Boolean isOverridden = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -221,6 +224,18 @@ public class QuizAttempt {
 
     public void setPublished(boolean published) {
         this.isPublished = published;
+    }
+
+    public Boolean getIsOverridden() {
+        return isOverridden;
+    }
+
+    public boolean isOverridden() {
+        return Boolean.TRUE.equals(isOverridden);
+    }
+
+    public void setIsOverridden(Boolean isOverridden) {
+        this.isOverridden = isOverridden != null ? isOverridden : false;
     }
 
     public LocalDateTime getCreatedAt() {
