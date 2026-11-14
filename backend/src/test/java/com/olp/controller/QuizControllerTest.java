@@ -15,6 +15,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -118,7 +119,7 @@ class QuizControllerTest {
 
         ResponseEntity<ApiResponse> deleteRes = controller.deleteQuiz(3, authentication);
         assertEquals(200, deleteRes.getStatusCode().value());
-        assertTrue(deleteRes.getBody().isSuccess());
+        assertTrue(Objects.requireNonNull(deleteRes.getBody()).isSuccess());
     }
 
     @Test

@@ -78,7 +78,7 @@ public class InstructorMediaService {
         String storedRelativePath = fileStorageService.storeProfilePicture(instructor.getId(), file);
 
         // 2. Delete old physical file if replacing
-        if (isReplacement && previousPicturePath.startsWith("profile-pictures/")) {
+        if (previousPicturePath != null && isReplacement && previousPicturePath.startsWith("profile-pictures/")) {
             fileStorageService.deleteFile(previousPicturePath);
         }
 

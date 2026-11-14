@@ -18,6 +18,8 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 
+import java.util.Objects;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -61,7 +63,7 @@ class VideoUploadControllerTest {
 
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals("upload-123", response.getBody().getUploadId());
+        assertEquals("upload-123", Objects.requireNonNull(response.getBody()).getUploadId());
         verify(videoUploadService, times(1)).initiateUpload(instructor, request);
     }
 
@@ -80,9 +82,9 @@ class VideoUploadControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(0, response.getBody().getChunkIndex());
-        assertFalse(response.getBody().isCompleted());
-        assertEquals(1, response.getBody().getNextExpectedChunkIndex());
+        assertEquals(0, Objects.requireNonNull(response.getBody()).getChunkIndex());
+        assertFalse(Objects.requireNonNull(response.getBody()).isCompleted());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).getNextExpectedChunkIndex());
     }
 
     @Test
@@ -97,7 +99,7 @@ class VideoUploadControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getNextExpectedChunkIndex());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).getNextExpectedChunkIndex());
     }
 
     @Test
@@ -115,7 +117,7 @@ class VideoUploadControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(75.0, response.getBody().getProgressPercent());
+        assertEquals(75.0, Objects.requireNonNull(response.getBody()).getProgressPercent());
     }
 
     @Test
@@ -132,7 +134,7 @@ class VideoUploadControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals("upload-123", response.getBody().getUploadId());
+        assertEquals("upload-123", Objects.requireNonNull(response.getBody()).getUploadId());
     }
 
     @Test
@@ -150,8 +152,8 @@ class VideoUploadControllerTest {
 
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals("upload-fresh-456", response.getBody().getUploadId());
-        assertEquals("UPLOADING", response.getBody().getStatusBadge());
+        assertEquals("upload-fresh-456", Objects.requireNonNull(response.getBody()).getUploadId());
+        assertEquals("UPLOADING", Objects.requireNonNull(response.getBody()).getStatusBadge());
         verify(videoUploadService, times(1)).retryUploadAfterFailure(eq(instructor), eq("upload-123"), any());
     }
 }

@@ -17,6 +17,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -80,9 +81,9 @@ class StudentQuizControllerTest {
         assertEquals(201, startRes.getStatusCode().value());
         assertSame(attempt, startRes.getBody());
 
-        assertEquals(1, controller.getStudentQuizAttempts(10, authentication).getBody().size());
+        assertEquals(1, Objects.requireNonNull(controller.getStudentQuizAttempts(10, authentication).getBody()).size());
         assertSame(attempt, controller.getQuizAttemptStatus(10, 55, authentication).getBody());
-        assertEquals("SUBMITTED", controller.submitQuizAttempt(10, 55, null, authentication).getBody().getStatus());
+        assertEquals("SUBMITTED", Objects.requireNonNull(controller.submitQuizAttempt(10, 55, null, authentication).getBody()).getStatus());
         assertSame(evalSummary, controller.getAttemptEvaluation(10, 55, authentication).getBody());
     }
 }

@@ -500,6 +500,9 @@ public class InstructorCourseService {
     }
 
     private CourseResponse createNewDraft(User currentUser, CourseDraftRequest request) {
+        if (request == null) {
+            request = new CourseDraftRequest();
+        }
         String title = "Untitled Draft";
         if (request != null && request.getTitle() != null) {
             String trimmedTitle = request.getTitle().trim();

@@ -21,6 +21,7 @@ import org.springframework.security.core.Authentication;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.eq;
@@ -71,7 +72,7 @@ class ContentDeclarationControllerTest {
 
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getId());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).getId());
         verify(declarationService, times(1)).declareContent(instructor, request);
     }
 
@@ -86,8 +87,8 @@ class ContentDeclarationControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().size());
-        assertEquals(1, response.getBody().get(0).getId());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).size());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).get(0).getId());
     }
 
     @Test
@@ -100,8 +101,8 @@ class ContentDeclarationControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(5, response.getBody().getId());
-        assertEquals(400, response.getBody().getLessonId());
+        assertEquals(5, Objects.requireNonNull(response.getBody()).getId());
+        assertEquals(400, Objects.requireNonNull(response.getBody()).getLessonId());
     }
 
     @Test
@@ -114,7 +115,7 @@ class ContentDeclarationControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(7, response.getBody().getId());
+        assertEquals(7, Objects.requireNonNull(response.getBody()).getId());
     }
 
     @Test
@@ -133,7 +134,7 @@ class ContentDeclarationControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(TakedownStatus.RESPONDED, response.getBody().getTakedownStatus());
+        assertEquals(TakedownStatus.RESPONDED, Objects.requireNonNull(response.getBody()).getTakedownStatus());
     }
 
     @Test
@@ -148,7 +149,7 @@ class ContentDeclarationControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(TakedownStatus.REMOVED, response.getBody().getTakedownStatus());
+        assertEquals(TakedownStatus.REMOVED, Objects.requireNonNull(response.getBody()).getTakedownStatus());
     }
 
     @Test
@@ -167,7 +168,7 @@ class ContentDeclarationControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(TakedownStatus.REPLACED, response.getBody().getTakedownStatus());
+        assertEquals(TakedownStatus.REPLACED, Objects.requireNonNull(response.getBody()).getTakedownStatus());
     }
 
     @Test
@@ -180,6 +181,6 @@ class ContentDeclarationControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertTrue((Boolean) response.getBody().get("declared"));
+        assertTrue((Boolean) Objects.requireNonNull(response.getBody()).get("declared"));
     }
 }

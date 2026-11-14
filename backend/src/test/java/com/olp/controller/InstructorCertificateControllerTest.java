@@ -21,6 +21,7 @@ import org.springframework.security.core.Authentication;
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -115,7 +116,7 @@ class InstructorCertificateControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody() instanceof List<?>);
         @SuppressWarnings("unchecked")
-        List<CertificateResponse> list = (List<CertificateResponse>) response.getBody();
+        List<CertificateResponse> list = (List<CertificateResponse>) Objects.requireNonNull(response.getBody());
         assertEquals(1, list.size());
         assertEquals("OLP-100-50-PHYSICS1", list.get(0).getCertificateCode());
         assertEquals("Peter Parker", list.get(0).getLearnerName());
@@ -136,7 +137,7 @@ class InstructorCertificateControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody() instanceof PageResponse<?>);
         @SuppressWarnings("unchecked")
-        PageResponse<CertificateResponse> body = (PageResponse<CertificateResponse>) response.getBody();
+        PageResponse<CertificateResponse> body = (PageResponse<CertificateResponse>) Objects.requireNonNull(response.getBody());
         assertEquals(1, body.getTotalElements());
         assertEquals(1, body.getContent().size());
         assertEquals("Advanced Physics", body.getContent().get(0).getCourseName());
@@ -169,8 +170,8 @@ class InstructorCertificateControllerTest {
                 auth, null, null, null, null, null, 0, 5);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(1, response.getBody().getTotalElements());
-        assertEquals(5, response.getBody().getPageSize());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).getTotalElements());
+        assertEquals(5, Objects.requireNonNull(response.getBody()).getPageSize());
     }
 
     @Test
@@ -184,7 +185,7 @@ class InstructorCertificateControllerTest {
                 auth, 100, null, null, null, null);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(1, response.getBody().size());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).size());
     }
 
     @Test
@@ -198,10 +199,10 @@ class InstructorCertificateControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertTrue(response.getBody().isValid());
-        assertEquals("VERIFIED", response.getBody().getStatus());
-        assertEquals("OLP-100-50-PHYSICS1", response.getBody().getCertificateCode());
-        assertEquals("/api/certificates/verify/OLP-100-50-PHYSICS1", response.getBody().getVerificationUrl());
+        assertTrue(Objects.requireNonNull(response.getBody()).isValid());
+        assertEquals("VERIFIED", Objects.requireNonNull(response.getBody()).getStatus());
+        assertEquals("OLP-100-50-PHYSICS1", Objects.requireNonNull(response.getBody()).getCertificateCode());
+        assertEquals("/api/certificates/verify/OLP-100-50-PHYSICS1", Objects.requireNonNull(response.getBody()).getVerificationUrl());
     }
 
     @Test
@@ -214,7 +215,7 @@ class InstructorCertificateControllerTest {
                 .getCertificateByCode("OLP-100-50-PHYSICS1");
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals("Peter Parker", response.getBody().getLearnerName());
+        assertEquals("Peter Parker", Objects.requireNonNull(response.getBody()).getLearnerName());
     }
 
     @Test
@@ -227,6 +228,6 @@ class InstructorCertificateControllerTest {
                 .verifyCertificateQuery("OLP-100-50-PHYSICS1");
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals("Advanced Physics", response.getBody().getCourseName());
+        assertEquals("Advanced Physics", Objects.requireNonNull(response.getBody()).getCourseName());
     }
 }

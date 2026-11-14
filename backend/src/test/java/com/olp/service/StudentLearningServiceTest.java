@@ -30,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -110,7 +111,7 @@ class StudentLearningServiceTest {
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
         assertNotNull(ex.getReason());
-        assertTrue(ex.getReason().contains("view-only"));
+        assertTrue(Objects.requireNonNull(ex.getReason()).contains("view-only"));
         verify(materialStorageService, never()).loadMaterialAsResource(anyString());
     }
 
@@ -125,7 +126,7 @@ class StudentLearningServiceTest {
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
         assertNotNull(ex.getReason());
-        assertTrue(ex.getReason().contains("enrolled"));
+        assertTrue(Objects.requireNonNull(ex.getReason()).contains("enrolled"));
         verify(materialStorageService, never()).loadMaterialAsResource(anyString());
     }
 

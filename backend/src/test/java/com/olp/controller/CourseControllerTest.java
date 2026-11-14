@@ -21,6 +21,7 @@ import org.springframework.security.core.Authentication;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -67,7 +68,7 @@ class CourseControllerTest {
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
         assertSame(pricing, response.getBody());
-        assertEquals(new BigDecimal("1180.00"), response.getBody().getFinalPayableAmount());
+        assertEquals(new BigDecimal("1180.00"), Objects.requireNonNull(response.getBody()).getFinalPayableAmount());
         verify(courseCatalogService).getCoursePricing(101);
     }
 
@@ -81,7 +82,7 @@ class CourseControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().success());
+        assertTrue(Objects.requireNonNull(response.getBody()).success());
         verify(courseCatalogService).enrollCourse(student, 101);
     }
 
@@ -100,7 +101,7 @@ class CourseControllerTest {
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
         assertSame(preview, response.getBody());
-        assertTrue(response.getBody().isPreview());
+        assertTrue(Objects.requireNonNull(response.getBody()).isPreview());
         verify(coursePreviewService).previewCourseAsStudent(student, 101);
     }
 
@@ -134,7 +135,7 @@ class CourseControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(1, response.getBody().size());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).size());
         verify(courseSubmissionService).getSubmissionHistory(student, 101);
     }
 
@@ -151,8 +152,8 @@ class CourseControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("CHANGES_REQUESTED", response.getBody().getReviewStatus());
-        assertTrue(response.getBody().isCanResubmit());
+        assertEquals("CHANGES_REQUESTED", Objects.requireNonNull(response.getBody()).getReviewStatus());
+        assertTrue(Objects.requireNonNull(response.getBody()).isCanResubmit());
         verify(courseSubmissionService).getReviewStatus(student, 101);
     }
 
@@ -172,7 +173,7 @@ class CourseControllerTest {
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
         assertSame(subResp, response.getBody());
-        assertEquals("PENDING_REVIEW", response.getBody().getStatus());
+        assertEquals("PENDING_REVIEW", Objects.requireNonNull(response.getBody()).getStatus());
         verify(courseSubmissionService).resubmitCourse(eq(student), eq(101), any(CourseSubmissionRequest.class));
     }
 }

@@ -22,6 +22,7 @@ import org.springframework.security.core.Authentication;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -90,7 +91,7 @@ class InstructorLectureControllerTest {
         ResponseEntity<List<LectureResponse>> response = controller.getLectures(10, authentication, 1, 1);
 
         assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().isEmpty());
+        assertTrue(Objects.requireNonNull(response.getBody()).isEmpty());
     }
 
     @Test
@@ -158,8 +159,8 @@ class InstructorLectureControllerTest {
         ResponseEntity<ApiResponse> response = controller.deleteLecture(10, 3, authentication, null, null);
 
         assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().isSuccess());
-        assertEquals("Lecture deleted successfully", response.getBody().getMessage());
+        assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
+        assertEquals("Lecture deleted successfully", Objects.requireNonNull(response.getBody()).getMessage());
         verify(instructorLectureService, times(1)).deleteLecture(currentUser, 10, 3);
     }
 
