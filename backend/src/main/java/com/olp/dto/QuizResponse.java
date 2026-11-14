@@ -31,6 +31,10 @@ public class QuizResponse {
     private LocalDateTime availableFrom;
     private LocalDateTime availableUntil;
     private Boolean feedbackReleased;
+    private Boolean negativeMarking;
+    private Boolean partialMarking;
+    private BigDecimal numericTolerance;
+    private String markingRulesSummary;
     private Integer questionCount;
     private List<QuizQuestionResponse> questions = new ArrayList<>();
     private LocalDateTime createdAt;
@@ -244,6 +248,38 @@ public class QuizResponse {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Boolean getNegativeMarking() {
+        return negativeMarking;
+    }
+
+    public void setNegativeMarking(Boolean negativeMarking) {
+        this.negativeMarking = negativeMarking;
+    }
+
+    public Boolean getPartialMarking() {
+        return partialMarking;
+    }
+
+    public void setPartialMarking(Boolean partialMarking) {
+        this.partialMarking = partialMarking;
+    }
+
+    public BigDecimal getNumericTolerance() {
+        return numericTolerance;
+    }
+
+    public void setNumericTolerance(BigDecimal numericTolerance) {
+        this.numericTolerance = numericTolerance;
+    }
+
+    public String getMarkingRulesSummary() {
+        return markingRulesSummary;
+    }
+
+    public void setMarkingRulesSummary(String markingRulesSummary) {
+        this.markingRulesSummary = markingRulesSummary;
     }
 }
 

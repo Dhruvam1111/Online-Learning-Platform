@@ -38,6 +38,10 @@ public class QuizSettingsRequest {
     @JsonAlias({ "showFeedback", "feedbackVisible", "reviewEnabled" })
     private Boolean feedbackReleased;
 
+    private Boolean negativeMarking;
+    private Boolean partialMarking;
+    private BigDecimal numericTolerance;
+
     public QuizSettingsRequest() {}
 
     public Integer getTimeLimitMinutes() {
@@ -110,6 +114,30 @@ public class QuizSettingsRequest {
 
     public void setShowFeedback(Boolean showFeedback) {
         this.feedbackReleased = showFeedback;
+    }
+
+    public Boolean getNegativeMarking() {
+        return negativeMarking;
+    }
+
+    public void setNegativeMarking(Boolean negativeMarking) {
+        this.negativeMarking = negativeMarking;
+    }
+
+    public Boolean getPartialMarking() {
+        return partialMarking;
+    }
+
+    public void setPartialMarking(Boolean partialMarking) {
+        this.partialMarking = partialMarking;
+    }
+
+    public BigDecimal getNumericTolerance() {
+        return numericTolerance;
+    }
+
+    public void setNumericTolerance(BigDecimal numericTolerance) {
+        this.numericTolerance = numericTolerance;
     }
 }
 

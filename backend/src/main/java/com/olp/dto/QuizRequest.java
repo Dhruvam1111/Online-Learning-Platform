@@ -51,6 +51,10 @@ public class QuizRequest {
     @JsonAlias({ "showFeedback", "feedbackVisible", "reviewEnabled" })
     private Boolean feedbackReleased;
 
+    private Boolean negativeMarking;
+    private Boolean partialMarking;
+    private BigDecimal numericTolerance;
+
     @Valid
     private List<QuizQuestionRequest> questions;
 
@@ -182,6 +186,30 @@ public class QuizRequest {
 
     public void setShowFeedback(Boolean showFeedback) {
         this.feedbackReleased = showFeedback;
+    }
+
+    public Boolean getNegativeMarking() {
+        return negativeMarking;
+    }
+
+    public void setNegativeMarking(Boolean negativeMarking) {
+        this.negativeMarking = negativeMarking;
+    }
+
+    public Boolean getPartialMarking() {
+        return partialMarking;
+    }
+
+    public void setPartialMarking(Boolean partialMarking) {
+        this.partialMarking = partialMarking;
+    }
+
+    public BigDecimal getNumericTolerance() {
+        return numericTolerance;
+    }
+
+    public void setNumericTolerance(BigDecimal numericTolerance) {
+        this.numericTolerance = numericTolerance;
     }
 
     public List<QuizQuestionRequest> getQuestions() {
