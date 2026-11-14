@@ -32,6 +32,7 @@ public class DescriptiveSubmissionResponse {
     private String evaluationStatus;
     private String gradingStatus;
     private String feedback;
+    private String overallFeedback;
     private Integer graderId;
     private String graderName;
     private LocalDateTime evaluatedAt;
@@ -53,6 +54,7 @@ public class DescriptiveSubmissionResponse {
             dto.setAttemptId(ans.getAttempt().getId());
             dto.setSubmissionDate(ans.getAttempt().getSubmittedAt());
             dto.setSubmittedAt(ans.getAttempt().getSubmittedAt());
+            dto.setOverallFeedback(ans.getAttempt().getOverallFeedback());
 
             if (ans.getAttempt().getStudent() != null) {
                 dto.setStudentId(ans.getAttempt().getStudent().getId());
@@ -285,6 +287,14 @@ public class DescriptiveSubmissionResponse {
 
     public void setFeedback(String feedback) {
         this.feedback = feedback;
+    }
+
+    public String getOverallFeedback() {
+        return overallFeedback;
+    }
+
+    public void setOverallFeedback(String overallFeedback) {
+        this.overallFeedback = overallFeedback;
     }
 
     public Integer getGraderId() {

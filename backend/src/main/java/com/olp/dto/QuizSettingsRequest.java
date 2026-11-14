@@ -35,6 +35,9 @@ public class QuizSettingsRequest {
     @JsonAlias({"endDate", "endTime"})
     private LocalDateTime availableUntil;
 
+    @JsonAlias({ "showFeedback", "feedbackVisible", "reviewEnabled" })
+    private Boolean feedbackReleased;
+
     public QuizSettingsRequest() {}
 
     public Integer getTimeLimitMinutes() {
@@ -91,6 +94,22 @@ public class QuizSettingsRequest {
 
     public void setAvailableUntil(LocalDateTime availableUntil) {
         this.availableUntil = availableUntil;
+    }
+
+    public Boolean getFeedbackReleased() {
+        return feedbackReleased;
+    }
+
+    public void setFeedbackReleased(Boolean feedbackReleased) {
+        this.feedbackReleased = feedbackReleased;
+    }
+
+    public Boolean getShowFeedback() {
+        return feedbackReleased;
+    }
+
+    public void setShowFeedback(Boolean showFeedback) {
+        this.feedbackReleased = showFeedback;
     }
 }
 
