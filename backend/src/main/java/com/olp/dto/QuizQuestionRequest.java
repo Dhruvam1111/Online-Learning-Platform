@@ -50,6 +50,8 @@ public class QuizQuestionRequest {
 
     private String explanation;
     private Boolean isBankQuestion;
+    private String reuseMode;
+    private Boolean copyFromBank;
 
     @Min(value = 1, message = "Order index must be at least 1")
     private Integer orderIndex;
@@ -216,6 +218,29 @@ public class QuizQuestionRequest {
 
     public void setIsRequired(Boolean isRequired) {
         this.isRequired = isRequired;
+    }
+
+    public String getReuseMode() {
+        return reuseMode;
+    }
+
+    public void setReuseMode(String reuseMode) {
+        this.reuseMode = reuseMode;
+    }
+
+    public Boolean getCopyFromBank() {
+        return copyFromBank;
+    }
+
+    public void setCopyFromBank(Boolean copyFromBank) {
+        this.copyFromBank = copyFromBank;
+        if (Boolean.TRUE.equals(copyFromBank)) {
+            this.reuseMode = "COPY";
+        }
+    }
+
+    public boolean isCopyMode() {
+        return "COPY".equalsIgnoreCase(reuseMode) || Boolean.TRUE.equals(copyFromBank);
     }
 }
 
