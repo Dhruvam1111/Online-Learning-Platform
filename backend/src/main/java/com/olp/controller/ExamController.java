@@ -22,11 +22,14 @@ public class ExamController {
 
     private final ExamService examService;
     private final com.olp.service.ExamRandomizationService examRandomizationService;
+    private final com.olp.service.ExamMonitoringService examMonitoringService;
 
     public ExamController(ExamService examService,
-                          com.olp.service.ExamRandomizationService examRandomizationService) {
+                          com.olp.service.ExamRandomizationService examRandomizationService,
+                          com.olp.service.ExamMonitoringService examMonitoringService) {
         this.examService = examService;
         this.examRandomizationService = examRandomizationService;
+        this.examMonitoringService = examMonitoringService;
     }
 
     // =========================================================================
@@ -151,6 +154,41 @@ public class ExamController {
             Authentication authentication) {
         User currentUser = examService.resolveUser(authentication);
         ExamStartResponse response = examService.startExam(currentUser, examId);
+        return ResponseEntity.ok(response);
+    }
+
+    // =========================================================================
+    // PROCTORING & MONITORING RULES ENDPOINTS (FR-I26, Step 40)
+    // =========================================================================
+
+    @PutMapping({"/instructor/exams/{examId}/monitoring", "/exams/{examId}/monitoring"})
+    @PreAuthorize("hasRole('instructor') or hasRole('admin')")
+    public ResponseEntity<ExamMonitoringConfigResponse> saveMonitoringConfig(
+            @PathVariable Integer examId,
+            @Valid @RequestBody ExamMonitoringConfigRequest request,
+            Authentication authentication) {
+        User currentUser = examService.resolveUser(authentication);
+        ExamMonitoringConfigResponse response = examMonitoringService.saveMonitoringConfig(currentUser, examId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/exams/{examId}/monitoring")
+    public ResponseEntity<ExamMonitoringConfigResponse> getMonitoringConfig(
+            @PathVariable Integer examId,
+            @RequestParam(required = false, defaultValue = "true") Boolean browserSupportsFullscreen,
+            Authentication authentication) {
+        User currentUser = examService.resolveUser(authentication);
+        ExamMonitoringConfigResponse response = examMonitoringService.getMonitoringConfig(currentUser, examId, browserSupportsFullscreen);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/exams/{examId}/consent")
+    public ResponseEntity<ExamConsentResponse> recordStudentConsent(
+            @PathVariable Integer examId,
+            @Valid @RequestBody ExamConsentRequest request,
+            Authentication authentication) {
+        User currentUser = examService.resolveUser(authentication);
+        ExamConsentResponse response = examMonitoringService.recordStudentConsent(currentUser, examId, request);
         return ResponseEntity.ok(response);
     }
 }
