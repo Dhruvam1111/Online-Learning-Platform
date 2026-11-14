@@ -229,6 +229,11 @@ CREATE INDEX IF NOT EXISTS idx_exam_attempts_published ON exam_attempts(is_publi
 CREATE INDEX IF NOT EXISTS idx_assignment_submissions_published ON assignment_submissions(is_published, is_locked);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_published ON quiz_attempts(is_published, is_locked);
 
+-- Step 56 / FR-I69: Flag and Escalate Attempts Indexes
+CREATE INDEX IF NOT EXISTS idx_exam_attempts_review_status ON exam_attempts(review_status);
+CREATE INDEX IF NOT EXISTS idx_exam_attempt_review_history_attempt ON exam_attempt_review_history(attempt_id, created_at DESC);
+
+
 
 
 

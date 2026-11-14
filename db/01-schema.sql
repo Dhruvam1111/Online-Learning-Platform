@@ -1118,6 +1118,28 @@ ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NO
 ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS published_at TIMESTAMP;
 ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- Step 56 / FR-I69: Flag and Escalate Attempts
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS review_status VARCHAR(30) NOT NULL DEFAULT 'NONE';
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS review_notes TEXT;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS escalated_at TIMESTAMP;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS escalation_reason TEXT;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS escalation_recommendation VARCHAR(100);
+
+CREATE TABLE IF NOT EXISTS exam_attempt_review_history (
+    id SERIAL PRIMARY KEY,
+    attempt_id INTEGER NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+    previous_status VARCHAR(30),
+    new_status VARCHAR(30) NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    notes TEXT,
+    recommendation VARCHAR(100),
+    reviewed_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+
 
 
 
