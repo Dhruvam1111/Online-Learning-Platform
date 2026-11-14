@@ -71,6 +71,15 @@ public class StudentLearningController {
         return ResponseEntity.ok(studentLearningService.getLessonMaterials(studentId, lessonId));
     }
 
+    // FR-I18: Get lesson details for enrolled student with release gating
+    @GetMapping("/lessons/{lessonId}")
+    public ResponseEntity<LessonResponse> getLesson(
+            @PathVariable Integer lessonId,
+            Authentication authentication) {
+        Integer studentId = getStudentId(authentication);
+        return ResponseEntity.ok(studentLearningService.getLessonForStudent(studentId, lessonId));
+    }
+
     // FR-S14, FR-I17: Access learning materials attached to a module
     @GetMapping("/modules/{moduleId}/materials")
     public ResponseEntity<List<LectureMaterialResponse>> getModuleMaterials(

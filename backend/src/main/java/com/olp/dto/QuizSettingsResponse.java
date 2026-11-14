@@ -29,6 +29,10 @@ public class QuizSettingsResponse {
     private Long attemptsUsed;
     private Integer remainingAttempts;
     private Boolean feedbackReleased;
+    private Boolean negativeMarking;
+    private Boolean partialMarking;
+    private BigDecimal numericTolerance;
+    private String markingRulesSummary;
 
     public QuizSettingsResponse() {}
 
@@ -198,6 +202,56 @@ public class QuizSettingsResponse {
 
     public void setShowFeedback(Boolean showFeedback) {
         this.feedbackReleased = showFeedback;
+    }
+
+    public Boolean getNegativeMarking() {
+        return negativeMarking;
+    }
+
+    public void setNegativeMarking(Boolean negativeMarking) {
+        this.negativeMarking = negativeMarking;
+    }
+
+    public Boolean getPartialMarking() {
+        return partialMarking;
+    }
+
+    public void setPartialMarking(Boolean partialMarking) {
+        this.partialMarking = partialMarking;
+    }
+
+    public BigDecimal getNumericTolerance() {
+        return numericTolerance;
+    }
+
+    public void setNumericTolerance(BigDecimal numericTolerance) {
+        this.numericTolerance = numericTolerance;
+    }
+
+    public String getMarkingRulesSummary() {
+        return markingRulesSummary;
+    }
+
+    public void setMarkingRulesSummary(String markingRulesSummary) {
+        this.markingRulesSummary = markingRulesSummary;
+    }
+
+    public static String computeMarkingRulesSummary(Boolean negativeMarking, Boolean partialMarking, BigDecimal numericTolerance) {
+        java.util.List<String> rules = new java.util.ArrayList<>();
+        if (Boolean.TRUE.equals(negativeMarking)) {
+            rules.add("Negative marking is ENABLED (deductions apply for incorrect answers)");
+        } else {
+            rules.add("Negative marking is DISABLED (no marks deducted for incorrect answers)");
+        }
+        if (Boolean.TRUE.equals(partialMarking)) {
+            rules.add("Partial marking is ENABLED for multiple-select questions");
+        } else {
+            rules.add("Partial marking is DISABLED (all-or-nothing for multiple-select questions)");
+        }
+        if (numericTolerance != null && numericTolerance.compareTo(BigDecimal.ZERO) > 0) {
+            rules.add("Numerical tolerance: \u00b1" + numericTolerance.stripTrailingZeros().toPlainString());
+        }
+        return String.join(". ", rules) + ".";
     }
 }
 

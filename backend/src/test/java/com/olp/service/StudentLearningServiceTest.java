@@ -1,15 +1,18 @@
 package com.olp.service;
 
 import com.olp.dto.LectureMaterialResponse;
+import com.olp.dto.LessonResponse;
 import com.olp.dto.MaterialViewerResponse;
 import com.olp.dto.ResourceAndMetadata;
 import com.olp.entity.LectureBookmark;
 import com.olp.entity.LectureMaterial;
 import com.olp.entity.LectureProgress;
+import com.olp.entity.Lesson;
 import com.olp.repository.EnrollmentCheckRepository;
 import com.olp.repository.LectureBookmarkRepository;
 import com.olp.repository.LectureMaterialRepository;
 import com.olp.repository.LectureProgressRepository;
+import com.olp.repository.LessonRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,6 +52,8 @@ class StudentLearningServiceTest {
     private MaterialStorageService materialStorageService;
     @Mock
     private JdbcTemplate jdbcTemplate;
+    @Mock
+    private LessonRepository lessonRepository;
 
     @InjectMocks
     private StudentLearningService studentLearningService;
@@ -286,5 +291,113 @@ class StudentLearningServiceTest {
         Map<String, Object> removeResult = studentLearningService.toggleLectureBookmark(studentId, lectureId);
         assertEquals(false, removeResult.get("isBookmarked"));
         verify(lectureBookmarkRepository, times(1)).deleteByStudentIdAndLectureId(studentId, lectureId);
+    }
+
+    @Test
+    void testGetLessonMaterials_excludesUnreleasedMaterials() {
+        when(jdbcTemplate.query(anyString(), ArgumentMatchers.<RowMapper<Integer>>any(), eq(lessonId)))
+                .thenReturn(List.of(courseId));
+        when(enrollmentCheckRepository.isStudentEnrolled(studentId, courseId)).thenReturn(true);
+
+        Lesson parentLesson = new Lesson();
+        parentLesson.setId(lessonId);
+        parentLesson.setIsReleased(true);
+        when(lessonRepository.findById(lessonId)).thenReturn(Optional.of(parentLesson));
+
+        LectureMaterial releasedMat = new LectureMaterial(lessonId, null, null, 1, "Released Notes", "rel.pdf",
+                "uploads/rel.pdf", "pdf", "application/pdf", 1024L, true);
+        releasedMat.setId(201);
+        releasedMat.setIsReleased(true);
+
+        LectureMaterial unreleasedMat = new LectureMaterial(lessonId, null, null, 2, "Unreleased Draft", "unrel.pdf",
+                "uploads/unrel.pdf", "pdf", "application/pdf", 1024L, true);
+        unreleasedMat.setId(202);
+        unreleasedMat.setIsReleased(false);
+        unreleasedMat.setReleaseAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).plusDays(5));
+
+        when(lectureMaterialRepository.findByLessonId(lessonId)).thenReturn(List.of(releasedMat, unreleasedMat));
+
+        List<LectureMaterialResponse> results = studentLearningService.getLessonMaterials(studentId, lessonId);
+
+        assertEquals(1, results.size());
+        assertEquals(201L, results.get(0).getId());
+    }
+
+    @Test
+    void testDownloadMaterial_unreleasedMaterial_throwsForbidden() {
+        when(jdbcTemplate.query(anyString(), ArgumentMatchers.<RowMapper<Integer>>any(), eq(lessonId)))
+                .thenReturn(List.of(courseId));
+        when(enrollmentCheckRepository.isStudentEnrolled(studentId, courseId)).thenReturn(true);
+
+        LectureMaterial unreleasedMat = new LectureMaterial(lessonId, null, null, 1, "Unreleased Draft", "unrel.pdf",
+                "uploads/unrel.pdf", "pdf", "application/pdf", 1024L, true);
+        unreleasedMat.setId(202);
+        unreleasedMat.setIsReleased(false);
+        unreleasedMat.setReleaseAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).plusDays(5));
+
+        when(lectureMaterialRepository.findById(202)).thenReturn(Optional.of(unreleasedMat));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                studentLearningService.downloadMaterial(studentId, 202));
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("scheduled for release"));
+    }
+
+    @Test
+    void testViewMaterial_unreleasedParentLesson_throwsForbidden() {
+        when(jdbcTemplate.query(anyString(), ArgumentMatchers.<RowMapper<Integer>>any(), eq(lessonId)))
+                .thenReturn(List.of(courseId));
+        when(enrollmentCheckRepository.isStudentEnrolled(studentId, courseId)).thenReturn(true);
+
+        LectureMaterial mat = new LectureMaterial(lessonId, null, null, 1, "Released Material", "mat.pdf",
+                "uploads/mat.pdf", "pdf", "application/pdf", 1024L, true);
+        mat.setId(203);
+        mat.setIsReleased(true);
+
+        Lesson unreleasedLesson = new Lesson();
+        unreleasedLesson.setId(lessonId);
+        unreleasedLesson.setIsReleased(false);
+        unreleasedLesson.setReleaseAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).plusDays(2));
+
+        when(lectureMaterialRepository.findById(203)).thenReturn(Optional.of(mat));
+        when(lessonRepository.findById(lessonId)).thenReturn(Optional.of(unreleasedLesson));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                studentLearningService.viewMaterial(studentId, 203));
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("parent lesson is scheduled for release"));
+    }
+
+    @Test
+    void testGetLessonForStudent_releasedAndUnreleased() {
+        when(jdbcTemplate.query(anyString(), ArgumentMatchers.<RowMapper<Integer>>any(), eq(lessonId)))
+                .thenReturn(List.of(courseId));
+        when(enrollmentCheckRepository.isStudentEnrolled(studentId, courseId)).thenReturn(true);
+
+        Lesson releasedLesson = new Lesson();
+        releasedLesson.setId(lessonId);
+        releasedLesson.setTitle("Introduction");
+        releasedLesson.setIsReleased(true);
+
+        when(lessonRepository.findById(lessonId)).thenReturn(Optional.of(releasedLesson));
+
+        LessonResponse resp = studentLearningService.getLessonForStudent(studentId, lessonId);
+        assertNotNull(resp);
+        assertEquals(lessonId, resp.getId());
+        assertEquals("Introduction", resp.getTitle());
+
+        // Test unreleased
+        Lesson unreleased = new Lesson();
+        unreleased.setId(lessonId);
+        unreleased.setIsReleased(false);
+        unreleased.setReleaseAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).plusHours(10));
+        when(lessonRepository.findById(lessonId)).thenReturn(Optional.of(unreleased));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                studentLearningService.getLessonForStudent(studentId, lessonId));
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("scheduled for release"));
     }
 }

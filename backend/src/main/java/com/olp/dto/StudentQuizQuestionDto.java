@@ -8,6 +8,9 @@ public class StudentQuizQuestionDto {
     private String questionType;
     private String optionsJson;
     private BigDecimal marks;
+    private BigDecimal negativeMarks;
+    private BigDecimal numericalTolerance;
+    private Boolean partialMarking;
     private Integer orderIndex;
     private String savedAnswer;
 
@@ -27,6 +30,15 @@ public class StudentQuizQuestionDto {
 
     public BigDecimal getMarks() { return marks; }
     public void setMarks(BigDecimal marks) { this.marks = marks; }
+
+    public BigDecimal getNegativeMarks() { return negativeMarks; }
+    public void setNegativeMarks(BigDecimal negativeMarks) { this.negativeMarks = negativeMarks; }
+
+    public BigDecimal getNumericalTolerance() { return numericalTolerance; }
+    public void setNumericalTolerance(BigDecimal numericalTolerance) { this.numericalTolerance = numericalTolerance; }
+
+    public Boolean getPartialMarking() { return partialMarking; }
+    public void setPartialMarking(Boolean partialMarking) { this.partialMarking = partialMarking; }
 
     public Integer getOrderIndex() { return orderIndex; }
     public void setOrderIndex(Integer orderIndex) { this.orderIndex = orderIndex; }
