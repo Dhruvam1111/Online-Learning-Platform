@@ -1,10 +1,14 @@
 package com.olp.controller;
 
+import com.olp.dto.AnswerFeedbackRequest;
+import com.olp.dto.AnswerFeedbackResponse;
 import com.olp.dto.DescriptiveSubmissionResponse;
 import com.olp.dto.GradeSubmissionRequest;
 import com.olp.dto.GradeSubmissionResponse;
 import com.olp.dto.PageResponse;
 import com.olp.dto.PublishResultResponse;
+import com.olp.dto.SubmissionFeedbackRequest;
+import com.olp.dto.SubmissionFeedbackResponse;
 import com.olp.entity.User;
 import com.olp.service.DescriptiveGradingService;
 import jakarta.validation.Valid;
@@ -154,6 +158,58 @@ public class InstructorGradingController {
 
         User currentUser = descriptiveGradingService.resolveUser(authentication);
         PublishResultResponse response = descriptiveGradingService.publishAttemptResults(currentUser, attemptId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST or PUT /api/instructor/grading/answers/{answerId}/feedback or /{answerId}/feedback
+     * Adds or updates answer-level feedback for a descriptive answer (FR-I31).
+     * Prevents feedback modification after results are published.
+     */
+    @RequestMapping(
+            value = { "/{answerId:\\d+}/feedback", "/answers/{answerId:\\d+}/feedback", "/submissions/{answerId:\\d+}/feedback" },
+            method = { RequestMethod.POST, RequestMethod.PUT }
+    )
+    public ResponseEntity<AnswerFeedbackResponse> addOrUpdateAnswerFeedback(
+            Authentication authentication,
+            @PathVariable Integer answerId,
+            @Valid @RequestBody AnswerFeedbackRequest request) {
+
+        User currentUser = descriptiveGradingService.resolveUser(authentication);
+        AnswerFeedbackResponse response = descriptiveGradingService.addOrUpdateAnswerFeedback(currentUser, answerId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST or PUT /api/instructor/grading/attempts/{attemptId}/feedback or /attempts/{attemptId}/overall-feedback
+     * Adds or updates submission-level overall feedback for an attempt (FR-I31).
+     * Prevents feedback modification after results are published.
+     */
+    @RequestMapping(
+            value = { "/attempts/{attemptId:\\d+}/feedback", "/attempts/{attemptId:\\d+}/overall-feedback", "/submissions/attempts/{attemptId:\\d+}/feedback" },
+            method = { RequestMethod.POST, RequestMethod.PUT }
+    )
+    public ResponseEntity<SubmissionFeedbackResponse> addOrUpdateSubmissionFeedback(
+            Authentication authentication,
+            @PathVariable Integer attemptId,
+            @Valid @RequestBody SubmissionFeedbackRequest request) {
+
+        User currentUser = descriptiveGradingService.resolveUser(authentication);
+        SubmissionFeedbackResponse response = descriptiveGradingService.addOrUpdateSubmissionFeedback(currentUser, attemptId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/instructor/grading/attempts/{attemptId}/feedback
+     * Retrieves submission-level overall feedback (FR-I31).
+     */
+    @GetMapping({ "/attempts/{attemptId:\\d+}/feedback", "/submissions/attempts/{attemptId:\\d+}/feedback" })
+    public ResponseEntity<SubmissionFeedbackResponse> getSubmissionFeedback(
+            Authentication authentication,
+            @PathVariable Integer attemptId) {
+
+        User currentUser = descriptiveGradingService.resolveUser(authentication);
+        SubmissionFeedbackResponse response = descriptiveGradingService.getSubmissionFeedback(currentUser, attemptId);
         return ResponseEntity.ok(response);
     }
 }
