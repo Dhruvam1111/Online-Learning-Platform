@@ -1,5 +1,6 @@
 package com.olp.dto;
 
+import com.olp.entity.QuestionCorrectionPolicy;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -31,6 +32,7 @@ public class ExamResponse {
     private Boolean isRandomized;
     private Long randomSeed;
     private Integer totalSets;
+    private QuestionCorrectionPolicy questionCorrectionPolicy;
     private List<ExamBlueprintItemDto> blueprints = new java.util.ArrayList<>();
     private Integer questionCount;
     private LocalDateTime createdAt;
@@ -262,6 +264,14 @@ public class ExamResponse {
 
     public void setBlueprints(List<ExamBlueprintItemDto> blueprints) {
         this.blueprints = blueprints;
+    }
+
+    public QuestionCorrectionPolicy getQuestionCorrectionPolicy() {
+        return questionCorrectionPolicy;
+    }
+
+    public void setQuestionCorrectionPolicy(QuestionCorrectionPolicy questionCorrectionPolicy) {
+        this.questionCorrectionPolicy = questionCorrectionPolicy;
     }
 }
 

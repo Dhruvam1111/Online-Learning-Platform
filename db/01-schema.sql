@@ -1058,6 +1058,9 @@ ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS tab_switch_count INTEGER NOT 
 ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS fullscreen_exit_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS monitoring_flags TEXT;
 
+-- Step 41 / FR-I66: Question Correction Policy
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS question_correction_policy VARCHAR(30) NOT NULL DEFAULT 'AWARD_FULL_MARKS';
+
 
 
 

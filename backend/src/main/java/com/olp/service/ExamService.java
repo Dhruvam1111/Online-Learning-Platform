@@ -8,9 +8,11 @@ import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.*;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -171,6 +173,10 @@ public class ExamService {
             }
         }
 
+        if (request.getQuestionCorrectionPolicy() != null) {
+            exam.setQuestionCorrectionPolicy(request.getQuestionCorrectionPolicy());
+        }
+
         Exam saved = examRepository.save(exam);
 
         // Save blueprints if provided
@@ -287,6 +293,16 @@ public class ExamService {
         }
         if (request.getStatus() != null) {
             exam.setStatus(request.getStatus().toUpperCase());
+        }
+        if (request.getQuestionCorrectionPolicy() != null) {
+            if (!request.getQuestionCorrectionPolicy().equals(exam.getQuestionCorrectionPolicy())) {
+                long attemptCount = examAttemptRepository.countByExamId(examId);
+                if (attemptCount > 0) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "Cannot modify question correction policy once attempts have started (DR-ED05). Policy is locked.");
+                }
+                exam.setQuestionCorrectionPolicy(request.getQuestionCorrectionPolicy());
+            }
         }
 
         Exam updated = examRepository.save(exam);
@@ -647,6 +663,7 @@ public class ExamService {
         res.setIsRandomized(exam.getIsRandomized());
         res.setRandomSeed(exam.getRandomSeed());
         res.setTotalSets(exam.getTotalSets());
+        res.setQuestionCorrectionPolicy(exam.getQuestionCorrectionPolicy());
         if (examBlueprintRepository != null) {
             List<ExamBlueprint> blueprints = examBlueprintRepository.findByExamIdOrderByOrderIndexAsc(exam.getId());
             res.setBlueprints(blueprints.stream()
@@ -673,6 +690,78 @@ public class ExamService {
         if (!isOwner && !isCollaborator) {
             throw new AccessDeniedException("You are not authorized to manage content for course: " + courseId);
         }
+    }
+
+    public QuestionCorrectionPolicyResponse getCorrectionPolicy(User currentUser, Integer examId) {
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new ResourceNotFoundException("Exam not found: " + examId));
+
+        if (currentUser != null && !"admin".equalsIgnoreCase(currentUser.getRole())) {
+            boolean isInstructor = "instructor".equalsIgnoreCase(currentUser.getRole());
+            if (isInstructor) {
+                verifyCourseAssociation(exam.getCourse().getId(), currentUser);
+            } else {
+                if (Boolean.TRUE.equals(exam.getRequireEnrollment())) {
+                    boolean enrolled = enrollmentRepository.existsByStudentIdAndCourseId(currentUser.getId(), exam.getCourse().getId());
+                    if (!enrolled) {
+                        throw new AccessDeniedException("Student is not enrolled in course: " + exam.getCourse().getId());
+                    }
+                }
+            }
+        }
+
+        long attemptCount = examAttemptRepository.countByExamId(examId);
+        boolean isLocked = attemptCount > 0;
+        String message = isLocked
+                ? "Question correction policy is locked because examination attempts have started (DR-ED05)."
+                : "Question correction policy is unlocked and can be modified.";
+
+        return new QuestionCorrectionPolicyResponse(
+                exam.getId(),
+                exam.getTitle(),
+                exam.getQuestionCorrectionPolicy(),
+                isLocked,
+                attemptCount,
+                message
+        );
+    }
+
+    @Transactional
+    public QuestionCorrectionPolicyResponse updateCorrectionPolicy(User currentUser, Integer examId, QuestionCorrectionPolicyRequest request) {
+        validateInstructorOrAdmin(currentUser);
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new ResourceNotFoundException("Exam not found: " + examId));
+        verifyCourseAssociation(exam.getCourse().getId(), currentUser);
+
+        if (request == null || request.getPolicy() == null) {
+            throw new IllegalArgumentException("Question correction policy is required");
+        }
+
+        long attemptCount = examAttemptRepository.countByExamId(examId);
+        boolean isLocked = attemptCount > 0;
+
+        if (isLocked && !request.getPolicy().equals(exam.getQuestionCorrectionPolicy())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Cannot modify question correction policy once attempts have started (DR-ED05). Policy is locked.");
+        }
+
+        exam.setQuestionCorrectionPolicy(request.getPolicy());
+        examRepository.save(exam);
+
+        return new QuestionCorrectionPolicyResponse(
+                exam.getId(),
+                exam.getTitle(),
+                exam.getQuestionCorrectionPolicy(),
+                isLocked,
+                attemptCount,
+                "Question correction policy updated successfully."
+        );
+    }
+
+    public QuestionCorrectionPolicy getCorrectionPolicyForCorrection(Integer examId) {
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new ResourceNotFoundException("Exam not found: " + examId));
+        return exam.getQuestionCorrectionPolicy();
     }
 
     private void validateInstructorOrAdmin(User user) {
