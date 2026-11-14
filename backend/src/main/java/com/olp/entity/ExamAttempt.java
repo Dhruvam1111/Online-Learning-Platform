@@ -84,6 +84,29 @@ public class ExamAttempt {
     @Column(name = "is_locked", nullable = false)
     private Boolean isLocked = false;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "review_status", length = 30, nullable = false)
+    private ExamAttemptReviewStatus reviewStatus = ExamAttemptReviewStatus.NONE;
+
+    @Column(name = "review_notes", columnDefinition = "TEXT")
+    private String reviewNotes;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reviewed_by")
+    private User reviewedBy;
+
+    @Column(name = "reviewed_at")
+    private LocalDateTime reviewedAt;
+
+    @Column(name = "escalated_at")
+    private LocalDateTime escalatedAt;
+
+    @Column(name = "escalation_reason", columnDefinition = "TEXT")
+    private String escalationReason;
+
+    @Column(name = "escalation_recommendation", length = 100)
+    private String escalationRecommendation;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -334,6 +357,62 @@ public class ExamAttempt {
 
     public void setIsLocked(Boolean isLocked) {
         this.isLocked = isLocked != null ? isLocked : false;
+    }
+
+    public ExamAttemptReviewStatus getReviewStatus() {
+        return reviewStatus != null ? reviewStatus : ExamAttemptReviewStatus.NONE;
+    }
+
+    public void setReviewStatus(ExamAttemptReviewStatus reviewStatus) {
+        this.reviewStatus = reviewStatus != null ? reviewStatus : ExamAttemptReviewStatus.NONE;
+    }
+
+    public String getReviewNotes() {
+        return reviewNotes;
+    }
+
+    public void setReviewNotes(String reviewNotes) {
+        this.reviewNotes = reviewNotes;
+    }
+
+    public User getReviewedBy() {
+        return reviewedBy;
+    }
+
+    public void setReviewedBy(User reviewedBy) {
+        this.reviewedBy = reviewedBy;
+    }
+
+    public LocalDateTime getReviewedAt() {
+        return reviewedAt;
+    }
+
+    public void setReviewedAt(LocalDateTime reviewedAt) {
+        this.reviewedAt = reviewedAt;
+    }
+
+    public LocalDateTime getEscalatedAt() {
+        return escalatedAt;
+    }
+
+    public void setEscalatedAt(LocalDateTime escalatedAt) {
+        this.escalatedAt = escalatedAt;
+    }
+
+    public String getEscalationReason() {
+        return escalationReason;
+    }
+
+    public void setEscalationReason(String escalationReason) {
+        this.escalationReason = escalationReason;
+    }
+
+    public String getEscalationRecommendation() {
+        return escalationRecommendation;
+    }
+
+    public void setEscalationRecommendation(String escalationRecommendation) {
+        this.escalationRecommendation = escalationRecommendation;
     }
 }
 
