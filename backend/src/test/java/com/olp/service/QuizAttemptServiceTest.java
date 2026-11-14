@@ -479,4 +479,82 @@ class QuizAttemptServiceTest {
                 assertEquals("Great explanation!", result.getFeedback());
                 assertFalse(result.isRequiresManualGrading());
         }
+
+        @Test
+        void testGetAttemptEvaluation_StudentCannotSeeFeedbackWhenFeedbackReleasedIsFalse() {
+                publishedQuiz.setFeedbackReleased(false);
+                QuizAttempt submitted = new QuizAttempt(
+                                publishedQuiz, enrolledStudent, 1, baseTime, baseTime.plusMinutes(30));
+                submitted.setId(804);
+                submitted.setStatus(QuizAttemptStatus.SUBMITTED);
+                submitted.setIsPublished(true);
+                submitted.setOverallFeedback("Overall great job!");
+
+                when(quizAttemptRepository.findByIdAndQuizId(804, 100)).thenReturn(Optional.of(submitted));
+
+                Question descQ = new Question(
+                                course, instructor, "Explain polymorphism", QuestionType.DESCRIPTIVE,
+                                null, null,
+                                new BigDecimal("10.00"), BigDecimal.ZERO, BigDecimal.ZERO, "Rubric", true);
+                descQ.setId(61);
+
+                QuizAttemptAnswer pubAns = new QuizAttemptAnswer(
+                                submitted, descQ, "Student explanation",
+                                new BigDecimal("8.50"), new BigDecimal("10.00"),
+                                EvaluationStatus.PUBLISHED, "Great explanation!", baseTime);
+                pubAns.setId(13);
+
+                when(quizAttemptAnswerRepository.findByAttemptId(804)).thenReturn(List.of(pubAns));
+
+                QuizEvaluationSummary studentSummary = attemptService.getAttemptEvaluation(enrolledStudent, 100, 804);
+
+                assertNotNull(studentSummary);
+                assertFalse(studentSummary.getFeedbackReleased());
+                // When feedbackReleased is false, student should not see answer feedback or overall feedback
+                assertNull(studentSummary.getOverallFeedback());
+                assertEquals(1, studentSummary.getResults().size());
+                assertNull(studentSummary.getResults().get(0).getFeedback());
+        }
+
+        @Test
+        void testGetAttemptEvaluation_StudentCannotSeeOverallFeedbackWhenUnpublished() {
+                publishedQuiz.setFeedbackReleased(true);
+                QuizAttempt submitted = new QuizAttempt(
+                                publishedQuiz, enrolledStudent, 1, baseTime, baseTime.plusMinutes(30));
+                submitted.setId(805);
+                submitted.setStatus(QuizAttemptStatus.SUBMITTED);
+                submitted.setIsPublished(false);
+                submitted.setOverallFeedback("Draft instructor comment");
+
+                when(quizAttemptRepository.findByIdAndQuizId(805, 100)).thenReturn(Optional.of(submitted));
+                when(quizAttemptAnswerRepository.findByAttemptId(805)).thenReturn(List.of());
+
+                QuizEvaluationSummary studentSummary = attemptService.getAttemptEvaluation(enrolledStudent, 100, 805);
+
+                assertNotNull(studentSummary);
+                assertFalse(studentSummary.getResultsPublished());
+                // Unpublished overall feedback must NOT be exposed to student
+                assertNull(studentSummary.getOverallFeedback());
+        }
+
+        @Test
+        void testGetAttemptEvaluation_StudentCanSeeOverallFeedbackWhenPublishedAndFeedbackReleased() {
+                publishedQuiz.setFeedbackReleased(true);
+                QuizAttempt submitted = new QuizAttempt(
+                                publishedQuiz, enrolledStudent, 1, baseTime, baseTime.plusMinutes(30));
+                submitted.setId(806);
+                submitted.setStatus(QuizAttemptStatus.SUBMITTED);
+                submitted.setIsPublished(true);
+                submitted.setOverallFeedback("Excellent performance throughout!");
+
+                when(quizAttemptRepository.findByIdAndQuizId(806, 100)).thenReturn(Optional.of(submitted));
+                when(quizAttemptAnswerRepository.findByAttemptId(806)).thenReturn(List.of());
+
+                QuizEvaluationSummary studentSummary = attemptService.getAttemptEvaluation(enrolledStudent, 100, 806);
+
+                assertNotNull(studentSummary);
+                assertTrue(studentSummary.getResultsPublished());
+                assertTrue(studentSummary.getFeedbackReleased());
+                assertEquals("Excellent performance throughout!", studentSummary.getOverallFeedback());
+        }
 }
