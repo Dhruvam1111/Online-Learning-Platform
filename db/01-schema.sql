@@ -1079,6 +1079,21 @@ CREATE TABLE IF NOT EXISTS result_versions (
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Step 50 / FR-I33: Pending Grading Alerts
+CREATE TABLE IF NOT EXISTS pending_grading_alerts (
+    id SERIAL PRIMARY KEY,
+    instructor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    alert_type VARCHAR(30) NOT NULL,
+    pending_count INTEGER NOT NULL DEFAULT 0,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    sent_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    digest_date DATE,
+    CONSTRAINT uq_grading_alert_digest UNIQUE (instructor_id, course_id, alert_type, digest_date)
+);
+
 
 
 
