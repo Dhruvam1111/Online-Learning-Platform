@@ -19,6 +19,8 @@ public class ExamStartResponse {
     private LocalDateTime expiresAt;
     private Long remainingSeconds;
     private String status;
+    private String setLabel;
+    private Long randomSeed;
     private LocalDateTime serverTime;
     private Integer durationMinutes;
     private BigDecimal totalMarks;
@@ -129,6 +131,22 @@ public class ExamStartResponse {
 
     public void setQuestions(List<ExamQuestionItemDto> questions) {
         this.questions = questions;
+    }
+
+    public String getSetLabel() {
+        return setLabel;
+    }
+
+    public void setSetLabel(String setLabel) {
+        this.setLabel = setLabel;
+    }
+
+    public Long getRandomSeed() {
+        return randomSeed;
+    }
+
+    public void setRandomSeed(Long randomSeed) {
+        this.randomSeed = randomSeed;
     }
 }
 

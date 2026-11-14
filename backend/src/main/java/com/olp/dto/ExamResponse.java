@@ -2,6 +2,7 @@ package com.olp.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Response DTO representing an examination (FR-I25, Step 38).
@@ -27,6 +28,10 @@ public class ExamResponse {
     private Boolean requirePrerequisites;
     private Boolean requireEnrollment;
     private String status;
+    private Boolean isRandomized;
+    private Long randomSeed;
+    private Integer totalSets;
+    private List<ExamBlueprintItemDto> blueprints = new java.util.ArrayList<>();
     private Integer questionCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -225,6 +230,38 @@ public class ExamResponse {
 
     public void setServerTime(LocalDateTime serverTime) {
         this.serverTime = serverTime;
+    }
+
+    public Boolean getIsRandomized() {
+        return isRandomized;
+    }
+
+    public void setIsRandomized(Boolean randomized) {
+        isRandomized = randomized;
+    }
+
+    public Long getRandomSeed() {
+        return randomSeed;
+    }
+
+    public void setRandomSeed(Long randomSeed) {
+        this.randomSeed = randomSeed;
+    }
+
+    public Integer getTotalSets() {
+        return totalSets;
+    }
+
+    public void setTotalSets(Integer totalSets) {
+        this.totalSets = totalSets;
+    }
+
+    public List<ExamBlueprintItemDto> getBlueprints() {
+        return blueprints;
+    }
+
+    public void setBlueprints(List<ExamBlueprintItemDto> blueprints) {
+        this.blueprints = blueprints;
     }
 }
 
