@@ -39,5 +39,11 @@ public interface QuizRepository extends JpaRepository<Quiz, Integer> {
             "AND q.status = :status ORDER BY q.createdAt DESC, q.id DESC")
     List<Quiz> findByAssociatedInstructorIdAndStatus(@Param("instructorId") Integer instructorId,
                                                      @Param("status") QuizStatus status);
+
+    @Query("SELECT q FROM Quiz q WHERE q.course.id = :courseId AND q.negativeMarking = true ORDER BY q.createdAt DESC")
+    List<Quiz> findByCourseIdAndNegativeMarkingTrue(@Param("courseId") Integer courseId);
+
+    @Query("SELECT q FROM Quiz q WHERE q.course.id = :courseId AND q.partialMarking = true ORDER BY q.createdAt DESC")
+    List<Quiz> findByCourseIdAndPartialMarkingTrue(@Param("courseId") Integer courseId);
 }
 

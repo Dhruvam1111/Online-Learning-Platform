@@ -26,5 +26,8 @@ public interface QuizQuestionRepository extends JpaRepository<QuizQuestion, Inte
 
     @Query("SELECT COALESCE(MAX(qq.orderIndex), 0) FROM QuizQuestion qq WHERE qq.quiz.id = :quizId")
     int findMaxOrderIndexByQuizId(@Param("quizId") Integer quizId);
+
+    @Query("SELECT qq FROM QuizQuestion qq JOIN FETCH qq.question WHERE qq.quiz.id = :quizId AND qq.negativeMarks IS NOT NULL AND qq.negativeMarks > 0")
+    List<QuizQuestion> findQuestionsWithNegativeMarksByQuizId(@Param("quizId") Integer quizId);
 }
 
