@@ -206,6 +206,9 @@ CREATE INDEX IF NOT EXISTS idx_exam_attempts_set_label ON exam_attempts(exam_id,
 -- Step 40 / FR-I26: Examination Monitoring Rules Indexes
 CREATE INDEX IF NOT EXISTS idx_exam_monitoring_exam_id ON exam_monitoring_configs(exam_id);
 
+-- Step 41 / FR-I66: Question Correction Policy Indexes
+CREATE INDEX IF NOT EXISTS idx_exams_correction_policy ON exams(question_correction_policy);
+
 
 
 
