@@ -888,6 +888,25 @@ ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS feedback_at TIMESTAMP;
 ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE quiz_attempt_answers ADD COLUMN IF NOT EXISTS feedback_at TIMESTAMP;
 
+-- Step 48 / FR-I32: Override Grades with Justification & Result Versioning (DR-01, DR-ED04)
+CREATE TABLE IF NOT EXISTS grading_result_versions (
+    id SERIAL PRIMARY KEY,
+    attempt_id INTEGER NOT NULL REFERENCES quiz_attempts(id) ON DELETE CASCADE,
+    answer_id INTEGER REFERENCES quiz_attempt_answers(id) ON DELETE CASCADE,
+    version_number INTEGER NOT NULL DEFAULT 1,
+    previous_marks NUMERIC(8,2) NOT NULL,
+    new_marks NUMERIC(8,2) NOT NULL,
+    max_marks NUMERIC(8,2) NOT NULL,
+    justification TEXT NOT NULL,
+    instructor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    status_before VARCHAR(30),
+    status_after VARCHAR(30),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE quiz_attempt_answers ADD COLUMN IF NOT EXISTS is_overridden BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS is_overridden BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- Step 25 / FR-I65: Marking Rules (Negative, Partial, Tolerance)
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS negative_marking BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS partial_marking BOOLEAN NOT NULL DEFAULT FALSE;
