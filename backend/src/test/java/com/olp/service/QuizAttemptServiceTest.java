@@ -1,6 +1,7 @@
 package com.olp.service;
 
 import com.olp.dto.QuestionAnswerSubmission;
+import com.olp.dto.QuestionEvaluationResult;
 import com.olp.dto.QuizAttemptResponse;
 import com.olp.dto.QuizEvaluationSummary;
 import com.olp.dto.QuizSettingsResponse;
@@ -365,5 +366,117 @@ class QuizAttemptServiceTest {
 
                 assertThrows(AccessDeniedException.class,
                                 () -> attemptService.getAttemptEvaluation(unenrolledStudent, 100, 800));
+        }
+
+        @Test
+        void testGetAttemptEvaluation_StudentCannotSeeUnpublishedMarks() {
+                QuizAttempt submitted = new QuizAttempt(
+                                publishedQuiz, enrolledStudent, 1, baseTime, baseTime.plusMinutes(30));
+                submitted.setId(801);
+                submitted.setStatus(QuizAttemptStatus.SUBMITTED);
+                submitted.setObtainedMarks(new BigDecimal("0.00"));
+
+                when(quizAttemptRepository.findByIdAndQuizId(801, 100)).thenReturn(Optional.of(submitted));
+
+                Question descQ = new Question(
+                                course, instructor, "Explain polymorphism", QuestionType.DESCRIPTIVE,
+                                null, null,
+                                new BigDecimal("10.00"), BigDecimal.ZERO, BigDecimal.ZERO, "Rubric", true);
+                descQ.setId(60);
+
+                QuizAttemptAnswer unpubAns = new QuizAttemptAnswer(
+                                submitted, descQ, "Student explanation",
+                                new BigDecimal("8.50"), new BigDecimal("10.00"),
+                                EvaluationStatus.EVALUATED_UNPUBLISHED, "Instructor draft note", baseTime);
+                unpubAns.setId(10);
+
+                when(quizAttemptAnswerRepository.findByAttemptId(801)).thenReturn(List.of(unpubAns));
+
+                QuizEvaluationSummary studentSummary = attemptService.getAttemptEvaluation(enrolledStudent, 100, 801);
+
+                assertNotNull(studentSummary);
+                assertEquals(1, studentSummary.getResults().size());
+                QuestionEvaluationResult result = studentSummary.getResults().get(0);
+
+                // Student must NOT see unpublished marks or feedback (FR-I30 Requirement 3)
+                assertEquals(EvaluationStatus.MANUAL_GRADING_REQUIRED, result.getStatus());
+                assertEquals(BigDecimal.ZERO, result.getAwardedMarks());
+                assertNull(result.getFeedback());
+                assertTrue(result.isRequiresManualGrading());
+                assertEquals(1, studentSummary.getManualGradingCount());
+        }
+
+        @Test
+        void testGetAttemptEvaluation_InstructorCanSeeUnpublishedMarks() {
+                QuizAttempt submitted = new QuizAttempt(
+                                publishedQuiz, enrolledStudent, 1, baseTime, baseTime.plusMinutes(30));
+                submitted.setId(802);
+                submitted.setStatus(QuizAttemptStatus.SUBMITTED);
+                submitted.setObtainedMarks(new BigDecimal("0.00"));
+
+                when(quizAttemptRepository.findByIdAndQuizId(802, 100)).thenReturn(Optional.of(submitted));
+
+                Question descQ = new Question(
+                                course, instructor, "Explain polymorphism", QuestionType.DESCRIPTIVE,
+                                null, null,
+                                new BigDecimal("10.00"), BigDecimal.ZERO, BigDecimal.ZERO, "Rubric", true);
+                descQ.setId(60);
+
+                QuizAttemptAnswer unpubAns = new QuizAttemptAnswer(
+                                submitted, descQ, "Student explanation",
+                                new BigDecimal("8.50"), new BigDecimal("10.00"),
+                                EvaluationStatus.EVALUATED_UNPUBLISHED, "Instructor draft note", baseTime);
+                unpubAns.setId(11);
+
+                when(quizAttemptAnswerRepository.findByAttemptId(802)).thenReturn(List.of(unpubAns));
+                when(courseRepository.findById(10)).thenReturn(Optional.of(course));
+
+                QuizEvaluationSummary instructorSummary = attemptService.getAttemptEvaluation(instructor, 100, 802);
+
+                assertNotNull(instructorSummary);
+                assertEquals(1, instructorSummary.getResults().size());
+                QuestionEvaluationResult result = instructorSummary.getResults().get(0);
+
+                // Instructor CAN see unpublished marks and feedback
+                assertEquals(EvaluationStatus.EVALUATED_UNPUBLISHED, result.getStatus());
+                assertEquals(new BigDecimal("8.50"), result.getAwardedMarks());
+                assertEquals("Instructor draft note", result.getFeedback());
+        }
+
+        @Test
+        void testGetAttemptEvaluation_StudentCanSeePublishedMarks() {
+                QuizAttempt submitted = new QuizAttempt(
+                                publishedQuiz, enrolledStudent, 1, baseTime, baseTime.plusMinutes(30));
+                submitted.setId(803);
+                submitted.setStatus(QuizAttemptStatus.SUBMITTED);
+                submitted.setObtainedMarks(new BigDecimal("8.50"));
+
+                when(quizAttemptRepository.findByIdAndQuizId(803, 100)).thenReturn(Optional.of(submitted));
+
+                Question descQ = new Question(
+                                course, instructor, "Explain polymorphism", QuestionType.DESCRIPTIVE,
+                                null, null,
+                                new BigDecimal("10.00"), BigDecimal.ZERO, BigDecimal.ZERO, "Rubric", true);
+                descQ.setId(60);
+
+                QuizAttemptAnswer pubAns = new QuizAttemptAnswer(
+                                submitted, descQ, "Student explanation",
+                                new BigDecimal("8.50"), new BigDecimal("10.00"),
+                                EvaluationStatus.PUBLISHED, "Great explanation!", baseTime);
+                pubAns.setId(12);
+
+                when(quizAttemptAnswerRepository.findByAttemptId(803)).thenReturn(List.of(pubAns));
+
+                QuizEvaluationSummary studentSummary = attemptService.getAttemptEvaluation(enrolledStudent, 100, 803);
+
+                assertNotNull(studentSummary);
+                assertEquals(1, studentSummary.getResults().size());
+                QuestionEvaluationResult result = studentSummary.getResults().get(0);
+
+                // Published marks and feedback ARE visible to students
+                assertEquals(EvaluationStatus.PUBLISHED, result.getStatus());
+                assertEquals(new BigDecimal("8.50"), result.getAwardedMarks());
+                assertEquals("Great explanation!", result.getFeedback());
+                assertFalse(result.isRequiresManualGrading());
         }
 }

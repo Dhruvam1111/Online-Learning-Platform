@@ -49,6 +49,10 @@ public class QuizAttemptAnswer {
     @Column(name = "evaluated_at")
     private LocalDateTime evaluatedAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "grader_id")
+    private User grader;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -165,6 +169,14 @@ public class QuizAttemptAnswer {
 
     public void setEvaluatedAt(LocalDateTime evaluatedAt) {
         this.evaluatedAt = evaluatedAt;
+    }
+
+    public User getGrader() {
+        return grader;
+    }
+
+    public void setGrader(User grader) {
+        this.grader = grader;
     }
 
     public LocalDateTime getCreatedAt() {
