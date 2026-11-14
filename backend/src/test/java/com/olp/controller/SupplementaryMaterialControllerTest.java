@@ -19,6 +19,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -69,8 +70,8 @@ class SupplementaryMaterialControllerTest {
 
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getId());
-        assertFalse(response.getBody().getIsDownloadable());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).getId());
+        assertFalse(Objects.requireNonNull(response.getBody()).getIsDownloadable());
         verify(materialService, times(1)).uploadMaterial(instructor, 400, null, null, "Lesson Slides", file);
     }
 
@@ -85,8 +86,8 @@ class SupplementaryMaterialControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().size());
-        assertEquals(1, response.getBody().get(0).getId());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).size());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).get(0).getId());
     }
 
     @Test
@@ -102,7 +103,7 @@ class SupplementaryMaterialControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().size());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).size());
     }
 
     @Test
@@ -115,7 +116,7 @@ class SupplementaryMaterialControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(3, response.getBody().getId());
+        assertEquals(3, Objects.requireNonNull(response.getBody()).getId());
     }
 
     @Test
@@ -129,9 +130,9 @@ class SupplementaryMaterialControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertTrue(response.getBody().isDeleted());
-        assertFalse(response.getBody().isSoftDeleted());
-        assertFalse(response.getBody().isCriteriaWarning());
+        assertTrue(Objects.requireNonNull(response.getBody()).isDeleted());
+        assertFalse(Objects.requireNonNull(response.getBody()).isSoftDeleted());
+        assertFalse(Objects.requireNonNull(response.getBody()).isCriteriaWarning());
         verify(materialService, times(1)).removeMaterial(instructor, 4);
     }
 
@@ -149,9 +150,9 @@ class SupplementaryMaterialControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertTrue(response.getBody().isDeleted());
-        assertTrue(response.getBody().isSoftDeleted());
-        assertNotNull(response.getBody().getWarning());
+        assertTrue(Objects.requireNonNull(response.getBody()).isDeleted());
+        assertTrue(Objects.requireNonNull(response.getBody()).isSoftDeleted());
+        assertNotNull(Objects.requireNonNull(response.getBody()).getWarning());
         verify(materialService, times(1)).removeMaterial(instructor, 5);
     }
 
@@ -174,9 +175,9 @@ class SupplementaryMaterialControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(3, response.getBody().size());
-        assertEquals(3, response.getBody().get(0).getId());
-        assertEquals(1, response.getBody().get(0).getOrderIndex());
+        assertEquals(3, Objects.requireNonNull(response.getBody()).size());
+        assertEquals(3, Objects.requireNonNull(response.getBody()).get(0).getId());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).get(0).getOrderIndex());
         verify(materialService, times(1)).reorderMaterialsInLesson(instructor, 400, List.of(3, 1, 2));
     }
 
@@ -194,7 +195,7 @@ class SupplementaryMaterialControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals("replacement.pdf", response.getBody().getOriginalFilename());
+        assertEquals("replacement.pdf", Objects.requireNonNull(response.getBody()).getOriginalFilename());
         verify(materialService, times(1)).replaceMaterialFile(instructor, 1, newFile);
     }
 
@@ -211,7 +212,7 @@ class SupplementaryMaterialControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertTrue(response.getBody().getIsDownloadable());
+        assertTrue(Objects.requireNonNull(response.getBody()).getIsDownloadable());
         verify(materialService, times(1)).updateDownloadableStatus(instructor, 3, true);
     }
 
@@ -228,7 +229,7 @@ class SupplementaryMaterialControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertFalse(response.getBody().getIsDownloadable());
+        assertFalse(Objects.requireNonNull(response.getBody()).getIsDownloadable());
         verify(materialService, times(1)).updateDownloadableStatus(instructor, 3, false);
     }
 }

@@ -22,6 +22,7 @@ import org.springframework.security.core.Authentication;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -56,7 +57,7 @@ class StudentLearningControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(MediaType.APPLICATION_PDF, response.getHeaders().getContentType());
-        assertTrue(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION).contains("attachment; filename=\"slides.pdf\""));
+        assertTrue(Objects.requireNonNull(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)).contains("attachment; filename=\"slides.pdf\""));
         assertEquals(resource, response.getBody());
         verify(studentLearningService, times(1)).downloadMaterial(50, 101);
     }
@@ -72,7 +73,7 @@ class StudentLearningControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(MediaType.APPLICATION_PDF, response.getHeaders().getContentType());
-        assertTrue(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION).contains("inline; filename=\"notes.pdf\""));
+        assertTrue(Objects.requireNonNull(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)).contains("inline; filename=\"notes.pdf\""));
         assertEquals(resource, response.getBody());
         verify(studentLearningService, times(1)).viewMaterial(50, 102);
     }
@@ -93,10 +94,10 @@ class StudentLearningControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertFalse(response.getBody().getIsDownloadable());
-        assertTrue(response.getBody().getViewOnly());
-        assertNull(response.getBody().getDownloadUrl(), "No download URL should be exposed for view-only materials");
-        assertEquals("/api/student/learning/materials/102/view", response.getBody().getViewUrl());
+        assertFalse(Objects.requireNonNull(response.getBody()).getIsDownloadable());
+        assertTrue(Objects.requireNonNull(response.getBody()).getViewOnly());
+        assertNull(Objects.requireNonNull(response.getBody()).getDownloadUrl(), "No download URL should be exposed for view-only materials");
+        assertEquals("/api/student/learning/materials/102/view", Objects.requireNonNull(response.getBody()).getViewUrl());
         verify(studentLearningService, times(1)).getMaterialViewerInfo(50, 102);
     }
 
@@ -108,7 +109,7 @@ class StudentLearningControllerTest {
         ResponseEntity<List<LectureMaterialResponse>> response = controller.getLectureMaterials(10, authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(1, response.getBody().size());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).size());
     }
 
     @Test
@@ -119,7 +120,7 @@ class StudentLearningControllerTest {
         ResponseEntity<List<LectureMaterialResponse>> response = controller.getLessonMaterials(20, authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(1, response.getBody().size());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).size());
     }
 
     @Test
@@ -130,6 +131,6 @@ class StudentLearningControllerTest {
         ResponseEntity<List<LectureMaterialResponse>> response = controller.getModuleMaterials(30, authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(1, response.getBody().size());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).size());
     }
 }

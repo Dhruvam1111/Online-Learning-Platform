@@ -32,9 +32,9 @@ import org.springframework.security.core.Authentication;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -105,7 +105,7 @@ class InstructorGradingControllerTest {
         assertEquals(HttpStatus.OK, entity.getStatusCode());
         assertTrue(entity.getBody() instanceof List);
         @SuppressWarnings("unchecked")
-        List<DescriptiveSubmissionResponse> list = (List<DescriptiveSubmissionResponse>) entity.getBody();
+        List<DescriptiveSubmissionResponse> list = (List<DescriptiveSubmissionResponse>) Objects.requireNonNull(entity.getBody());
         assertEquals(1, list.size());
         assertEquals(500, list.get(0).getAnswerId());
     }
@@ -125,7 +125,7 @@ class InstructorGradingControllerTest {
         assertEquals(HttpStatus.OK, entity.getStatusCode());
         assertTrue(entity.getBody() instanceof PageResponse);
         @SuppressWarnings("unchecked")
-        PageResponse<DescriptiveSubmissionResponse> body = (PageResponse<DescriptiveSubmissionResponse>) entity.getBody();
+        PageResponse<DescriptiveSubmissionResponse> body = (PageResponse<DescriptiveSubmissionResponse>) Objects.requireNonNull(entity.getBody());
         assertEquals(1, body.getContent().size());
         assertEquals(500, body.getContent().get(0).getAnswerId());
     }
@@ -144,8 +144,8 @@ class InstructorGradingControllerTest {
 
         assertNotNull(entity);
         assertEquals(HttpStatus.OK, entity.getStatusCode());
-        assertNotNull(entity.getBody());
-        assertEquals(1, entity.getBody().getContent().size());
+        PageResponse<DescriptiveSubmissionResponse> body = Objects.requireNonNull(entity.getBody());
+        assertEquals(1, body.getContent().size());
     }
 
     @Test
@@ -158,9 +158,9 @@ class InstructorGradingControllerTest {
 
         assertNotNull(entity);
         assertEquals(HttpStatus.OK, entity.getStatusCode());
-        assertNotNull(entity.getBody());
-        assertEquals(500, entity.getBody().getAnswerId());
-        assertEquals("Alice Learner", entity.getBody().getStudentName());
+        DescriptiveSubmissionResponse body = Objects.requireNonNull(entity.getBody());
+        assertEquals(500, body.getAnswerId());
+        assertEquals("Alice Learner", body.getStudentName());
     }
 
     @Test
@@ -180,9 +180,9 @@ class InstructorGradingControllerTest {
 
         assertNotNull(entity);
         assertEquals(HttpStatus.OK, entity.getStatusCode());
-        assertNotNull(entity.getBody());
-        assertEquals(BigDecimal.valueOf(17.5), entity.getBody().getSubmission().getAwardedMarks());
-        assertEquals("EVALUATED_UNPUBLISHED", entity.getBody().getSubmission().getEvaluationStatus());
+        GradeSubmissionResponse body = Objects.requireNonNull(entity.getBody());
+        assertEquals(BigDecimal.valueOf(17.5), Objects.requireNonNull(body.getSubmission()).getAwardedMarks());
+        assertEquals("EVALUATED_UNPUBLISHED", Objects.requireNonNull(body.getSubmission()).getEvaluationStatus());
     }
 
     @Test
@@ -197,8 +197,8 @@ class InstructorGradingControllerTest {
 
         assertNotNull(entity);
         assertEquals(HttpStatus.OK, entity.getStatusCode());
-        assertNotNull(entity.getBody());
-        assertEquals(1, entity.getBody().getPublishedCount());
+        PublishResultResponse body = Objects.requireNonNull(entity.getBody());
+        assertEquals(1, body.getPublishedCount());
     }
 
     @Test
@@ -213,8 +213,8 @@ class InstructorGradingControllerTest {
 
         assertNotNull(entity);
         assertEquals(HttpStatus.OK, entity.getStatusCode());
-        assertNotNull(entity.getBody());
-        assertEquals(3, entity.getBody().getPublishedCount());
+        PublishResultResponse body = Objects.requireNonNull(entity.getBody());
+        assertEquals(3, body.getPublishedCount());
     }
 
     @Test
@@ -229,8 +229,8 @@ class InstructorGradingControllerTest {
 
         assertNotNull(entity);
         assertEquals(HttpStatus.OK, entity.getStatusCode());
-        assertNotNull(entity.getBody());
-        assertEquals(1, entity.getBody().getPublishedCount());
+        PublishResultResponse body = Objects.requireNonNull(entity.getBody());
+        assertEquals(1, body.getPublishedCount());
     }
 
     @Test
@@ -249,8 +249,8 @@ class InstructorGradingControllerTest {
 
         assertNotNull(entity);
         assertEquals(HttpStatus.OK, entity.getStatusCode());
-        assertNotNull(entity.getBody());
-        assertEquals("Good point made", entity.getBody().getFeedback());
+        AnswerFeedbackResponse body = Objects.requireNonNull(entity.getBody());
+        assertEquals("Good point made", body.getFeedback());
     }
 
     @Test
@@ -269,8 +269,8 @@ class InstructorGradingControllerTest {
 
         assertNotNull(entity);
         assertEquals(HttpStatus.OK, entity.getStatusCode());
-        assertNotNull(entity.getBody());
-        assertEquals("Great overall test score", entity.getBody().getOverallFeedback());
+        SubmissionFeedbackResponse body = Objects.requireNonNull(entity.getBody());
+        assertEquals("Great overall test score", body.getOverallFeedback());
     }
 
     @Test
@@ -288,8 +288,8 @@ class InstructorGradingControllerTest {
 
         assertNotNull(entity);
         assertEquals(HttpStatus.OK, entity.getStatusCode());
-        assertNotNull(entity.getBody());
-        assertEquals("Detailed feedback comments", entity.getBody().getOverallFeedback());
+        SubmissionFeedbackResponse body = Objects.requireNonNull(entity.getBody());
+        assertEquals("Detailed feedback comments", body.getOverallFeedback());
     }
 
     // =========================================================================
@@ -313,9 +313,9 @@ class InstructorGradingControllerTest {
 
         assertNotNull(entity);
         assertEquals(HttpStatus.OK, entity.getStatusCode());
-        assertNotNull(entity.getBody());
-        assertEquals(BigDecimal.valueOf(18.0), entity.getBody().getNewMarks());
-        assertEquals("Bonus marks awarded for alternative proof", entity.getBody().getJustification());
+        GradeOverrideResponse body = Objects.requireNonNull(entity.getBody());
+        assertEquals(BigDecimal.valueOf(18.0), body.getNewMarks());
+        assertEquals("Bonus marks awarded for alternative proof", body.getJustification());
     }
 
     @Test
@@ -335,8 +335,8 @@ class InstructorGradingControllerTest {
 
         assertNotNull(entity);
         assertEquals(HttpStatus.OK, entity.getStatusCode());
-        assertNotNull(entity.getBody());
-        assertEquals(BigDecimal.valueOf(85.0), entity.getBody().getNewMarks());
+        GradeOverrideResponse body = Objects.requireNonNull(entity.getBody());
+        assertEquals(BigDecimal.valueOf(85.0), body.getNewMarks());
     }
 
     @Test
@@ -355,8 +355,9 @@ class InstructorGradingControllerTest {
 
         assertNotNull(entity);
         assertEquals(HttpStatus.OK, entity.getStatusCode());
-        assertEquals(1, entity.getBody().size());
-        assertEquals(BigDecimal.valueOf(15.0), entity.getBody().get(0).getNewMarks());
+        List<GradingResultVersionResponse> body = Objects.requireNonNull(entity.getBody());
+        assertEquals(1, body.size());
+        assertEquals(BigDecimal.valueOf(15.0), body.get(0).getNewMarks());
     }
 
     @Test
@@ -375,8 +376,9 @@ class InstructorGradingControllerTest {
 
         assertNotNull(entity);
         assertEquals(HttpStatus.OK, entity.getStatusCode());
-        assertEquals(1, entity.getBody().size());
-        assertEquals(BigDecimal.valueOf(80.0), entity.getBody().get(0).getNewMarks());
+        List<GradingResultVersionResponse> body = Objects.requireNonNull(entity.getBody());
+        assertEquals(1, body.size());
+        assertEquals(BigDecimal.valueOf(80.0), body.get(0).getNewMarks());
     }
 
     @Test
@@ -395,6 +397,7 @@ class InstructorGradingControllerTest {
 
         assertNotNull(entity);
         assertEquals(HttpStatus.OK, entity.getStatusCode());
-        assertEquals(BigDecimal.valueOf(17.0), entity.getBody().getNewMarks());
+        GradeOverrideResponse body = Objects.requireNonNull(entity.getBody());
+        assertEquals(BigDecimal.valueOf(17.0), body.getNewMarks());
     }
 }
