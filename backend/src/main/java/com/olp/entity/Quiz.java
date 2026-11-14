@@ -67,6 +67,9 @@ public class Quiz {
     @Column(name = "available_until")
     private LocalDateTime availableUntil;
 
+    @Column(name = "feedback_released", nullable = false)
+    private Boolean feedbackReleased = true;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -243,6 +246,22 @@ public class Quiz {
 
     public void setAvailableUntil(LocalDateTime availableUntil) {
         this.availableUntil = availableUntil;
+    }
+
+    public Boolean getFeedbackReleased() {
+        return feedbackReleased != null ? feedbackReleased : true;
+    }
+
+    public void setFeedbackReleased(Boolean feedbackReleased) {
+        this.feedbackReleased = feedbackReleased != null ? feedbackReleased : true;
+    }
+
+    public Boolean isShowFeedback() {
+        return getFeedbackReleased();
+    }
+
+    public void setShowFeedback(Boolean showFeedback) {
+        setFeedbackReleased(showFeedback);
     }
 
     public LocalDateTime getCreatedAt() {
