@@ -57,5 +57,13 @@ public interface QuestionRepository extends JpaRepository<Question, Integer> {
 
     @Query("SELECT q FROM Question q WHERE (q.id = :rootId OR q.parentQuestion.id = :rootId) AND q.isLatest = true")
     Optional<Question> findLatestVersionByRootId(@Param("rootId") Integer rootId);
+
+    @Query("SELECT q FROM Question q WHERE q.course.id = :courseId " +
+            "AND (:topic IS NULL OR LOWER(q.topic) = LOWER(:topic)) " +
+            "AND (:difficulty IS NULL OR LOWER(q.difficulty) = LOWER(:difficulty)) " +
+            "ORDER BY q.id ASC")
+    List<Question> findByCourseIdAndTopicAndDifficulty(@Param("courseId") Integer courseId,
+                                                      @Param("topic") String topic,
+                                                      @Param("difficulty") String difficulty);
 }
 

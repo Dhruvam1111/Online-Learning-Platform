@@ -16,9 +16,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -39,6 +37,8 @@ public class ExamService {
     private final QuestionRepository questionRepository;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final ExamBlueprintRepository examBlueprintRepository;
+    private final ExamRandomizationService examRandomizationService;
 
     private Clock clock = Clock.systemUTC();
 
@@ -52,7 +52,9 @@ public class ExamService {
                        CourseProgressService courseProgressService,
                        QuestionRepository questionRepository,
                        UserRepository userRepository,
-                       ApplicationEventPublisher eventPublisher) {
+                       ApplicationEventPublisher eventPublisher,
+                       ExamBlueprintRepository examBlueprintRepository,
+                       ExamRandomizationService examRandomizationService) {
         this.examRepository = examRepository;
         this.examQuestionRepository = examQuestionRepository;
         this.examAttemptRepository = examAttemptRepository;
@@ -64,6 +66,25 @@ public class ExamService {
         this.questionRepository = questionRepository;
         this.userRepository = userRepository;
         this.eventPublisher = eventPublisher;
+        this.examBlueprintRepository = examBlueprintRepository;
+        this.examRandomizationService = examRandomizationService;
+    }
+
+    public ExamService(ExamRepository examRepository,
+                       ExamQuestionRepository examQuestionRepository,
+                       ExamAttemptRepository examAttemptRepository,
+                       CourseRepository courseRepository,
+                       CourseInstructorRepository courseInstructorRepository,
+                       EnrollmentRepository enrollmentRepository,
+                       CoursePrerequisiteRepository coursePrerequisiteRepository,
+                       CourseProgressService courseProgressService,
+                       QuestionRepository questionRepository,
+                       UserRepository userRepository,
+                       ApplicationEventPublisher eventPublisher) {
+        this(examRepository, examQuestionRepository, examAttemptRepository,
+                courseRepository, courseInstructorRepository, enrollmentRepository,
+                coursePrerequisiteRepository, courseProgressService, questionRepository,
+                userRepository, eventPublisher, null, null);
     }
 
     public void setClock(Clock clock) {
@@ -142,7 +163,31 @@ public class ExamService {
                 request.getStatus() != null ? request.getStatus().toUpperCase() : "SCHEDULED"
         );
 
+        if (Boolean.TRUE.equals(request.getIsRandomized())) {
+            exam.setIsRandomized(true);
+            exam.setRandomSeed(request.getRandomSeed());
+            if (request.getTotalSets() != null && request.getTotalSets() >= 1) {
+                exam.setTotalSets(request.getTotalSets());
+            }
+        }
+
         Exam saved = examRepository.save(exam);
+
+        // Save blueprints if provided
+        if (request.getBlueprints() != null && !request.getBlueprints().isEmpty() && examBlueprintRepository != null) {
+            int bpOrder = 1;
+            for (ExamBlueprintItemDto bpDto : request.getBlueprints()) {
+                ExamBlueprint bp = new ExamBlueprint(
+                        saved,
+                        trimToNull(bpDto.getTopic()),
+                        trimToNull(bpDto.getDifficulty()),
+                        bpDto.getQuestionCount() != null ? bpDto.getQuestionCount() : 1,
+                        bpDto.getMarksPerQuestion() != null ? bpDto.getMarksPerQuestion() : BigDecimal.ONE,
+                        bpOrder++
+                );
+                examBlueprintRepository.save(bp);
+            }
+        }
 
         // Attach questions from question bank if provided
         if (request.getQuestionIds() != null && !request.getQuestionIds().isEmpty()) {
@@ -459,27 +504,86 @@ public class ExamService {
 
         ExamAttempt attempt = new ExamAttempt(exam, currentUser, nextAttemptNumber, startedAt, expiresAt);
         attempt.setTotalMarks(exam.getMaxMarks());
+
+        // Randomized exam set handling (FR-I27, Step 39)
+        String setLabel = "SET_A";
+        Long attemptSeed = null;
+        List<ExamQuestionItemDto> questionDtos;
+
+        if (Boolean.TRUE.equals(exam.getIsRandomized()) && examRandomizationService != null) {
+            long baseSeed = exam.getRandomSeed() != null ? exam.getRandomSeed() : 42L;
+            attemptSeed = baseSeed + ((long) currentUser.getId() * 10007L) + nextAttemptNumber;
+            int totalSets = Math.max(1, exam.getTotalSets() != null ? exam.getTotalSets() : 1);
+            int variantIdx = Math.abs((int) (attemptSeed % totalSets));
+            setLabel = "SET_" + (char) ('A' + variantIdx);
+
+            List<ExamBlueprint> blueprints = examBlueprintRepository != null
+                    ? examBlueprintRepository.findByExamIdOrderByOrderIndexAsc(exam.getId())
+                    : Collections.emptyList();
+
+            if (!blueprints.isEmpty()) {
+                ExamSetVariantDto variant = examRandomizationService.generateSingleSet(exam, blueprints, setLabel, attemptSeed);
+                questionDtos = variant.getQuestions();
+            } else {
+                List<ExamQuestion> examQuestions = examQuestionRepository.findByExamIdOrderByOrderIndexAsc(exam.getId());
+                List<ExamQuestion> shuffled = new ArrayList<>(examQuestions);
+                Collections.shuffle(shuffled, new Random(attemptSeed));
+                questionDtos = new ArrayList<>();
+                int idx = 1;
+                for (ExamQuestion eq : shuffled) {
+                    Question q = eq.getQuestion();
+                    questionDtos.add(new ExamQuestionItemDto(
+                            eq.getId(), q.getId(), q.getQuestionText(),
+                            q.getQuestionType() != null ? q.getQuestionType().name() : "MULTIPLE_CHOICE",
+                            q.getOptionsJson(), eq.getMarks(), idx++
+                    ));
+                }
+            }
+
+            // Shuffle option order per question
+            Map<String, List<Integer>> shuffleMap = new LinkedHashMap<>();
+            for (ExamQuestionItemDto qDto : questionDtos) {
+                ExamRandomizationService.ShuffledOptionsResult optRes = examRandomizationService.shuffleOptions(
+                        qDto.getOptionsJson(), attemptSeed + qDto.getQuestionId()
+                );
+                qDto.setOptionsJson(optRes.getShuffledJson());
+                if (!optRes.getPermutation().isEmpty()) {
+                    shuffleMap.put(String.valueOf(qDto.getQuestionId()), optRes.getPermutation());
+                }
+            }
+
+            attempt.setSetLabel(setLabel);
+            attempt.setRandomSeed(attemptSeed);
+            attempt.setQuestionOrder(questionDtos.stream().map(q -> String.valueOf(q.getQuestionId())).collect(Collectors.joining(",")));
+            if (!shuffleMap.isEmpty()) {
+                try {
+                    attempt.setOptionShuffleMap(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(shuffleMap));
+                } catch (Exception ignored) {}
+            }
+        } else {
+            List<ExamQuestion> examQuestions = examQuestionRepository.findByExamIdOrderByOrderIndexAsc(exam.getId());
+            questionDtos = examQuestions.stream()
+                    .map(eq -> {
+                        Question q = eq.getQuestion();
+                        return new ExamQuestionItemDto(
+                                eq.getId(),
+                                q.getId(),
+                                q.getQuestionText(),
+                                q.getQuestionType() != null ? q.getQuestionType().name() : "MULTIPLE_CHOICE",
+                                q.getOptionsJson(),
+                                eq.getMarks(),
+                                eq.getOrderIndex()
+                        );
+                    })
+                    .collect(Collectors.toList());
+        }
+
         ExamAttempt savedAttempt = examAttemptRepository.save(attempt);
 
-        return buildExamStartResponse(exam, savedAttempt, serverNow);
+        return buildExamStartResponse(exam, savedAttempt, questionDtos, serverNow);
     }
 
     private ExamStartResponse buildExamStartResponse(Exam exam, ExamAttempt attempt, LocalDateTime serverNow) {
-        ExamStartResponse res = new ExamStartResponse();
-        res.setAttemptId(attempt.getId());
-        res.setExamId(exam.getId());
-        res.setTitle(exam.getTitle());
-        res.setAttemptNumber(attempt.getAttemptNumber());
-        res.setStartedAt(attempt.getStartedAt());
-        res.setExpiresAt(attempt.getExpiresAt());
-        long remaining = Math.max(0, Duration.between(serverNow, attempt.getExpiresAt()).toSeconds());
-        res.setRemainingSeconds(remaining);
-        res.setStatus(attempt.getStatus());
-        res.setServerTime(serverNow);
-        res.setDurationMinutes(exam.getDurationMinutes());
-        res.setTotalMarks(exam.getMaxMarks());
-        res.setInstructions(exam.getInstructions());
-
         List<ExamQuestion> examQuestions = examQuestionRepository.findByExamIdOrderByOrderIndexAsc(exam.getId());
         List<ExamQuestionItemDto> questionDtos = examQuestions.stream()
                 .map(eq -> {
@@ -495,6 +599,26 @@ public class ExamService {
                     );
                 })
                 .collect(Collectors.toList());
+        return buildExamStartResponse(exam, attempt, questionDtos, serverNow);
+    }
+
+    private ExamStartResponse buildExamStartResponse(Exam exam, ExamAttempt attempt, List<ExamQuestionItemDto> questionDtos, LocalDateTime serverNow) {
+        ExamStartResponse res = new ExamStartResponse();
+        res.setAttemptId(attempt.getId());
+        res.setExamId(exam.getId());
+        res.setTitle(exam.getTitle());
+        res.setAttemptNumber(attempt.getAttemptNumber());
+        res.setStartedAt(attempt.getStartedAt());
+        res.setExpiresAt(attempt.getExpiresAt());
+        long remaining = Math.max(0, Duration.between(serverNow, attempt.getExpiresAt()).toSeconds());
+        res.setRemainingSeconds(remaining);
+        res.setStatus(attempt.getStatus());
+        res.setSetLabel(attempt.getSetLabel());
+        res.setRandomSeed(attempt.getRandomSeed());
+        res.setServerTime(serverNow);
+        res.setDurationMinutes(exam.getDurationMinutes());
+        res.setTotalMarks(exam.getMaxMarks());
+        res.setInstructions(exam.getInstructions());
         res.setQuestions(questionDtos);
         return res;
     }
@@ -520,6 +644,15 @@ public class ExamService {
         res.setRequirePrerequisites(exam.getRequirePrerequisites());
         res.setRequireEnrollment(exam.getRequireEnrollment());
         res.setStatus(exam.getStatus());
+        res.setIsRandomized(exam.getIsRandomized());
+        res.setRandomSeed(exam.getRandomSeed());
+        res.setTotalSets(exam.getTotalSets());
+        if (examBlueprintRepository != null) {
+            List<ExamBlueprint> blueprints = examBlueprintRepository.findByExamIdOrderByOrderIndexAsc(exam.getId());
+            res.setBlueprints(blueprints.stream()
+                    .map(b -> new ExamBlueprintItemDto(b.getId(), b.getTopic(), b.getDifficulty(), b.getQuestionCount(), b.getMarksPerQuestion(), b.getOrderIndex()))
+                    .collect(Collectors.toList()));
+        }
         res.setQuestionCount((int) examQuestionRepository.countByExamId(exam.getId()));
         res.setCreatedAt(exam.getCreatedAt());
         res.setUpdatedAt(exam.getUpdatedAt());
