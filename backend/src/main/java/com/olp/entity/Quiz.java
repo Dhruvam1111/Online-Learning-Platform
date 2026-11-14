@@ -79,6 +79,18 @@ public class Quiz {
     @Column(name = "numeric_tolerance", precision = 8, scale = 2)
     private BigDecimal numericTolerance = BigDecimal.ZERO;
 
+    @Column(name = "show_correct_answers", nullable = false)
+    private Boolean showCorrectAnswers = true;
+
+    @Column(name = "show_feedback", nullable = false)
+    private Boolean showFeedback = true;
+
+    @Column(name = "answer_release_timing", nullable = false, length = 30)
+    private String answerReleaseTiming = "IMMEDIATELY";
+
+    @Column(name = "is_exam", nullable = false)
+    private Boolean isExam = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -130,6 +142,30 @@ public class Quiz {
         }
         if (this.numericTolerance == null) {
             this.numericTolerance = BigDecimal.ZERO;
+        }
+        if (this.isExam == null) {
+            this.isExam = false;
+        }
+        if (Boolean.TRUE.equals(this.isExam)) {
+            if (this.showCorrectAnswers == null) {
+                this.showCorrectAnswers = false;
+            }
+            if (this.showFeedback == null) {
+                this.showFeedback = false;
+            }
+            if (this.answerReleaseTiming == null) {
+                this.answerReleaseTiming = "AFTER_DEADLINE";
+            }
+        } else {
+            if (this.showCorrectAnswers == null) {
+                this.showCorrectAnswers = true;
+            }
+            if (this.showFeedback == null) {
+                this.showFeedback = true;
+            }
+            if (this.answerReleaseTiming == null) {
+                this.answerReleaseTiming = "IMMEDIATELY";
+            }
         }
     }
 
@@ -274,14 +310,6 @@ public class Quiz {
         this.feedbackReleased = feedbackReleased != null ? feedbackReleased : true;
     }
 
-    public Boolean isShowFeedback() {
-        return getFeedbackReleased();
-    }
-
-    public void setShowFeedback(Boolean showFeedback) {
-        setFeedbackReleased(showFeedback);
-    }
-
     public Boolean getNegativeMarking() {
         return negativeMarking != null ? negativeMarking : false;
     }
@@ -336,6 +364,92 @@ public class Quiz {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Boolean getShowCorrectAnswers() {
+        return showCorrectAnswers;
+    }
+
+    public void setShowCorrectAnswers(Boolean showCorrectAnswers) {
+        this.showCorrectAnswers = showCorrectAnswers;
+    }
+
+    public Boolean isShowCorrectAnswers() {
+        return Boolean.TRUE.equals(this.showCorrectAnswers);
+    }
+
+    public Boolean getShowFeedback() {
+        return showFeedback;
+    }
+
+    public void setShowFeedback(Boolean showFeedback) {
+        this.showFeedback = showFeedback;
+    }
+
+    public Boolean isShowFeedback() {
+        return Boolean.TRUE.equals(this.showFeedback);
+    }
+
+    public String getAnswerReleaseTiming() {
+        return answerReleaseTiming != null ? answerReleaseTiming : "IMMEDIATELY";
+    }
+
+    public void setAnswerReleaseTiming(String answerReleaseTiming) {
+        this.answerReleaseTiming = answerReleaseTiming;
+    }
+
+    public Boolean getIsExam() {
+        return isExam;
+    }
+
+    public void setIsExam(Boolean exam) {
+        this.isExam = exam;
+    }
+
+    public boolean isExam() {
+        return Boolean.TRUE.equals(this.isExam);
+    }
+
+    /**
+     * Determines whether students are currently permitted to review correct answers (FR-I23, Step 27).
+     * Server-side authority: checks toggle flag, release timing rule, and deadline timestamp in UTC.
+     */
+    public boolean isCorrectAnswersVisible(LocalDateTime atUtc) {
+        if (!Boolean.TRUE.equals(this.showCorrectAnswers)) {
+            return false;
+        }
+        String timing = getAnswerReleaseTiming();
+        if ("NEVER".equalsIgnoreCase(timing)) {
+            return false;
+        }
+        if ("AFTER_DEADLINE".equalsIgnoreCase(timing)) {
+            if (this.availableUntil == null) {
+                return false;
+            }
+            return atUtc != null && !atUtc.isBefore(this.availableUntil);
+        }
+        return true; // IMMEDIATELY
+    }
+
+    /**
+     * Determines whether students are currently permitted to review feedback and explanations (FR-I23, Step 27).
+     * Server-side authority: checks feedback toggle flags, release timing rule, and deadline timestamp in UTC.
+     */
+    public boolean isFeedbackVisible(LocalDateTime atUtc) {
+        if (!Boolean.TRUE.equals(this.feedbackReleased) || !Boolean.TRUE.equals(this.showFeedback)) {
+            return false;
+        }
+        String timing = getAnswerReleaseTiming();
+        if ("NEVER".equalsIgnoreCase(timing)) {
+            return false;
+        }
+        if ("AFTER_DEADLINE".equalsIgnoreCase(timing)) {
+            if (this.availableUntil == null) {
+                return false;
+            }
+            return atUtc != null && !atUtc.isBefore(this.availableUntil);
+        }
+        return true; // IMMEDIATELY
     }
 
     public List<QuizQuestion> getQuizQuestions() {
