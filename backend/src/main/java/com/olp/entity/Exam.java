@@ -92,6 +92,9 @@ public class Exam {
     @OrderBy("orderIndex ASC")
     private List<ExamBlueprint> blueprints = new ArrayList<>();
 
+    @OneToOne(mappedBy = "exam", cascade = CascadeType.ALL, orphanRemoval = true)
+    private ExamMonitoringConfig monitoringConfig;
+
     public Exam() {}
 
     public Exam(Course course, User createdBy, String title, String description, String instructions,
@@ -362,6 +365,14 @@ public class Exam {
 
     public void setBlueprints(List<ExamBlueprint> blueprints) {
         this.blueprints = blueprints;
+    }
+
+    public ExamMonitoringConfig getMonitoringConfig() {
+        return monitoringConfig;
+    }
+
+    public void setMonitoringConfig(ExamMonitoringConfig monitoringConfig) {
+        this.monitoringConfig = monitoringConfig;
     }
 }
 

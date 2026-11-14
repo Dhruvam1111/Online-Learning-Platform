@@ -60,6 +60,21 @@ public class ExamAttempt {
     @Column(name = "option_shuffle_map", columnDefinition = "TEXT")
     private String optionShuffleMap;
 
+    @Column(name = "consent_given", nullable = false)
+    private Boolean consentGiven = false;
+
+    @Column(name = "consent_given_at")
+    private LocalDateTime consentGivenAt;
+
+    @Column(name = "tab_switch_count", nullable = false)
+    private Integer tabSwitchCount = 0;
+
+    @Column(name = "fullscreen_exit_count", nullable = false)
+    private Integer fullscreenExitCount = 0;
+
+    @Column(name = "monitoring_flags", columnDefinition = "TEXT")
+    private String monitoringFlags;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -246,6 +261,46 @@ public class ExamAttempt {
 
     public void setOptionShuffleMap(String optionShuffleMap) {
         this.optionShuffleMap = optionShuffleMap;
+    }
+
+    public Boolean getConsentGiven() {
+        return consentGiven;
+    }
+
+    public void setConsentGiven(Boolean consentGiven) {
+        this.consentGiven = consentGiven != null ? consentGiven : false;
+    }
+
+    public LocalDateTime getConsentGivenAt() {
+        return consentGivenAt;
+    }
+
+    public void setConsentGivenAt(LocalDateTime consentGivenAt) {
+        this.consentGivenAt = consentGivenAt;
+    }
+
+    public Integer getTabSwitchCount() {
+        return tabSwitchCount;
+    }
+
+    public void setTabSwitchCount(Integer tabSwitchCount) {
+        this.tabSwitchCount = tabSwitchCount != null ? tabSwitchCount : 0;
+    }
+
+    public Integer getFullscreenExitCount() {
+        return fullscreenExitCount;
+    }
+
+    public void setFullscreenExitCount(Integer fullscreenExitCount) {
+        this.fullscreenExitCount = fullscreenExitCount != null ? fullscreenExitCount : 0;
+    }
+
+    public String getMonitoringFlags() {
+        return monitoringFlags;
+    }
+
+    public void setMonitoringFlags(String monitoringFlags) {
+        this.monitoringFlags = monitoringFlags;
     }
 }
 
