@@ -48,6 +48,18 @@ public class ExamAttempt {
     @Column(name = "obtained_marks", precision = 8, scale = 2)
     private BigDecimal obtainedMarks;
 
+    @Column(name = "set_label", length = 50)
+    private String setLabel;
+
+    @Column(name = "random_seed")
+    private Long randomSeed;
+
+    @Column(name = "question_order", columnDefinition = "TEXT")
+    private String questionOrder;
+
+    @Column(name = "option_shuffle_map", columnDefinition = "TEXT")
+    private String optionShuffleMap;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -202,6 +214,38 @@ public class ExamAttempt {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getSetLabel() {
+        return setLabel;
+    }
+
+    public void setSetLabel(String setLabel) {
+        this.setLabel = setLabel;
+    }
+
+    public Long getRandomSeed() {
+        return randomSeed;
+    }
+
+    public void setRandomSeed(Long randomSeed) {
+        this.randomSeed = randomSeed;
+    }
+
+    public String getQuestionOrder() {
+        return questionOrder;
+    }
+
+    public void setQuestionOrder(String questionOrder) {
+        this.questionOrder = questionOrder;
+    }
+
+    public String getOptionShuffleMap() {
+        return optionShuffleMap;
+    }
+
+    public void setOptionShuffleMap(String optionShuffleMap) {
+        this.optionShuffleMap = optionShuffleMap;
     }
 }
 

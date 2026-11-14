@@ -59,6 +59,14 @@ public class ExamCreateRequest {
 
     private String status = "SCHEDULED";
 
+    private Boolean isRandomized = false;
+
+    private Long randomSeed;
+
+    private Integer totalSets = 1;
+
+    private List<ExamBlueprintItemDto> blueprints = new ArrayList<>();
+
     private List<Integer> questionIds = new ArrayList<>();
 
     public ExamCreateRequest() {}
@@ -189,6 +197,38 @@ public class ExamCreateRequest {
 
     public void setQuestionIds(List<Integer> questionIds) {
         this.questionIds = questionIds != null ? questionIds : new ArrayList<>();
+    }
+
+    public Boolean getIsRandomized() {
+        return isRandomized;
+    }
+
+    public void setIsRandomized(Boolean randomized) {
+        isRandomized = randomized;
+    }
+
+    public Long getRandomSeed() {
+        return randomSeed;
+    }
+
+    public void setRandomSeed(Long randomSeed) {
+        this.randomSeed = randomSeed;
+    }
+
+    public Integer getTotalSets() {
+        return totalSets;
+    }
+
+    public void setTotalSets(Integer totalSets) {
+        this.totalSets = totalSets;
+    }
+
+    public List<ExamBlueprintItemDto> getBlueprints() {
+        return blueprints;
+    }
+
+    public void setBlueprints(List<ExamBlueprintItemDto> blueprints) {
+        this.blueprints = blueprints;
     }
 }
 

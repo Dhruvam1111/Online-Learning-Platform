@@ -48,6 +48,12 @@ public class ExamUpdateRequest {
 
     private String status;
 
+    private Boolean isRandomized;
+
+    private Long randomSeed;
+
+    private Integer totalSets;
+
     public ExamUpdateRequest() {}
 
     public String getTitle() {
@@ -160,6 +166,30 @@ public class ExamUpdateRequest {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public Boolean getIsRandomized() {
+        return isRandomized;
+    }
+
+    public void setIsRandomized(Boolean randomized) {
+        isRandomized = randomized;
+    }
+
+    public Long getRandomSeed() {
+        return randomSeed;
+    }
+
+    public void setRandomSeed(Long randomSeed) {
+        this.randomSeed = randomSeed;
+    }
+
+    public Integer getTotalSets() {
+        return totalSets;
+    }
+
+    public void setTotalSets(Integer totalSets) {
+        this.totalSets = totalSets;
     }
 }
 

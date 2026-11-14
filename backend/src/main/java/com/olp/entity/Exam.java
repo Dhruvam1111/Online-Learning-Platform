@@ -69,6 +69,15 @@ public class Exam {
     @Column(name = "status", length = 30, nullable = false)
     private String status = "SCHEDULED";
 
+    @Column(name = "is_randomized", nullable = false)
+    private Boolean isRandomized = false;
+
+    @Column(name = "random_seed")
+    private Long randomSeed;
+
+    @Column(name = "total_sets", nullable = false)
+    private Integer totalSets = 1;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -78,6 +87,10 @@ public class Exam {
     @OneToMany(mappedBy = "exam", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("orderIndex ASC")
     private List<ExamQuestion> examQuestions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "exam", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("orderIndex ASC")
+    private List<ExamBlueprint> blueprints = new ArrayList<>();
 
     public Exam() {}
 
@@ -317,6 +330,38 @@ public class Exam {
 
     public void setExamQuestions(List<ExamQuestion> examQuestions) {
         this.examQuestions = examQuestions;
+    }
+
+    public Boolean getIsRandomized() {
+        return isRandomized;
+    }
+
+    public void setIsRandomized(Boolean randomized) {
+        isRandomized = randomized != null ? randomized : false;
+    }
+
+    public Long getRandomSeed() {
+        return randomSeed;
+    }
+
+    public void setRandomSeed(Long randomSeed) {
+        this.randomSeed = randomSeed;
+    }
+
+    public Integer getTotalSets() {
+        return totalSets;
+    }
+
+    public void setTotalSets(Integer totalSets) {
+        this.totalSets = totalSets != null ? totalSets : 1;
+    }
+
+    public List<ExamBlueprint> getBlueprints() {
+        return blueprints;
+    }
+
+    public void setBlueprints(List<ExamBlueprint> blueprints) {
+        this.blueprints = blueprints;
     }
 }
 

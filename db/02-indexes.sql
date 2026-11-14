@@ -199,6 +199,11 @@ CREATE INDEX IF NOT EXISTS idx_exam_questions_exam_id ON exam_questions(exam_id)
 CREATE INDEX IF NOT EXISTS idx_exam_attempts_exam_student ON exam_attempts(exam_id, student_id);
 CREATE INDEX IF NOT EXISTS idx_exam_attempts_status ON exam_attempts(status);
 
+-- Step 39 / FR-I27: Randomised Exam Sets Indexes
+CREATE INDEX IF NOT EXISTS idx_exam_blueprints_exam_id ON exam_blueprints(exam_id);
+CREATE INDEX IF NOT EXISTS idx_exam_attempts_set_label ON exam_attempts(exam_id, set_label);
+
+
 
 
 

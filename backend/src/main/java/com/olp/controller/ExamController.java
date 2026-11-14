@@ -21,9 +21,12 @@ import java.util.List;
 public class ExamController {
 
     private final ExamService examService;
+    private final com.olp.service.ExamRandomizationService examRandomizationService;
 
-    public ExamController(ExamService examService) {
+    public ExamController(ExamService examService,
+                          com.olp.service.ExamRandomizationService examRandomizationService) {
         this.examService = examService;
+        this.examRandomizationService = examRandomizationService;
     }
 
     // =========================================================================
@@ -59,6 +62,51 @@ public class ExamController {
             Authentication authentication) {
         User currentUser = examService.resolveUser(authentication);
         List<ExamQuestionItemDto> response = examService.linkQuestionsToExam(currentUser, examId, questionIds);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping({"/instructor/exams/{examId}/blueprint", "/exams/{examId}/blueprint"})
+    @PreAuthorize("hasRole('instructor') or hasRole('admin')")
+    public ResponseEntity<List<ExamBlueprintItemDto>> configureBlueprint(
+            @PathVariable Integer examId,
+            @Valid @RequestBody ExamBlueprintRequest request,
+            Authentication authentication) {
+        User currentUser = examService.resolveUser(authentication);
+        List<ExamBlueprintItemDto> response = examRandomizationService.configureBlueprint(currentUser, examId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping({"/instructor/exams/{examId}/blueprint", "/exams/{examId}/blueprint"})
+    @PreAuthorize("hasRole('instructor') or hasRole('admin')")
+    public ResponseEntity<List<ExamBlueprintItemDto>> getBlueprint(
+            @PathVariable Integer examId,
+            Authentication authentication) {
+        User currentUser = examService.resolveUser(authentication);
+        List<ExamBlueprintItemDto> response = examRandomizationService.getBlueprint(currentUser, examId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping({"/instructor/exams/{examId}/preview-sets", "/exams/{examId}/preview-sets"})
+    @PreAuthorize("hasRole('instructor') or hasRole('admin')")
+    public ResponseEntity<ExamSetGenerationResponse> previewExamSets(
+            @PathVariable Integer examId,
+            @RequestParam(required = false) Long seed,
+            @RequestParam(required = false) Integer numSets,
+            Authentication authentication) {
+        User currentUser = examService.resolveUser(authentication);
+        ExamSetGenerationResponse response = examRandomizationService.previewExamSets(currentUser, examId, seed, numSets);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/exams/{examId}/sets")
+    @PreAuthorize("hasRole('instructor') or hasRole('admin')")
+    public ResponseEntity<ExamSetGenerationResponse> getExamSets(
+            @PathVariable Integer examId,
+            @RequestParam(required = false) Long seed,
+            @RequestParam(required = false) Integer numSets,
+            Authentication authentication) {
+        User currentUser = examService.resolveUser(authentication);
+        ExamSetGenerationResponse response = examRandomizationService.previewExamSets(currentUser, examId, seed, numSets);
         return ResponseEntity.ok(response);
     }
 

@@ -1012,6 +1012,28 @@ CREATE TABLE IF NOT EXISTS exam_attempts (
     CONSTRAINT uq_exam_student_attempt UNIQUE (exam_id, student_id, attempt_number)
 );
 
+-- Step 39 / FR-I27: Randomised Exam Sets
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS is_randomized BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS random_seed BIGINT;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS total_sets INTEGER NOT NULL DEFAULT 1;
+
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS set_label VARCHAR(50);
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS random_seed BIGINT;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS question_order TEXT;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS option_shuffle_map TEXT;
+
+CREATE TABLE IF NOT EXISTS exam_blueprints (
+    id SERIAL PRIMARY KEY,
+    exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    topic VARCHAR(100),
+    difficulty VARCHAR(30),
+    question_count INTEGER NOT NULL DEFAULT 1,
+    marks_per_question NUMERIC(8, 2) NOT NULL DEFAULT 1.00,
+    order_index INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+
 
 
 
