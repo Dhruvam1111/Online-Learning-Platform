@@ -63,7 +63,7 @@ public class ScheduledReleaseResponse {
 
         ZonedDateTime zdt = this.releaseAt.atZone(ZoneOffset.UTC).withZoneSameInstant(zoneId);
         String shortLabel = zoneId.getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
-        if ("UTC".equalsIgnoreCase(zoneId.getId())) {
+        if ("UTC".equalsIgnoreCase(zoneId.getId()) || "Z".equalsIgnoreCase(zoneId.getId())) {
             shortLabel = "UTC";
         } else if ("Asia/Kolkata".equalsIgnoreCase(zoneId.getId()) || "Asia/Calcutta".equalsIgnoreCase(zoneId.getId())) {
             shortLabel = "IST";
