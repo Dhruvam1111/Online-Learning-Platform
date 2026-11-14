@@ -32,5 +32,14 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, Intege
 
     @Query("SELECT ea FROM ExamAttempt ea WHERE ea.exam.id = :examId AND ea.student.id = :studentId AND ea.status = 'IN_PROGRESS' ORDER BY ea.id DESC")
     List<ExamAttempt> findActiveAttempts(@Param("examId") Integer examId, @Param("studentId") Integer studentId);
+
+    @Query("SELECT ea FROM ExamAttempt ea WHERE ea.exam.id = :examId")
+    List<ExamAttempt> findByExamId(@Param("examId") Integer examId);
+
+    @Query("SELECT COUNT(ea) FROM ExamAttempt ea WHERE ea.exam.id = :examId AND ea.status != 'GRADED'")
+    long countUngradedByExamId(@Param("examId") Integer examId);
+
+    @Query("SELECT COUNT(ea) FROM ExamAttempt ea WHERE ea.exam.id = :examId AND ea.status = 'GRADED'")
+    long countGradedByExamId(@Param("examId") Integer examId);
 }
 

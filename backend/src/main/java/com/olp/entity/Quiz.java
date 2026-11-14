@@ -91,6 +91,15 @@ public class Quiz {
     @Column(name = "is_exam", nullable = false)
     private Boolean isExam = false;
 
+    @Column(name = "results_published", nullable = false)
+    private Boolean resultsPublished = false;
+
+    @Column(name = "results_published_at")
+    private LocalDateTime resultsPublishedAt;
+
+    @Column(name = "results_withheld", nullable = false)
+    private Boolean resultsWithheld = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -458,6 +467,30 @@ public class Quiz {
 
     public void setQuizQuestions(List<QuizQuestion> quizQuestions) {
         this.quizQuestions = quizQuestions;
+    }
+
+    public Boolean getResultsPublished() {
+        return resultsPublished != null ? resultsPublished : false;
+    }
+
+    public void setResultsPublished(Boolean resultsPublished) {
+        this.resultsPublished = resultsPublished != null ? resultsPublished : false;
+    }
+
+    public LocalDateTime getResultsPublishedAt() {
+        return resultsPublishedAt;
+    }
+
+    public void setResultsPublishedAt(LocalDateTime resultsPublishedAt) {
+        this.resultsPublishedAt = resultsPublishedAt;
+    }
+
+    public Boolean getResultsWithheld() {
+        return resultsWithheld != null ? resultsWithheld : false;
+    }
+
+    public void setResultsWithheld(Boolean resultsWithheld) {
+        this.resultsWithheld = resultsWithheld != null ? resultsWithheld : false;
     }
 }
 

@@ -75,6 +75,15 @@ public class ExamAttempt {
     @Column(name = "monitoring_flags", columnDefinition = "TEXT")
     private String monitoringFlags;
 
+    @Column(name = "is_published", nullable = false)
+    private Boolean isPublished = false;
+
+    @Column(name = "published_at")
+    private LocalDateTime publishedAt;
+
+    @Column(name = "is_locked", nullable = false)
+    private Boolean isLocked = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -301,6 +310,30 @@ public class ExamAttempt {
 
     public void setMonitoringFlags(String monitoringFlags) {
         this.monitoringFlags = monitoringFlags;
+    }
+
+    public Boolean getIsPublished() {
+        return isPublished != null ? isPublished : false;
+    }
+
+    public void setIsPublished(Boolean isPublished) {
+        this.isPublished = isPublished != null ? isPublished : false;
+    }
+
+    public LocalDateTime getPublishedAt() {
+        return publishedAt;
+    }
+
+    public void setPublishedAt(LocalDateTime publishedAt) {
+        this.publishedAt = publishedAt;
+    }
+
+    public Boolean getIsLocked() {
+        return isLocked != null ? isLocked : false;
+    }
+
+    public void setIsLocked(Boolean isLocked) {
+        this.isLocked = isLocked != null ? isLocked : false;
     }
 }
 
