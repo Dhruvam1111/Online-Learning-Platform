@@ -339,7 +339,7 @@ public class AssignmentService {
         AssignmentSubmission submission = assignmentSubmissionRepository
                 .findByAssignmentIdAndStudentId(assignmentId, currentUser.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("No submission found for assignment id: " + assignmentId));
-        return mapToSubmissionResponse(submission);
+        return mapToSubmissionResponseForStudent(submission);
     }
 
     @Transactional(readOnly = true)
@@ -362,6 +362,10 @@ public class AssignmentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Submission not found with id: " + submissionId));
         Assignment assignment = submission.getAssignment();
         verifyCourseAssociation(assignment.getCourse().getId(), currentUser);
+
+        if (Boolean.TRUE.equals(submission.getIsLocked()) || Boolean.TRUE.equals(assignment.getResultsPublished())) {
+            throw new IllegalStateException("Cannot modify graded results: assignment results have been published and locked (DR-01)");
+        }
 
         if (awardedMarks == null || awardedMarks.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("Awarded marks cannot be negative");
@@ -532,6 +536,21 @@ public class AssignmentService {
         response.setGradedAt(submission.getGradedAt());
         response.setCreatedAt(submission.getCreatedAt());
         response.setUpdatedAt(submission.getUpdatedAt());
+        return response;
+    }
+
+    public AssignmentSubmissionResponse mapToSubmissionResponseForStudent(AssignmentSubmission submission) {
+        AssignmentSubmissionResponse response = mapToSubmissionResponse(submission);
+        Assignment assignment = submission.getAssignment();
+        boolean resultsWithheld = assignment != null && Boolean.TRUE.equals(assignment.getResultsWithheld());
+        boolean resultsPublished = assignment != null && Boolean.TRUE.equals(assignment.getResultsPublished());
+        boolean submissionPublished = Boolean.TRUE.equals(submission.getIsPublished());
+
+        if (resultsWithheld || (!resultsPublished && !submissionPublished)) {
+            response.setAwardedMarks(null);
+            response.setEffectiveMarks(null);
+            response.setFeedback(null);
+        }
         return response;
     }
 }

@@ -300,10 +300,11 @@ public class QuizAttemptService {
                 : List.of();
 
         boolean feedbackEnabled = quiz.getFeedbackReleased() == null || quiz.getFeedbackReleased();
-        boolean attemptPublished = Boolean.TRUE.equals(attempt.getIsPublished());
+        boolean resultsWithheld = Boolean.TRUE.equals(quiz.getResultsWithheld());
+        boolean attemptPublished = Boolean.TRUE.equals(attempt.getIsPublished()) && !resultsWithheld;
         LocalDateTime serverNow = LocalDateTime.now(clock);
-        boolean answersVisible = !isStudent || quiz.isCorrectAnswersVisible(serverNow);
-        boolean feedbackAllowedByQuiz = !isStudent || quiz.isFeedbackVisible(serverNow);
+        boolean answersVisible = !isStudent || (quiz.isCorrectAnswersVisible(serverNow) && !resultsWithheld);
+        boolean feedbackAllowedByQuiz = !isStudent || (quiz.isFeedbackVisible(serverNow) && !resultsWithheld);
         boolean overallFeedbackVisible = !isStudent || (feedbackAllowedByQuiz && attemptPublished);
 
         QuizEvaluationSummary summary = new QuizEvaluationSummary();
@@ -354,7 +355,10 @@ public class QuizAttemptService {
             // Result & Feedback Visibility (FR-I30 Requirement 3, FR-I31 Requirement 3, FR-I23):
             // Graded marks and feedback must remain unpublished and invisible to students until explicitly published.
             if (isStudent) {
-                if (status == EvaluationStatus.EVALUATED_UNPUBLISHED) {
+                if (resultsWithheld) {
+                    marks = BigDecimal.ZERO;
+                    feedback = null;
+                } else if (status == EvaluationStatus.EVALUATED_UNPUBLISHED) {
                     status = EvaluationStatus.MANUAL_GRADING_REQUIRED;
                     marks = BigDecimal.ZERO;
                     feedback = null;
@@ -413,7 +417,10 @@ public class QuizAttemptService {
         summary.setUnansweredCount(unanswered);
         summary.setResults(results);
 
-        if (summary.getPassingMarks() != null) {
+        if (isStudent && resultsWithheld) {
+            summary.setTotalAwardedMarks(null);
+            summary.setPassed(null);
+        } else if (summary.getPassingMarks() != null) {
             summary.setPassed(totalAwarded.compareTo(summary.getPassingMarks()) >= 0);
         }
 
