@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,5 +39,14 @@ public interface AssignmentSubmissionRepository extends JpaRepository<Assignment
     boolean existsByAssignmentIdAndStudentId(
             @Param("assignmentId") Integer assignmentId,
             @Param("studentId") Integer studentId);
+
+    @Query("SELECT COUNT(s) FROM AssignmentSubmission s WHERE s.assignment.course.id IN :courseIds AND s.gradingStatus = 'PENDING'")
+    long countPendingByCourseIds(@Param("courseIds") Collection<Integer> courseIds);
+
+    @Query("SELECT COUNT(s) FROM AssignmentSubmission s WHERE s.assignment.course.id = :courseId AND s.gradingStatus = 'PENDING'")
+    long countPendingByCourseId(@Param("courseId") Integer courseId);
+
+    @Query("SELECT s FROM AssignmentSubmission s WHERE s.assignment.course.id = :courseId AND s.gradingStatus = 'PENDING' ORDER BY s.submittedAt ASC")
+    List<AssignmentSubmission> findPendingByCourseId(@Param("courseId") Integer courseId);
 }
 

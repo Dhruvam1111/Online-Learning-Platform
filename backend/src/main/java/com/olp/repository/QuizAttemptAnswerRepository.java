@@ -100,4 +100,29 @@ public interface QuizAttemptAnswerRepository extends JpaRepository<QuizAttemptAn
            "WHERE a.attempt.id = :attemptId " +
            "AND a.evaluationStatus = com.olp.entity.EvaluationStatus.EVALUATED_UNPUBLISHED")
     List<QuizAttemptAnswer> findEvaluatedUnpublishedByAttemptId(@Param("attemptId") Integer attemptId);
+
+    @Query("SELECT COUNT(a) FROM QuizAttemptAnswer a " +
+           "WHERE a.attempt.quiz.course.id IN :courseIds " +
+           "AND (a.question.questionType = com.olp.entity.QuestionType.DESCRIPTIVE OR a.question.requiresManualGrading = true) " +
+           "AND a.evaluationStatus = com.olp.entity.EvaluationStatus.MANUAL_GRADING_REQUIRED")
+    long countPendingDescriptiveByCourseIds(@Param("courseIds") Collection<Integer> courseIds);
+
+    @Query("SELECT COUNT(a) FROM QuizAttemptAnswer a " +
+           "WHERE a.attempt.quiz.course.id = :courseId " +
+           "AND (a.question.questionType = com.olp.entity.QuestionType.DESCRIPTIVE OR a.question.requiresManualGrading = true) " +
+           "AND a.evaluationStatus = com.olp.entity.EvaluationStatus.MANUAL_GRADING_REQUIRED")
+    long countPendingDescriptiveByCourseId(@Param("courseId") Integer courseId);
+
+    @Query("SELECT a FROM QuizAttemptAnswer a " +
+           "JOIN FETCH a.question q " +
+           "JOIN FETCH a.attempt att " +
+           "JOIN FETCH att.student s " +
+           "JOIN FETCH att.quiz qz " +
+           "JOIN FETCH qz.course c " +
+           "LEFT JOIN FETCH a.grader gr " +
+           "WHERE c.id = :courseId " +
+           "AND (q.questionType = com.olp.entity.QuestionType.DESCRIPTIVE OR q.requiresManualGrading = true) " +
+           "AND a.evaluationStatus = com.olp.entity.EvaluationStatus.MANUAL_GRADING_REQUIRED " +
+           "ORDER BY att.submittedAt ASC, a.id ASC")
+    List<QuizAttemptAnswer> findPendingDescriptiveByCourseId(@Param("courseId") Integer courseId);
 }
