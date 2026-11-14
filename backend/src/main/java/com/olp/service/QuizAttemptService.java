@@ -281,6 +281,7 @@ public class QuizAttemptService {
         summary.setPassingMarks(quiz.getPassingMarks());
         summary.setFeedbackReleased(feedbackEnabled);
         summary.setResultsPublished(attemptPublished);
+        summary.setIsOverridden(attempt.isOverridden());
 
         if (isStudent) {
             // Student visibility: overall feedback only if feedback released and results published
