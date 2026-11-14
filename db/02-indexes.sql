@@ -216,6 +216,11 @@ CREATE INDEX IF NOT EXISTS idx_result_versions_assessment ON result_versions(ass
 CREATE INDEX IF NOT EXISTS idx_result_versions_actor_id ON result_versions(actor_id);
 CREATE INDEX IF NOT EXISTS idx_result_versions_created_at ON result_versions(created_at DESC);
 
+-- Step 50 / FR-I33: Pending Grading Alerts Indexes
+CREATE INDEX IF NOT EXISTS idx_grading_alerts_instructor ON pending_grading_alerts(instructor_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_grading_alerts_course ON pending_grading_alerts(course_id);
+CREATE INDEX IF NOT EXISTS idx_grading_alerts_sent_at ON pending_grading_alerts(sent_at DESC);
+
 
 
 
