@@ -203,6 +203,10 @@ CREATE INDEX IF NOT EXISTS idx_exam_attempts_status ON exam_attempts(status);
 CREATE INDEX IF NOT EXISTS idx_exam_blueprints_exam_id ON exam_blueprints(exam_id);
 CREATE INDEX IF NOT EXISTS idx_exam_attempts_set_label ON exam_attempts(exam_id, set_label);
 
+-- Step 40 / FR-I26: Examination Monitoring Rules Indexes
+CREATE INDEX IF NOT EXISTS idx_exam_monitoring_exam_id ON exam_monitoring_configs(exam_id);
+
+
 
 
 
