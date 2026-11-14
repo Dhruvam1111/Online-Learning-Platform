@@ -921,6 +921,49 @@ ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS show_feedback BOOLEAN NOT NULL DEFA
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS answer_release_timing VARCHAR(30) NOT NULL DEFAULT 'IMMEDIATELY';
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_exam BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- Step 28 / FR-I68: Assignments & Submissions
+CREATE TABLE IF NOT EXISTS assignments (
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    module_id INTEGER REFERENCES course_modules(id) ON DELETE SET NULL,
+    lesson_id INTEGER REFERENCES lessons(id) ON DELETE SET NULL,
+    created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(200) NOT NULL,
+    instructions TEXT,
+    deadline TIMESTAMP NOT NULL,
+    max_marks NUMERIC(8, 2) NOT NULL DEFAULT 100.00,
+    rubric TEXT,
+    submission_type VARCHAR(50) NOT NULL DEFAULT 'FILE',
+    late_policy VARCHAR(50) NOT NULL DEFAULT 'REJECT',
+    late_penalty_percentage NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
+    status VARCHAR(30) NOT NULL DEFAULT 'PUBLISHED',
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS assignment_submissions (
+    id SERIAL PRIMARY KEY,
+    assignment_id INTEGER NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    submission_type VARCHAR(50) NOT NULL DEFAULT 'FILE',
+    file_url VARCHAR(500),
+    file_name VARCHAR(255),
+    file_size_bytes BIGINT,
+    text_content TEXT,
+    submitted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    is_late BOOLEAN NOT NULL DEFAULT FALSE,
+    applied_penalty_percentage NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
+    grading_status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+    awarded_marks NUMERIC(8, 2),
+    feedback TEXT,
+    grader_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    graded_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_assignment_student UNIQUE (assignment_id, student_id)
+);
+
+
 
 
 
