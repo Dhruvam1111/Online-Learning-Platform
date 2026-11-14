@@ -174,6 +174,11 @@ CREATE INDEX IF NOT EXISTS idx_quiz_attempts_grader ON quiz_attempts(grader_id);
 -- Step 25 / FR-I65: Marking Rules Indexes
 CREATE INDEX IF NOT EXISTS idx_quizzes_marking_rules ON quizzes(negative_marking, partial_marking);
 
+-- Step 26 / FR-I24: Question Bank & Versioning Indexes
+CREATE INDEX IF NOT EXISTS idx_questions_bank_search ON questions(is_bank_question, course_id, is_latest, topic, difficulty);
+CREATE INDEX IF NOT EXISTS idx_questions_parent_version ON questions(parent_question_id, version);
+CREATE INDEX IF NOT EXISTS idx_questions_origin ON questions(origin);
+
 
 
 

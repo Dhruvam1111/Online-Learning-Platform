@@ -636,6 +636,11 @@ CREATE TABLE questions (
     difficulty              VARCHAR(30),
     explanation             TEXT,
     is_bank_question        BOOLEAN       NOT NULL DEFAULT FALSE,
+    origin                  VARCHAR(30)   NOT NULL DEFAULT 'MANUAL',
+    tags                    TEXT,
+    version                 INTEGER       NOT NULL DEFAULT 1,
+    parent_question_id      INTEGER,
+    is_latest               BOOLEAN       NOT NULL DEFAULT TRUE,
     created_at              TIMESTAMP     NOT NULL DEFAULT NOW(),
     updated_at              TIMESTAMP     NOT NULL DEFAULT NOW(),
 
@@ -647,6 +652,11 @@ CREATE TABLE questions (
     CONSTRAINT fk_questions_created_by
         FOREIGN KEY (created_by)
         REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_questions_parent
+        FOREIGN KEY (parent_question_id)
+        REFERENCES questions(id)
         ON DELETE SET NULL,
 
     CONSTRAINT chk_question_type
@@ -892,6 +902,13 @@ ALTER TABLE quiz_attempt_answers ADD COLUMN IF NOT EXISTS feedback_at TIMESTAMP;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS negative_marking BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS partial_marking BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS numeric_tolerance NUMERIC(8,2) DEFAULT 0.00;
+
+-- Step 26 / FR-I24: Question Bank & Versioning
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS origin VARCHAR(30) NOT NULL DEFAULT 'MANUAL';
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS tags TEXT;
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS parent_question_id INTEGER REFERENCES questions(id) ON DELETE SET NULL;
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS is_latest BOOLEAN NOT NULL DEFAULT TRUE;
 
 
 
