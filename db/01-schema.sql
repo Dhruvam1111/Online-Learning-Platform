@@ -862,6 +862,15 @@ ALTER TABLE quiz_attempt_answers ADD CONSTRAINT chk_attempt_answer_status
 ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS order_index INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
 
+-- Step 47 / FR-I31 & FR-I23: Feedback on Graded Work & Visibility Settings
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS feedback_released BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS overall_feedback TEXT;
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS grader_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS feedback_at TIMESTAMP;
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE quiz_attempt_answers ADD COLUMN IF NOT EXISTS feedback_at TIMESTAMP;
+
+
 
 
 

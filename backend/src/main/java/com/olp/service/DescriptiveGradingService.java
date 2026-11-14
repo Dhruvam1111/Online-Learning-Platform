@@ -1,10 +1,14 @@
 package com.olp.service;
 
+import com.olp.dto.AnswerFeedbackRequest;
+import com.olp.dto.AnswerFeedbackResponse;
 import com.olp.dto.DescriptiveSubmissionResponse;
 import com.olp.dto.GradeSubmissionRequest;
 import com.olp.dto.GradeSubmissionResponse;
 import com.olp.dto.PageResponse;
 import com.olp.dto.PublishResultResponse;
+import com.olp.dto.SubmissionFeedbackRequest;
+import com.olp.dto.SubmissionFeedbackResponse;
 import com.olp.entity.*;
 import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.ResourceNotFoundException;
@@ -164,6 +168,10 @@ public class DescriptiveGradingService {
 
         verifyAnswerAssociation(answer, currentUser);
 
+        if (answer.getEvaluationStatus() == EvaluationStatus.PUBLISHED) {
+            throw new IllegalStateException("Cannot modify evaluation or feedback: answer results have already been published");
+        }
+
         // Marks bounds validation
         BigDecimal awarded = request.getAwardedMarks();
         if (awarded == null) {
@@ -188,11 +196,12 @@ public class DescriptiveGradingService {
         answer.setFeedback(request.getFeedback());
         answer.setGrader(currentUser);
         answer.setEvaluatedAt(now);
+        answer.setFeedbackAt(now);
         answer.setEvaluationStatus(targetStatus);
 
         QuizAttemptAnswer saved = quizAttemptAnswerRepository.save(answer);
 
-        // If published immediately, update the attempt score
+        // If published immediately, update the attempt score and check attempt publish status
         if (publish) {
             recalculateAttemptScore(answer.getAttempt());
         }
@@ -291,10 +300,134 @@ public class DescriptiveGradingService {
             count++;
         }
 
+        attempt.setIsPublished(true);
         recalculateAttemptScore(attempt);
 
         return new PublishResultResponse("Published " + count + " evaluated submission(s) for attempt #" + attemptId,
                 count, attempt.getQuiz().getId(), attemptId);
+    }
+
+    // =========================================================================
+    // 4. FEEDBACK ON GRADED WORK (FR-I31)
+    // =========================================================================
+
+    /**
+     * Adds or updates answer-level feedback for a descriptive answer (FR-I31).
+     * Prevents feedback modification after results are published.
+     */
+    @Transactional
+    public AnswerFeedbackResponse addOrUpdateAnswerFeedback(User currentUser, Integer answerId, AnswerFeedbackRequest request) {
+        validateInstructor(currentUser);
+        if (answerId == null) {
+            throw new IllegalArgumentException("Answer ID cannot be null");
+        }
+        if (request == null) {
+            throw new IllegalArgumentException("Feedback request cannot be null");
+        }
+
+        QuizAttemptAnswer answer = quizAttemptAnswerRepository.findByIdWithDetails(answerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Submission answer not found with id: " + answerId));
+
+        verifyAnswerAssociation(answer, currentUser);
+
+        // Disallow modification if already published
+        if (answer.getEvaluationStatus() == EvaluationStatus.PUBLISHED) {
+            throw new IllegalStateException("Cannot modify feedback: answer results have already been published");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        answer.setFeedback(request.getFeedback());
+        answer.setGrader(currentUser);
+        answer.setFeedbackAt(now);
+        if (answer.getEvaluatedAt() == null) {
+            answer.setEvaluatedAt(now);
+        }
+
+        boolean publish = Boolean.TRUE.equals(request.getPublish());
+        if (publish) {
+            answer.setEvaluationStatus(EvaluationStatus.PUBLISHED);
+            recalculateAttemptScore(answer.getAttempt());
+        }
+
+        QuizAttemptAnswer saved = quizAttemptAnswerRepository.save(answer);
+        return AnswerFeedbackResponse.fromEntity(saved, "Answer feedback saved successfully");
+    }
+
+    /**
+     * Adds or updates submission-level overall feedback for an attempt (FR-I31).
+     * Prevents feedback modification after results are published.
+     */
+    @Transactional
+    public SubmissionFeedbackResponse addOrUpdateSubmissionFeedback(User currentUser, Integer attemptId, SubmissionFeedbackRequest request) {
+        validateInstructor(currentUser);
+        if (attemptId == null) {
+            throw new IllegalArgumentException("Attempt ID cannot be null");
+        }
+        if (request == null) {
+            throw new IllegalArgumentException("Feedback request cannot be null");
+        }
+
+        QuizAttempt attempt = quizAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz attempt not found with id: " + attemptId));
+
+        verifyCourseAssociation(attempt.getQuiz().getCourse(), currentUser);
+
+        // Disallow modification if already published
+        if (Boolean.TRUE.equals(attempt.getIsPublished())) {
+            throw new IllegalStateException("Cannot modify submission feedback: results have already been published");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        attempt.setOverallFeedback(request.getFeedback());
+        attempt.setGrader(currentUser);
+        attempt.setFeedbackAt(now);
+
+        boolean publish = Boolean.TRUE.equals(request.getPublish());
+        if (publish) {
+            attempt.setIsPublished(true);
+        }
+
+        QuizAttempt saved = quizAttemptRepository.save(attempt);
+        return SubmissionFeedbackResponse.fromEntity(saved, "Submission feedback saved successfully");
+    }
+
+    /**
+     * Retrieves submission-level feedback with appropriate access control and student visibility masking (FR-I31, FR-I23).
+     */
+    @Transactional(readOnly = true)
+    public SubmissionFeedbackResponse getSubmissionFeedback(User currentUser, Integer attemptId) {
+        if (currentUser == null) {
+            throw new InvalidCredentialsException("User is not authenticated");
+        }
+        if (attemptId == null) {
+            throw new IllegalArgumentException("Attempt ID cannot be null");
+        }
+
+        QuizAttempt attempt = quizAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz attempt not found with id: " + attemptId));
+
+        boolean isStudent = currentUser.getId().equals(attempt.getStudent().getId());
+        if (isStudent) {
+            Quiz quiz = attempt.getQuiz();
+            boolean feedbackReleased = quiz.getFeedbackReleased() == null || quiz.getFeedbackReleased();
+            boolean isPublished = Boolean.TRUE.equals(attempt.getIsPublished());
+
+            if (!feedbackReleased || !isPublished) {
+                throw new AccessDeniedException("Feedback is not yet visible or results have not been published");
+            }
+        } else {
+            // Instructor or Admin check
+            verifyCourseAssociation(attempt.getQuiz().getCourse(), currentUser);
+        }
+
+        return SubmissionFeedbackResponse.fromEntity(attempt, "Submission feedback retrieved successfully");
+    }
+
+    /**
+     * Updates an attempt's isPublished status if all evaluated answers are published.
+     */
+    public void checkAndUpdateAttemptPublishStatus(QuizAttempt attempt) {
+        recalculateAttemptScore(attempt);
     }
 
     // =========================================================================
@@ -307,17 +440,22 @@ public class DescriptiveGradingService {
         BigDecimal total = BigDecimal.ZERO;
         boolean hasPending = false;
 
-        for (QuizAttemptAnswer ans : answers) {
-            if (ans.getEvaluationStatus() == EvaluationStatus.MANUAL_GRADING_REQUIRED ||
-                ans.getEvaluationStatus() == EvaluationStatus.EVALUATED_UNPUBLISHED) {
-                hasPending = true;
-            }
-            if (ans.getEvaluationStatus() == EvaluationStatus.PUBLISHED ||
-                ans.getEvaluationStatus() == EvaluationStatus.CORRECT ||
-                ans.getEvaluationStatus() == EvaluationStatus.PARTIALLY_CORRECT) {
-                if (ans.getAwardedMarks() != null) {
-                    total = total.add(ans.getAwardedMarks());
+        if (answers != null) {
+            for (QuizAttemptAnswer ans : answers) {
+                if (ans.getEvaluationStatus() == EvaluationStatus.MANUAL_GRADING_REQUIRED ||
+                    ans.getEvaluationStatus() == EvaluationStatus.EVALUATED_UNPUBLISHED) {
+                    hasPending = true;
                 }
+                if (ans.getEvaluationStatus() == EvaluationStatus.PUBLISHED ||
+                    ans.getEvaluationStatus() == EvaluationStatus.CORRECT ||
+                    ans.getEvaluationStatus() == EvaluationStatus.PARTIALLY_CORRECT) {
+                    if (ans.getAwardedMarks() != null) {
+                        total = total.add(ans.getAwardedMarks());
+                    }
+                }
+            }
+            if (!hasPending && !answers.isEmpty()) {
+                attempt.setIsPublished(true);
             }
         }
 

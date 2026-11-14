@@ -272,10 +272,35 @@ public class QuizAttemptService {
                 ? quizAttemptAnswerRepository.findByAttemptId(attemptId)
                 : List.of();
 
+        boolean feedbackEnabled = quiz.getFeedbackReleased() == null || quiz.getFeedbackReleased();
+        boolean attemptPublished = Boolean.TRUE.equals(attempt.getIsPublished());
+
         QuizEvaluationSummary summary = new QuizEvaluationSummary();
         summary.setQuizId(quiz.getId());
         summary.setAttemptId(attempt.getId());
         summary.setPassingMarks(quiz.getPassingMarks());
+        summary.setFeedbackReleased(feedbackEnabled);
+        summary.setResultsPublished(attemptPublished);
+
+        if (isStudent) {
+            // Student visibility: overall feedback only if feedback released and results published
+            if (feedbackEnabled && attemptPublished) {
+                summary.setOverallFeedback(attempt.getOverallFeedback());
+                if (attempt.getGrader() != null) {
+                    summary.setGraderId(attempt.getGrader().getId());
+                    summary.setGraderName(attempt.getGrader().getName());
+                }
+                summary.setFeedbackAt(attempt.getFeedbackAt());
+            }
+        } else {
+            // Instructors and admins always see overall feedback
+            summary.setOverallFeedback(attempt.getOverallFeedback());
+            if (attempt.getGrader() != null) {
+                summary.setGraderId(attempt.getGrader().getId());
+                summary.setGraderName(attempt.getGrader().getName());
+            }
+            summary.setFeedbackAt(attempt.getFeedbackAt());
+        }
 
         BigDecimal totalAwarded = attempt.getObtainedMarks() != null ? attempt.getObtainedMarks() : BigDecimal.ZERO;
         BigDecimal totalMax = quiz.getTotalMarks() != null ? quiz.getTotalMarks() : BigDecimal.ZERO;
@@ -293,13 +318,19 @@ public class QuizAttemptService {
             String feedback = ans.getFeedback();
             boolean requiresManual = status == EvaluationStatus.MANUAL_GRADING_REQUIRED;
 
-            // Result Visibility (FR-I30 Requirement 3):
-            // Graded marks must remain unpublished and invisible to students until explicitly published.
-            if (isStudent && status == EvaluationStatus.EVALUATED_UNPUBLISHED) {
-                status = EvaluationStatus.MANUAL_GRADING_REQUIRED;
-                marks = BigDecimal.ZERO;
-                feedback = null;
-                requiresManual = true;
+            // Result & Feedback Visibility (FR-I30 Requirement 3, FR-I31 Requirement 3, FR-I23):
+            // Graded marks and feedback must remain unpublished and invisible to students until explicitly published.
+            if (isStudent) {
+                if (status == EvaluationStatus.EVALUATED_UNPUBLISHED) {
+                    status = EvaluationStatus.MANUAL_GRADING_REQUIRED;
+                    marks = BigDecimal.ZERO;
+                    feedback = null;
+                    requiresManual = true;
+                } else if (!feedbackEnabled) {
+                    feedback = null;
+                } else if (requiresManual && status != EvaluationStatus.PUBLISHED) {
+                    feedback = null;
+                }
             }
 
             QuestionEvaluationResult res = new QuestionEvaluationResult(

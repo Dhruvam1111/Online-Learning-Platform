@@ -28,6 +28,7 @@ public class QuizSettingsResponse {
     private LocalDateTime serverTime;
     private Long attemptsUsed;
     private Integer remainingAttempts;
+    private Boolean feedbackReleased;
 
     public QuizSettingsResponse() {}
 
@@ -181,6 +182,22 @@ public class QuizSettingsResponse {
 
     public void setRemainingAttempts(Integer remainingAttempts) {
         this.remainingAttempts = remainingAttempts;
+    }
+
+    public Boolean getFeedbackReleased() {
+        return feedbackReleased;
+    }
+
+    public void setFeedbackReleased(Boolean feedbackReleased) {
+        this.feedbackReleased = feedbackReleased;
+    }
+
+    public Boolean getShowFeedback() {
+        return feedbackReleased;
+    }
+
+    public void setShowFeedback(Boolean showFeedback) {
+        this.feedbackReleased = showFeedback;
     }
 }
 

@@ -1,10 +1,14 @@
 package com.olp.service;
 
+import com.olp.dto.AnswerFeedbackRequest;
+import com.olp.dto.AnswerFeedbackResponse;
 import com.olp.dto.DescriptiveSubmissionResponse;
 import com.olp.dto.GradeSubmissionRequest;
 import com.olp.dto.GradeSubmissionResponse;
 import com.olp.dto.PageResponse;
 import com.olp.dto.PublishResultResponse;
+import com.olp.dto.SubmissionFeedbackRequest;
+import com.olp.dto.SubmissionFeedbackResponse;
 import com.olp.entity.*;
 import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.ResourceNotFoundException;
@@ -392,5 +396,124 @@ class DescriptiveGradingServiceTest {
 
         // Total should be 10 + 15 = 25 (excluding the 12 marks)
         assertEquals(BigDecimal.valueOf(25.0), attempt.getObtainedMarks());
+    }
+
+    // =========================================================================
+    // 5. FR-I31 Feedback Management & Immutability Tests
+    // =========================================================================
+
+    @Test
+    @DisplayName("Should successfully add or update answer-level feedback before publish")
+    void testAddAnswerFeedback_BeforePublish_Success() {
+        answer.setEvaluationStatus(EvaluationStatus.EVALUATED_UNPUBLISHED);
+        when(quizAttemptAnswerRepository.findByIdWithDetails(500)).thenReturn(Optional.of(answer));
+        when(quizAttemptAnswerRepository.save(any(QuizAttemptAnswer.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AnswerFeedbackRequest req = new AnswerFeedbackRequest("Excellent explanation with good depth", false);
+        AnswerFeedbackResponse res = gradingService.addOrUpdateAnswerFeedback(instructor, 500, req);
+
+        assertNotNull(res);
+        assertEquals("Excellent explanation with good depth", res.getFeedback());
+        assertEquals(instructor.getId(), res.getGraderId());
+        assertNotNull(res.getFeedbackAt());
+        assertFalse(res.isPublished());
+        verify(quizAttemptAnswerRepository).save(answer);
+    }
+
+    @Test
+    @DisplayName("Should prevent modifying answer feedback when results are already published")
+    void testAddAnswerFeedback_AfterPublish_ThrowsIllegalStateException() {
+        answer.setEvaluationStatus(EvaluationStatus.PUBLISHED);
+        when(quizAttemptAnswerRepository.findByIdWithDetails(500)).thenReturn(Optional.of(answer));
+
+        AnswerFeedbackRequest req = new AnswerFeedbackRequest("Changed my mind", false);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> gradingService.addOrUpdateAnswerFeedback(instructor, 500, req));
+        assertTrue(ex.getMessage().contains("already been published"));
+        verify(quizAttemptAnswerRepository, never()).save(answer);
+    }
+
+    @Test
+    @DisplayName("Should prevent grading when answer results are already published")
+    void testGradeSubmission_AfterPublish_ThrowsIllegalStateException() {
+        answer.setEvaluationStatus(EvaluationStatus.PUBLISHED);
+        when(quizAttemptAnswerRepository.findByIdWithDetails(500)).thenReturn(Optional.of(answer));
+
+        GradeSubmissionRequest req = new GradeSubmissionRequest(BigDecimal.valueOf(18.0), "Updated", false);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> gradingService.gradeSubmission(instructor, 500, req));
+        assertTrue(ex.getMessage().contains("already been published"));
+    }
+
+    @Test
+    @DisplayName("Should successfully add or update submission-level overall feedback")
+    void testAddSubmissionFeedback_Success() {
+        attempt.setIsPublished(false);
+        when(quizAttemptRepository.findById(300)).thenReturn(Optional.of(attempt));
+        when(quizAttemptRepository.save(any(QuizAttempt.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SubmissionFeedbackRequest req = new SubmissionFeedbackRequest("Great overall test performance", false);
+        SubmissionFeedbackResponse res = gradingService.addOrUpdateSubmissionFeedback(instructor, 300, req);
+
+        assertNotNull(res);
+        assertEquals("Great overall test performance", res.getOverallFeedback());
+        assertEquals(instructor.getId(), res.getGraderId());
+        assertNotNull(res.getFeedbackAt());
+        assertFalse(res.isPublished());
+        verify(quizAttemptRepository).save(attempt);
+    }
+
+    @Test
+    @DisplayName("Should prevent modifying submission feedback after results are published")
+    void testAddSubmissionFeedback_AfterPublish_ThrowsIllegalStateException() {
+        attempt.setIsPublished(true);
+        when(quizAttemptRepository.findById(300)).thenReturn(Optional.of(attempt));
+
+        SubmissionFeedbackRequest req = new SubmissionFeedbackRequest("Editing overall feedback", false);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> gradingService.addOrUpdateSubmissionFeedback(instructor, 300, req));
+        assertTrue(ex.getMessage().contains("already been published"));
+        verify(quizAttemptRepository, never()).save(attempt);
+    }
+
+    @Test
+    @DisplayName("Student cannot view unpublished submission feedback")
+    void testGetSubmissionFeedback_Student_Unpublished_ThrowsAccessDenied() {
+        attempt.setIsPublished(false);
+        attempt.setOverallFeedback("Secret draft feedback");
+        when(quizAttemptRepository.findById(300)).thenReturn(Optional.of(attempt));
+
+        assertThrows(AccessDeniedException.class,
+                () -> gradingService.getSubmissionFeedback(student, 300));
+    }
+
+    @Test
+    @DisplayName("Student cannot view submission feedback when quiz feedback is disabled (FR-I23)")
+    void testGetSubmissionFeedback_Student_FeedbackDisabled_ThrowsAccessDenied() {
+        quiz.setFeedbackReleased(false);
+        attempt.setIsPublished(true);
+        attempt.setOverallFeedback("Hidden feedback");
+        when(quizAttemptRepository.findById(300)).thenReturn(Optional.of(attempt));
+
+        assertThrows(AccessDeniedException.class,
+                () -> gradingService.getSubmissionFeedback(student, 300));
+    }
+
+    @Test
+    @DisplayName("Student can view submission feedback when results are published and feedback released")
+    void testGetSubmissionFeedback_Student_PublishedAndEnabled_Success() {
+        quiz.setFeedbackReleased(true);
+        attempt.setIsPublished(true);
+        attempt.setOverallFeedback("Awesome job!");
+        when(quizAttemptRepository.findById(300)).thenReturn(Optional.of(attempt));
+
+        SubmissionFeedbackResponse res = gradingService.getSubmissionFeedback(student, 300);
+
+        assertNotNull(res);
+        assertEquals("Awesome job!", res.getOverallFeedback());
+        assertTrue(res.isPublished());
     }
 }

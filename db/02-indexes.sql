@@ -162,6 +162,12 @@ CREATE INDEX IF NOT EXISTS idx_quiz_attempt_answers_grader ON quiz_attempt_answe
 CREATE INDEX IF NOT EXISTS idx_materials_lesson_order ON lecture_materials(lesson_id, order_index);
 CREATE INDEX IF NOT EXISTS idx_materials_deleted_at ON lecture_materials(deleted_at);
 
+-- Step 47 / FR-I31 & FR-I23: Feedback on Graded Work Indexes
+CREATE INDEX IF NOT EXISTS idx_quizzes_feedback_released ON quizzes(feedback_released);
+CREATE INDEX IF NOT EXISTS idx_quiz_attempts_published ON quiz_attempts(is_published);
+CREATE INDEX IF NOT EXISTS idx_quiz_attempts_grader ON quiz_attempts(grader_id);
+
+
 
 
 

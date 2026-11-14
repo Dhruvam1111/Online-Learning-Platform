@@ -1,10 +1,14 @@
 package com.olp.controller;
 
+import com.olp.dto.AnswerFeedbackRequest;
+import com.olp.dto.AnswerFeedbackResponse;
 import com.olp.dto.DescriptiveSubmissionResponse;
 import com.olp.dto.GradeSubmissionRequest;
 import com.olp.dto.GradeSubmissionResponse;
 import com.olp.dto.PageResponse;
 import com.olp.dto.PublishResultResponse;
+import com.olp.dto.SubmissionFeedbackRequest;
+import com.olp.dto.SubmissionFeedbackResponse;
 import com.olp.entity.User;
 import com.olp.service.DescriptiveGradingService;
 import org.junit.jupiter.api.BeforeEach;
@@ -221,5 +225,64 @@ class InstructorGradingControllerTest {
         assertEquals(HttpStatus.OK, entity.getStatusCode());
         assertNotNull(entity.getBody());
         assertEquals(1, entity.getBody().getPublishedCount());
+    }
+
+    @Test
+    @DisplayName("POST /api/instructor/grading/answers/{answerId}/feedback - adds or updates answer feedback")
+    void testAddOrUpdateAnswerFeedback() {
+        AnswerFeedbackRequest req = new AnswerFeedbackRequest("Good point made", false);
+        AnswerFeedbackResponse res = new AnswerFeedbackResponse();
+        res.setAnswerId(500);
+        res.setFeedback("Good point made");
+        res.setMessage("Answer feedback saved successfully");
+
+        when(descriptiveGradingService.addOrUpdateAnswerFeedback(instructor, 500, req))
+                .thenReturn(res);
+
+        ResponseEntity<AnswerFeedbackResponse> entity = controller.addOrUpdateAnswerFeedback(auth, 500, req);
+
+        assertNotNull(entity);
+        assertEquals(HttpStatus.OK, entity.getStatusCode());
+        assertNotNull(entity.getBody());
+        assertEquals("Good point made", entity.getBody().getFeedback());
+    }
+
+    @Test
+    @DisplayName("POST /api/instructor/grading/attempts/{attemptId}/feedback - adds or updates submission feedback")
+    void testAddOrUpdateSubmissionFeedback() {
+        SubmissionFeedbackRequest req = new SubmissionFeedbackRequest("Great overall test score", false);
+        SubmissionFeedbackResponse res = new SubmissionFeedbackResponse();
+        res.setAttemptId(300);
+        res.setOverallFeedback("Great overall test score");
+        res.setMessage("Submission feedback saved successfully");
+
+        when(descriptiveGradingService.addOrUpdateSubmissionFeedback(instructor, 300, req))
+                .thenReturn(res);
+
+        ResponseEntity<SubmissionFeedbackResponse> entity = controller.addOrUpdateSubmissionFeedback(auth, 300, req);
+
+        assertNotNull(entity);
+        assertEquals(HttpStatus.OK, entity.getStatusCode());
+        assertNotNull(entity.getBody());
+        assertEquals("Great overall test score", entity.getBody().getOverallFeedback());
+    }
+
+    @Test
+    @DisplayName("GET /api/instructor/grading/attempts/{attemptId}/feedback - retrieves submission feedback")
+    void testGetSubmissionFeedback() {
+        SubmissionFeedbackResponse res = new SubmissionFeedbackResponse();
+        res.setAttemptId(300);
+        res.setOverallFeedback("Detailed feedback comments");
+        res.setMessage("Submission feedback retrieved successfully");
+
+        when(descriptiveGradingService.getSubmissionFeedback(instructor, 300))
+                .thenReturn(res);
+
+        ResponseEntity<SubmissionFeedbackResponse> entity = controller.getSubmissionFeedback(auth, 300);
+
+        assertNotNull(entity);
+        assertEquals(HttpStatus.OK, entity.getStatusCode());
+        assertNotNull(entity.getBody());
+        assertEquals("Detailed feedback comments", entity.getBody().getOverallFeedback());
     }
 }

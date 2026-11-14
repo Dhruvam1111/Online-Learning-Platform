@@ -1,6 +1,7 @@
 package com.olp.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,6 +21,12 @@ public class QuizEvaluationSummary {
     private int partiallyCorrectCount;
     private int manualGradingCount;
     private int unansweredCount;
+    private String overallFeedback;
+    private Integer graderId;
+    private String graderName;
+    private LocalDateTime feedbackAt;
+    private Boolean feedbackReleased;
+    private Boolean resultsPublished;
     private List<QuestionEvaluationResult> results = new ArrayList<>();
 
     public QuizEvaluationSummary() {}
@@ -110,6 +117,54 @@ public class QuizEvaluationSummary {
 
     public void setUnansweredCount(int unansweredCount) {
         this.unansweredCount = unansweredCount;
+    }
+
+    public String getOverallFeedback() {
+        return overallFeedback;
+    }
+
+    public void setOverallFeedback(String overallFeedback) {
+        this.overallFeedback = overallFeedback;
+    }
+
+    public Integer getGraderId() {
+        return graderId;
+    }
+
+    public void setGraderId(Integer graderId) {
+        this.graderId = graderId;
+    }
+
+    public String getGraderName() {
+        return graderName;
+    }
+
+    public void setGraderName(String graderName) {
+        this.graderName = graderName;
+    }
+
+    public LocalDateTime getFeedbackAt() {
+        return feedbackAt;
+    }
+
+    public void setFeedbackAt(LocalDateTime feedbackAt) {
+        this.feedbackAt = feedbackAt;
+    }
+
+    public Boolean getFeedbackReleased() {
+        return feedbackReleased;
+    }
+
+    public void setFeedbackReleased(Boolean feedbackReleased) {
+        this.feedbackReleased = feedbackReleased;
+    }
+
+    public Boolean getResultsPublished() {
+        return resultsPublished;
+    }
+
+    public void setResultsPublished(Boolean resultsPublished) {
+        this.resultsPublished = resultsPublished;
     }
 
     public List<QuestionEvaluationResult> getResults() {
