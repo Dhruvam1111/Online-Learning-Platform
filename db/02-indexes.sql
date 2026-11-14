@@ -179,6 +179,10 @@ CREATE INDEX IF NOT EXISTS idx_questions_bank_search ON questions(is_bank_questi
 CREATE INDEX IF NOT EXISTS idx_questions_parent_version ON questions(parent_question_id, version);
 CREATE INDEX IF NOT EXISTS idx_questions_origin ON questions(origin);
 
+-- Step 27 / FR-I23: Answer Review and Feedback Toggle Indexes
+CREATE INDEX IF NOT EXISTS idx_quizzes_review_toggle ON quizzes(show_correct_answers, show_feedback, answer_release_timing);
+CREATE INDEX IF NOT EXISTS idx_quizzes_is_exam ON quizzes(is_exam);
+
 
 
 

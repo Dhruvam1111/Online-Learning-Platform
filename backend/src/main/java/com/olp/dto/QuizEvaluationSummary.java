@@ -27,6 +27,8 @@ public class QuizEvaluationSummary {
     private LocalDateTime feedbackAt;
     private Boolean feedbackReleased;
     private Boolean resultsPublished;
+    private Boolean correctAnswersVisible;
+    private Boolean showCorrectAnswers;
     private List<QuestionEvaluationResult> results = new ArrayList<>();
 
     public QuizEvaluationSummary() {}
@@ -165,6 +167,22 @@ public class QuizEvaluationSummary {
 
     public void setResultsPublished(Boolean resultsPublished) {
         this.resultsPublished = resultsPublished;
+    }
+
+    public Boolean getCorrectAnswersVisible() {
+        return correctAnswersVisible;
+    }
+
+    public void setCorrectAnswersVisible(Boolean correctAnswersVisible) {
+        this.correctAnswersVisible = correctAnswersVisible;
+    }
+
+    public Boolean getShowCorrectAnswers() {
+        return showCorrectAnswers;
+    }
+
+    public void setShowCorrectAnswers(Boolean showCorrectAnswers) {
+        this.showCorrectAnswers = showCorrectAnswers;
     }
 
     public List<QuestionEvaluationResult> getResults() {

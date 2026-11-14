@@ -585,6 +585,11 @@ CREATE TABLE quizzes (
     negative_marking    BOOLEAN       NOT NULL DEFAULT FALSE,
     partial_marking     BOOLEAN       NOT NULL DEFAULT FALSE,
     numeric_tolerance   NUMERIC(8,2)  DEFAULT 0.00,
+    feedback_released   BOOLEAN       NOT NULL DEFAULT TRUE,
+    show_correct_answers BOOLEAN      NOT NULL DEFAULT TRUE,
+    show_feedback       BOOLEAN       NOT NULL DEFAULT TRUE,
+    answer_release_timing VARCHAR(30) NOT NULL DEFAULT 'IMMEDIATELY',
+    is_exam             BOOLEAN       NOT NULL DEFAULT FALSE,
     created_at          TIMESTAMP     NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMP     NOT NULL DEFAULT NOW(),
 
@@ -909,6 +914,12 @@ ALTER TABLE questions ADD COLUMN IF NOT EXISTS tags TEXT;
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS parent_question_id INTEGER REFERENCES questions(id) ON DELETE SET NULL;
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS is_latest BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- Step 27 / FR-I23: Answer Review and Feedback Toggle
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS show_correct_answers BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS show_feedback BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS answer_release_timing VARCHAR(30) NOT NULL DEFAULT 'IMMEDIATELY';
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_exam BOOLEAN NOT NULL DEFAULT FALSE;
 
 
 

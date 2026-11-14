@@ -132,6 +132,15 @@ public class QuizController {
         return ResponseEntity.ok(quizService.configureQuizSettings(currentUser, quizId, request));
     }
 
+    @PutMapping("/quizzes/{quizId}/review-toggle")
+    public ResponseEntity<QuizSettingsResponse> updateReviewToggle(
+            @PathVariable Integer quizId,
+            @RequestBody QuizSettingsRequest request,
+            Authentication authentication) {
+        User currentUser = quizService.resolveUser(authentication);
+        return ResponseEntity.ok(quizService.configureQuizSettings(currentUser, quizId, request));
+    }
+
     // =========================================================================
     // QUIZ-QUESTION MAPPING & ORDERING ENDPOINTS
     // =========================================================================

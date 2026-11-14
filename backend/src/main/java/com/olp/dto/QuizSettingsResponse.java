@@ -33,6 +33,12 @@ public class QuizSettingsResponse {
     private Boolean partialMarking;
     private BigDecimal numericTolerance;
     private String markingRulesSummary;
+    private Boolean showCorrectAnswers;
+    private Boolean showFeedback;
+    private String answerReleaseTiming;
+    private Boolean isExam;
+    private Boolean correctAnswersVisible;
+    private Boolean feedbackVisible;
 
     public QuizSettingsResponse() {}
 
@@ -196,14 +202,6 @@ public class QuizSettingsResponse {
         this.feedbackReleased = feedbackReleased;
     }
 
-    public Boolean getShowFeedback() {
-        return feedbackReleased;
-    }
-
-    public void setShowFeedback(Boolean showFeedback) {
-        this.feedbackReleased = showFeedback;
-    }
-
     public Boolean getNegativeMarking() {
         return negativeMarking;
     }
@@ -234,6 +232,54 @@ public class QuizSettingsResponse {
 
     public void setMarkingRulesSummary(String markingRulesSummary) {
         this.markingRulesSummary = markingRulesSummary;
+    }
+
+    public Boolean getShowCorrectAnswers() {
+        return showCorrectAnswers;
+    }
+
+    public void setShowCorrectAnswers(Boolean showCorrectAnswers) {
+        this.showCorrectAnswers = showCorrectAnswers;
+    }
+
+    public Boolean getShowFeedback() {
+        return showFeedback;
+    }
+
+    public void setShowFeedback(Boolean showFeedback) {
+        this.showFeedback = showFeedback;
+    }
+
+    public String getAnswerReleaseTiming() {
+        return answerReleaseTiming;
+    }
+
+    public void setAnswerReleaseTiming(String answerReleaseTiming) {
+        this.answerReleaseTiming = answerReleaseTiming;
+    }
+
+    public Boolean getIsExam() {
+        return isExam;
+    }
+
+    public void setIsExam(Boolean exam) {
+        this.isExam = exam;
+    }
+
+    public Boolean getCorrectAnswersVisible() {
+        return correctAnswersVisible;
+    }
+
+    public void setCorrectAnswersVisible(Boolean correctAnswersVisible) {
+        this.correctAnswersVisible = correctAnswersVisible;
+    }
+
+    public Boolean getFeedbackVisible() {
+        return feedbackVisible;
+    }
+
+    public void setFeedbackVisible(Boolean feedbackVisible) {
+        this.feedbackVisible = feedbackVisible;
     }
 
     public static String computeMarkingRulesSummary(Boolean negativeMarking, Boolean partialMarking, BigDecimal numericTolerance) {
