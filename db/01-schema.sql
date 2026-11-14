@@ -582,6 +582,9 @@ CREATE TABLE quizzes (
     max_attempts        INTEGER       NOT NULL DEFAULT 1,
     available_from      TIMESTAMP,
     available_until     TIMESTAMP,
+    negative_marking    BOOLEAN       NOT NULL DEFAULT FALSE,
+    partial_marking     BOOLEAN       NOT NULL DEFAULT FALSE,
+    numeric_tolerance   NUMERIC(8,2)  DEFAULT 0.00,
     created_at          TIMESTAMP     NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMP     NOT NULL DEFAULT NOW(),
 
@@ -884,6 +887,11 @@ ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS grader_id INTEGER REFERENCES 
 ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS feedback_at TIMESTAMP;
 ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE quiz_attempt_answers ADD COLUMN IF NOT EXISTS feedback_at TIMESTAMP;
+
+-- Step 25 / FR-I65: Marking Rules (Negative, Partial, Tolerance)
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS negative_marking BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS partial_marking BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS numeric_tolerance NUMERIC(8,2) DEFAULT 0.00;
 
 
 

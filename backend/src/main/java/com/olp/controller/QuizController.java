@@ -13,7 +13,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * REST Controller for Quiz creation, management, and ordered Quiz-Question mapping (FR-I19).
+ * REST Controller for Quiz creation, management, ordered Quiz-Question mapping (FR-I19),
+ * and Quiz Marking Rules configuration (FR-I65, Step 25).
  */
 @RestController
 @RequestMapping({"/api/instructor", "/api/instructors"})

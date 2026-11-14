@@ -171,6 +171,9 @@ CREATE INDEX IF NOT EXISTS idx_quizzes_feedback_released ON quizzes(feedback_rel
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_published ON quiz_attempts(is_published);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_grader ON quiz_attempts(grader_id);
 
+-- Step 25 / FR-I65: Marking Rules Indexes
+CREATE INDEX IF NOT EXISTS idx_quizzes_marking_rules ON quizzes(negative_marking, partial_marking);
+
 
 
 
