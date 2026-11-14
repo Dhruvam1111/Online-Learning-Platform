@@ -48,6 +48,9 @@ public class QuizRequest {
     private LocalDateTime availableFrom;
     private LocalDateTime availableUntil;
 
+    @JsonAlias({ "showFeedback", "feedbackVisible", "reviewEnabled" })
+    private Boolean feedbackReleased;
+
     @Valid
     private List<QuizQuestionRequest> questions;
 
@@ -163,6 +166,22 @@ public class QuizRequest {
 
     public void setAvailableUntil(LocalDateTime availableUntil) {
         this.availableUntil = availableUntil;
+    }
+
+    public Boolean getFeedbackReleased() {
+        return feedbackReleased;
+    }
+
+    public void setFeedbackReleased(Boolean feedbackReleased) {
+        this.feedbackReleased = feedbackReleased;
+    }
+
+    public Boolean getShowFeedback() {
+        return feedbackReleased;
+    }
+
+    public void setShowFeedback(Boolean showFeedback) {
+        this.feedbackReleased = showFeedback;
     }
 
     public List<QuizQuestionRequest> getQuestions() {

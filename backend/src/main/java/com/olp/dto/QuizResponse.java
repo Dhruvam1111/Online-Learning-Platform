@@ -30,6 +30,7 @@ public class QuizResponse {
     private Integer maxAttempts;
     private LocalDateTime availableFrom;
     private LocalDateTime availableUntil;
+    private Boolean feedbackReleased;
     private Integer questionCount;
     private List<QuizQuestionResponse> questions = new ArrayList<>();
     private LocalDateTime createdAt;
@@ -195,6 +196,22 @@ public class QuizResponse {
 
     public void setAvailableUntil(LocalDateTime availableUntil) {
         this.availableUntil = availableUntil;
+    }
+
+    public Boolean getFeedbackReleased() {
+        return feedbackReleased;
+    }
+
+    public void setFeedbackReleased(Boolean feedbackReleased) {
+        this.feedbackReleased = feedbackReleased;
+    }
+
+    public Boolean getShowFeedback() {
+        return feedbackReleased;
+    }
+
+    public void setShowFeedback(Boolean showFeedback) {
+        this.feedbackReleased = showFeedback;
     }
 
     public Integer getQuestionCount() {

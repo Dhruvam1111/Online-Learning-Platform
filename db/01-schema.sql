@@ -859,6 +859,11 @@ CREATE TABLE IF NOT EXISTS lesson_progress (
     UNIQUE (student_id, lesson_id)
 );
 
+-- Step 46 / FR-I30: Descriptive Submissions Grading & Grader Attribution
+ALTER TABLE quiz_attempt_answers ADD COLUMN IF NOT EXISTS grader_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE quiz_attempt_answers DROP CONSTRAINT IF EXISTS chk_attempt_answer_status;
+ALTER TABLE quiz_attempt_answers ADD CONSTRAINT chk_attempt_answer_status
+    CHECK (evaluation_status IN ('CORRECT', 'INCORRECT', 'PARTIALLY_CORRECT', 'MANUAL_GRADING_REQUIRED', 'EVALUATED_UNPUBLISHED', 'PUBLISHED', 'PENDING', 'UNANSWERED', 'INVALID_SUBMISSION'));
 -- Step 19 / FR-I16: Content Reorder, Replace and Remove
 ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS order_index INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
@@ -871,6 +876,14 @@ ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS time_zone VARCHAR(50) DEF
 ALTER TABLE lessons ADD COLUMN IF NOT EXISTS release_at TIMESTAMP;
 ALTER TABLE lessons ADD COLUMN IF NOT EXISTS is_released BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE lessons ADD COLUMN IF NOT EXISTS time_zone VARCHAR(50) DEFAULT 'Asia/Kolkata';
+
+-- Step 47 / FR-I31 & FR-I23: Feedback on Graded Work & Visibility Settings
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS feedback_released BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS overall_feedback TEXT;
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS grader_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS feedback_at TIMESTAMP;
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE quiz_attempt_answers ADD COLUMN IF NOT EXISTS feedback_at TIMESTAMP;
 
 
 

@@ -17,11 +17,13 @@ import com.olp.dto.CourseSubmissionRequest;
 import com.olp.dto.CourseSubmissionResponse;
 import com.olp.dto.CreateCourseRequest;
 import com.olp.dto.DeleteCourseRequest;
+import com.olp.dto.DescriptiveSubmissionResponse;
 import com.olp.dto.PageResponse;
 import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
 import com.olp.entity.User;
 import com.olp.service.CourseCompletionService;
+import com.olp.service.DescriptiveGradingService;
 import com.olp.service.InstructorCourseService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,17 +43,20 @@ public class InstructorCourseController {
 
     private final InstructorCourseService instructorCourseService;
     private final CourseCompletionService courseCompletionService;
+    private final DescriptiveGradingService descriptiveGradingService;
 
     public InstructorCourseController(InstructorCourseService instructorCourseService) {
-        this(instructorCourseService, null);
+        this(instructorCourseService, null, null);
     }
 
     @Autowired
     public InstructorCourseController(
             InstructorCourseService instructorCourseService,
-            @Autowired(required = false) CourseCompletionService courseCompletionService) {
+            @Autowired(required = false) CourseCompletionService courseCompletionService,
+            @Autowired(required = false) DescriptiveGradingService descriptiveGradingService) {
         this.instructorCourseService = instructorCourseService;
         this.courseCompletionService = courseCompletionService;
+        this.descriptiveGradingService = descriptiveGradingService;
     }
 
     /**
@@ -526,6 +531,37 @@ public class InstructorCourseController {
         } else {
             List<CertificateResponse> response = courseCompletionService.getIssuedCertificatesList(
                     currentUser, courseId, start, end);
+            return ResponseEntity.ok(response);
+        }
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}/grading
+     * Lists descriptive submissions in the grading queue for a specific course (FR-I30).
+     */
+    @GetMapping({ "/{courseId:\\d+}/grading", "/{courseId:\\d+}/grading-queue" })
+    public ResponseEntity<?> getCourseGradingQueue(
+            Authentication authentication,
+            @PathVariable Integer courseId,
+            @RequestParam(required = false) Integer quizId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        if (descriptiveGradingService == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        if (page != null || size != null) {
+            int p = page != null ? page : 0;
+            int s = size != null ? size : 20;
+            PageResponse<DescriptiveSubmissionResponse> response = descriptiveGradingService
+                    .getGradingQueuePaged(currentUser, courseId, quizId, status, p, s);
+            return ResponseEntity.ok(response);
+        } else {
+            List<DescriptiveSubmissionResponse> response = descriptiveGradingService
+                    .getGradingQueue(currentUser, courseId, quizId, status);
             return ResponseEntity.ok(response);
         }
     }
