@@ -4,10 +4,13 @@ import com.olp.dto.*;
 import com.olp.entity.LectureBookmark;
 import com.olp.entity.LectureMaterial;
 import com.olp.entity.LectureProgress;
+import com.olp.entity.Lesson;
 import com.olp.repository.EnrollmentCheckRepository;
 import com.olp.repository.LectureBookmarkRepository;
 import com.olp.repository.LectureMaterialRepository;
 import com.olp.repository.LectureProgressRepository;
+import com.olp.repository.LessonRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -28,6 +31,25 @@ public class StudentLearningService {
     private final EnrollmentCheckRepository enrollmentCheckRepository;
     private final MaterialStorageService materialStorageService;
     private final JdbcTemplate jdbcTemplate;
+    private final LessonRepository lessonRepository;
+
+    @Autowired
+    public StudentLearningService(
+            LectureProgressRepository lectureProgressRepository,
+            LectureMaterialRepository lectureMaterialRepository,
+            LectureBookmarkRepository lectureBookmarkRepository,
+            EnrollmentCheckRepository enrollmentCheckRepository,
+            MaterialStorageService materialStorageService,
+            JdbcTemplate jdbcTemplate,
+            @Autowired(required = false) LessonRepository lessonRepository) {
+        this.lectureProgressRepository = lectureProgressRepository;
+        this.lectureMaterialRepository = lectureMaterialRepository;
+        this.lectureBookmarkRepository = lectureBookmarkRepository;
+        this.enrollmentCheckRepository = enrollmentCheckRepository;
+        this.materialStorageService = materialStorageService;
+        this.jdbcTemplate = jdbcTemplate;
+        this.lessonRepository = lessonRepository;
+    }
 
     public StudentLearningService(
             LectureProgressRepository lectureProgressRepository,
@@ -36,12 +58,8 @@ public class StudentLearningService {
             EnrollmentCheckRepository enrollmentCheckRepository,
             MaterialStorageService materialStorageService,
             JdbcTemplate jdbcTemplate) {
-        this.lectureProgressRepository = lectureProgressRepository;
-        this.lectureMaterialRepository = lectureMaterialRepository;
-        this.lectureBookmarkRepository = lectureBookmarkRepository;
-        this.enrollmentCheckRepository = enrollmentCheckRepository;
-        this.materialStorageService = materialStorageService;
-        this.jdbcTemplate = jdbcTemplate;
+        this(lectureProgressRepository, lectureMaterialRepository, lectureBookmarkRepository,
+                enrollmentCheckRepository, materialStorageService, jdbcTemplate, null);
     }
 
     private Integer getCourseIdForLecture(Integer lectureId) {
@@ -125,46 +143,53 @@ public class StudentLearningService {
         return Map.of("lectureId", lectureId, "playbackPositionSeconds", position);
     }
 
-    // FR-S14, FR-I17: Access learning materials for a lecture
+    // FR-S14, FR-I17, FR-I18: Access learning materials for a lecture
     @Transactional(readOnly = true)
     public List<LectureMaterialResponse> getLectureMaterials(Integer studentId, Integer lectureId) {
         Integer courseId = getCourseIdForLecture(lectureId);
         verifyEnrollment(studentId, courseId);
 
         return lectureMaterialRepository.findByLectureId(lectureId).stream()
-                .filter(m -> m.getDeletedAt() == null)
+                .filter(m -> m.getDeletedAt() == null && m.isAvailableToStudent())
                 .sorted(java.util.Comparator.comparing(LectureMaterial::getOrderIndex, java.util.Comparator.nullsLast(Integer::compareTo)))
                 .map(this::toLectureMaterialResponse)
                 .collect(Collectors.toList());
     }
 
-    // FR-S14, FR-I17: Access learning materials for a lesson
+    // FR-S14, FR-I17, FR-I18: Access learning materials for a lesson
     @Transactional(readOnly = true)
     public List<LectureMaterialResponse> getLessonMaterials(Integer studentId, Integer lessonId) {
         Integer courseId = getCourseIdForLesson(lessonId);
         verifyEnrollment(studentId, courseId);
 
+        if (lessonRepository != null) {
+            Lesson lesson = lessonRepository.findById(lessonId).orElse(null);
+            if (lesson != null && !lesson.isAvailableToStudent()) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This lesson is scheduled for release and is not yet available to students.");
+            }
+        }
+
         return lectureMaterialRepository.findByLessonId(lessonId).stream()
-                .filter(m -> m.getDeletedAt() == null)
+                .filter(m -> m.getDeletedAt() == null && m.isAvailableToStudent())
                 .sorted(java.util.Comparator.comparing(LectureMaterial::getOrderIndex, java.util.Comparator.nullsLast(Integer::compareTo)))
                 .map(this::toLectureMaterialResponse)
                 .collect(Collectors.toList());
     }
 
-    // FR-S14, FR-I17: Access learning materials for a module
+    // FR-S14, FR-I17, FR-I18: Access learning materials for a module
     @Transactional(readOnly = true)
     public List<LectureMaterialResponse> getModuleMaterials(Integer studentId, Integer moduleId) {
         Integer courseId = getCourseIdForModule(moduleId);
         verifyEnrollment(studentId, courseId);
 
         return lectureMaterialRepository.findByModuleId(moduleId).stream()
-                .filter(m -> m.getDeletedAt() == null)
+                .filter(m -> m.getDeletedAt() == null && m.isAvailableToStudent())
                 .sorted(java.util.Comparator.comparing(LectureMaterial::getOrderIndex, java.util.Comparator.nullsLast(Integer::compareTo)))
                 .map(this::toLectureMaterialResponse)
                 .collect(Collectors.toList());
     }
 
-    // FR-I17: Secure download endpoint with enrollment & downloadable checks (DR-09)
+    // FR-I17, FR-I18: Secure download endpoint with enrollment & downloadable checks (DR-09, FR-I18)
     @Transactional(readOnly = true)
     public ResourceAndMetadata downloadMaterial(Integer studentId, Integer materialId) {
         LectureMaterial material = lectureMaterialRepository.findById(materialId)
@@ -176,6 +201,17 @@ public class StudentLearningService {
 
         Integer courseId = getCourseIdForMaterial(material);
         verifyEnrollment(studentId, courseId);
+
+        if (!material.isAvailableToStudent()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This content item is scheduled for release and is not yet available to students.");
+        }
+
+        if (lessonRepository != null && material.getLessonId() != null) {
+            Lesson lesson = lessonRepository.findById(material.getLessonId()).orElse(null);
+            if (lesson != null && !lesson.isAvailableToStudent()) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This content item's parent lesson is scheduled for release and is not yet available to students.");
+            }
+        }
 
         if (Boolean.FALSE.equals(material.getIsDownloadable()) || material.getIsDownloadable() == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This material is marked as view-only and cannot be downloaded");
@@ -190,7 +226,7 @@ public class StudentLearningService {
         );
     }
 
-    // FR-I17: Secure view/stream endpoint for embedded viewer
+    // FR-I17, FR-I18: Secure view/stream endpoint for embedded viewer
     @Transactional(readOnly = true)
     public ResourceAndMetadata viewMaterial(Integer studentId, Integer materialId) {
         LectureMaterial material = lectureMaterialRepository.findById(materialId)
@@ -203,6 +239,17 @@ public class StudentLearningService {
         Integer courseId = getCourseIdForMaterial(material);
         verifyEnrollment(studentId, courseId);
 
+        if (!material.isAvailableToStudent()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This content item is scheduled for release and is not yet available to students.");
+        }
+
+        if (lessonRepository != null && material.getLessonId() != null) {
+            Lesson lesson = lessonRepository.findById(material.getLessonId()).orElse(null);
+            if (lesson != null && !lesson.isAvailableToStudent()) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This content item's parent lesson is scheduled for release and is not yet available to students.");
+            }
+        }
+
         Resource resource = materialStorageService.loadMaterialAsResource(material.getFileUrl());
         return new ResourceAndMetadata(
                 resource,
@@ -212,7 +259,7 @@ public class StudentLearningService {
         );
     }
 
-    // FR-I17: Viewer metadata endpoint (does NOT expose download URL for view-only files)
+    // FR-I17, FR-I18: Viewer metadata endpoint (does NOT expose download URL for view-only files)
     @Transactional(readOnly = true)
     public MaterialViewerResponse getMaterialViewerInfo(Integer studentId, Integer materialId) {
         LectureMaterial material = lectureMaterialRepository.findById(materialId)
@@ -225,7 +272,37 @@ public class StudentLearningService {
         Integer courseId = getCourseIdForMaterial(material);
         verifyEnrollment(studentId, courseId);
 
+        if (!material.isAvailableToStudent()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This content item is scheduled for release and is not yet available to students.");
+        }
+
+        if (lessonRepository != null && material.getLessonId() != null) {
+            Lesson lesson = lessonRepository.findById(material.getLessonId()).orElse(null);
+            if (lesson != null && !lesson.isAvailableToStudent()) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This content item's parent lesson is scheduled for release and is not yet available to students.");
+            }
+        }
+
         return MaterialViewerResponse.fromEntity(material);
+    }
+
+    // FR-I18: Student lesson retrieval with release gating
+    @Transactional(readOnly = true)
+    public LessonResponse getLessonForStudent(Integer studentId, Integer lessonId) {
+        Integer courseId = getCourseIdForLesson(lessonId);
+        verifyEnrollment(studentId, courseId);
+
+        if (lessonRepository == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Lesson repository unavailable");
+        }
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found with id: " + lessonId));
+
+        if (!lesson.isAvailableToStudent()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This lesson is scheduled for release and is not yet available to students.");
+        }
+
+        return LessonResponse.fromEntity(lesson);
     }
 
     private LectureMaterialResponse toLectureMaterialResponse(LectureMaterial m) {
