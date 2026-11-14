@@ -236,5 +236,53 @@ class CourseStructureControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
     }
+
+    @Test
+    void testGetSections_Success() {
+        givenResolvedUser();
+        when(service.getSections(instructor, 10, 101)).thenReturn(List.of());
+
+        ResponseEntity<List<CourseSectionResponse>> response = controller.getSections(10, 101, authentication);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertNotNull(response.getBody());
+    }
+
+    @Test
+    void testGetSection_Success() {
+        givenResolvedUser();
+        CourseSectionResponse sectionRes = new CourseSectionResponse();
+        sectionRes.setId(201);
+        when(service.getSection(instructor, 10, 101, 201)).thenReturn(sectionRes);
+
+        ResponseEntity<CourseSectionResponse> response = controller.getSection(10, 101, 201, authentication);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(201, response.getBody().getId());
+    }
+
+    @Test
+    void testGetLessons_Success() {
+        givenResolvedUser();
+        when(service.getLessons(instructor, 10, 101, 201)).thenReturn(List.of());
+
+        ResponseEntity<List<LessonResponse>> response = controller.getLessons(10, 101, 201, authentication);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertNotNull(response.getBody());
+    }
+
+    @Test
+    void testGetLesson_Success() {
+        givenResolvedUser();
+        LessonResponse lessonRes = new LessonResponse();
+        lessonRes.setId(301);
+        when(service.getLesson(instructor, 10, 101, 201, 301)).thenReturn(lessonRes);
+
+        ResponseEntity<LessonResponse> response = controller.getLesson(10, 101, 201, 301, authentication);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(301, response.getBody().getId());
+    }
 }
 
