@@ -221,6 +221,14 @@ CREATE INDEX IF NOT EXISTS idx_grading_alerts_instructor ON pending_grading_aler
 CREATE INDEX IF NOT EXISTS idx_grading_alerts_course ON pending_grading_alerts(course_id);
 CREATE INDEX IF NOT EXISTS idx_grading_alerts_sent_at ON pending_grading_alerts(sent_at DESC);
 
+-- Step 51 / FR-I34: Publish or Withhold Results Indexes
+CREATE INDEX IF NOT EXISTS idx_quizzes_publish ON quizzes(results_published, results_withheld);
+CREATE INDEX IF NOT EXISTS idx_assignments_publish ON assignments(results_published, results_withheld);
+CREATE INDEX IF NOT EXISTS idx_exams_publish ON exams(results_published, results_withheld);
+CREATE INDEX IF NOT EXISTS idx_exam_attempts_published ON exam_attempts(is_published, is_locked);
+CREATE INDEX IF NOT EXISTS idx_assignment_submissions_published ON assignment_submissions(is_published, is_locked);
+CREATE INDEX IF NOT EXISTS idx_quiz_attempts_published ON quiz_attempts(is_published, is_locked);
+
 
 
 

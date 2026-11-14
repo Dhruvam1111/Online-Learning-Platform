@@ -63,6 +63,12 @@ public class QuizAttempt {
     @Column(name = "is_published", nullable = false)
     private Boolean isPublished = false;
 
+    @Column(name = "published_at")
+    private LocalDateTime publishedAt;
+
+    @Column(name = "is_locked", nullable = false)
+    private Boolean isLocked = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -221,6 +227,30 @@ public class QuizAttempt {
 
     public void setPublished(boolean published) {
         this.isPublished = published;
+    }
+
+    public LocalDateTime getPublishedAt() {
+        return publishedAt;
+    }
+
+    public void setPublishedAt(LocalDateTime publishedAt) {
+        this.publishedAt = publishedAt;
+    }
+
+    public Boolean getIsLocked() {
+        return isLocked != null ? isLocked : false;
+    }
+
+    public void setIsLocked(Boolean isLocked) {
+        this.isLocked = isLocked != null ? isLocked : false;
+    }
+
+    public boolean isLocked() {
+        return Boolean.TRUE.equals(this.isLocked);
+    }
+
+    public void setLocked(boolean locked) {
+        this.isLocked = locked;
     }
 
     public LocalDateTime getCreatedAt() {

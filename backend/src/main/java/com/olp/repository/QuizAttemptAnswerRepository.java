@@ -113,6 +113,12 @@ public interface QuizAttemptAnswerRepository extends JpaRepository<QuizAttemptAn
            "AND a.evaluationStatus = com.olp.entity.EvaluationStatus.MANUAL_GRADING_REQUIRED")
     long countPendingDescriptiveByCourseId(@Param("courseId") Integer courseId);
 
+    @Query("SELECT COUNT(a) FROM QuizAttemptAnswer a " +
+           "WHERE a.attempt.quiz.id = :quizId " +
+           "AND (a.question.questionType = com.olp.entity.QuestionType.DESCRIPTIVE OR a.question.requiresManualGrading = true) " +
+           "AND a.evaluationStatus = com.olp.entity.EvaluationStatus.MANUAL_GRADING_REQUIRED")
+    long countPendingDescriptiveByQuizId(@Param("quizId") Integer quizId);
+
     @Query("SELECT a FROM QuizAttemptAnswer a " +
            "JOIN FETCH a.question q " +
            "JOIN FETCH a.attempt att " +
