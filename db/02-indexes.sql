@@ -183,6 +183,15 @@ CREATE INDEX IF NOT EXISTS idx_questions_origin ON questions(origin);
 CREATE INDEX IF NOT EXISTS idx_quizzes_review_toggle ON quizzes(show_correct_answers, show_feedback, answer_release_timing);
 CREATE INDEX IF NOT EXISTS idx_quizzes_is_exam ON quizzes(is_exam);
 
+-- Step 28 / FR-I68: Assignments Indexes
+CREATE INDEX IF NOT EXISTS idx_assignments_course_id ON assignments(course_id);
+CREATE INDEX IF NOT EXISTS idx_assignments_lesson_id ON assignments(lesson_id);
+CREATE INDEX IF NOT EXISTS idx_assignments_deadline ON assignments(deadline);
+CREATE INDEX IF NOT EXISTS idx_assignment_submissions_assignment_id ON assignment_submissions(assignment_id);
+CREATE INDEX IF NOT EXISTS idx_assignment_submissions_student_id ON assignment_submissions(student_id);
+CREATE INDEX IF NOT EXISTS idx_assignment_submissions_grading_status ON assignment_submissions(grading_status);
+
+
 
 
 
