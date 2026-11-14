@@ -251,6 +251,9 @@ CREATE TABLE lessons (
     duration_minutes INTEGER,
     order_index      INTEGER      NOT NULL DEFAULT 0,
     metadata         TEXT,
+    release_at       TIMESTAMP,
+    is_released      BOOLEAN      NOT NULL DEFAULT TRUE,
+    time_zone        VARCHAR(50)  DEFAULT 'Asia/Kolkata',
     created_at       TIMESTAMP    NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMP    NOT NULL DEFAULT NOW(),
 
@@ -462,6 +465,9 @@ CREATE TABLE IF NOT EXISTS lecture_materials (
     scan_status       VARCHAR(30) NOT NULL DEFAULT 'CLEAN',
     order_index       INTEGER NOT NULL DEFAULT 1,
     deleted_at        TIMESTAMP,
+    release_at        TIMESTAMP,
+    is_released       BOOLEAN NOT NULL DEFAULT TRUE,
+    time_zone         VARCHAR(50) DEFAULT 'Asia/Kolkata',
     created_at        TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at        TIMESTAMP NOT NULL DEFAULT NOW()
 );
@@ -856,6 +862,16 @@ CREATE TABLE IF NOT EXISTS lesson_progress (
 -- Step 19 / FR-I16: Content Reorder, Replace and Remove
 ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS order_index INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+
+-- Step 20 / FR-I18: Scheduled Content Release
+ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS release_at TIMESTAMP;
+ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS is_released BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS time_zone VARCHAR(50) DEFAULT 'Asia/Kolkata';
+
+ALTER TABLE lessons ADD COLUMN IF NOT EXISTS release_at TIMESTAMP;
+ALTER TABLE lessons ADD COLUMN IF NOT EXISTS is_released BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE lessons ADD COLUMN IF NOT EXISTS time_zone VARCHAR(50) DEFAULT 'Asia/Kolkata';
+
 
 
 

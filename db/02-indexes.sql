@@ -159,6 +159,11 @@ CREATE INDEX IF NOT EXISTS idx_certificates_course_issued_at ON certificates(cou
 CREATE INDEX IF NOT EXISTS idx_materials_lesson_order ON lecture_materials(lesson_id, order_index);
 CREATE INDEX IF NOT EXISTS idx_materials_deleted_at ON lecture_materials(deleted_at);
 
+-- Step 20 / FR-I18: Scheduled Content Release Indexes
+CREATE INDEX IF NOT EXISTS idx_materials_release_schedule ON lecture_materials(is_released, release_at);
+CREATE INDEX IF NOT EXISTS idx_lessons_release_schedule ON lessons(is_released, release_at);
+
+
 
 
 
