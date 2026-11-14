@@ -78,6 +78,10 @@ public class Exam {
     @Column(name = "total_sets", nullable = false)
     private Integer totalSets = 1;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "question_correction_policy", length = 30, nullable = false)
+    private QuestionCorrectionPolicy questionCorrectionPolicy = QuestionCorrectionPolicy.AWARD_FULL_MARKS;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -373,6 +377,14 @@ public class Exam {
 
     public void setMonitoringConfig(ExamMonitoringConfig monitoringConfig) {
         this.monitoringConfig = monitoringConfig;
+    }
+
+    public QuestionCorrectionPolicy getQuestionCorrectionPolicy() {
+        return questionCorrectionPolicy;
+    }
+
+    public void setQuestionCorrectionPolicy(QuestionCorrectionPolicy questionCorrectionPolicy) {
+        this.questionCorrectionPolicy = questionCorrectionPolicy != null ? questionCorrectionPolicy : QuestionCorrectionPolicy.AWARD_FULL_MARKS;
     }
 }
 

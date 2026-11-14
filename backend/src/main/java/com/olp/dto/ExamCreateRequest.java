@@ -1,5 +1,6 @@
 package com.olp.dto;
 
+import com.olp.entity.QuestionCorrectionPolicy;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -64,6 +65,8 @@ public class ExamCreateRequest {
     private Long randomSeed;
 
     private Integer totalSets = 1;
+
+    private QuestionCorrectionPolicy questionCorrectionPolicy = QuestionCorrectionPolicy.AWARD_FULL_MARKS;
 
     private List<ExamBlueprintItemDto> blueprints = new ArrayList<>();
 
@@ -229,6 +232,14 @@ public class ExamCreateRequest {
 
     public void setBlueprints(List<ExamBlueprintItemDto> blueprints) {
         this.blueprints = blueprints;
+    }
+
+    public QuestionCorrectionPolicy getQuestionCorrectionPolicy() {
+        return questionCorrectionPolicy;
+    }
+
+    public void setQuestionCorrectionPolicy(QuestionCorrectionPolicy questionCorrectionPolicy) {
+        this.questionCorrectionPolicy = questionCorrectionPolicy;
     }
 }
 

@@ -1,5 +1,6 @@
 package com.olp.dto;
 
+import com.olp.entity.QuestionCorrectionPolicy;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -53,6 +54,8 @@ public class ExamUpdateRequest {
     private Long randomSeed;
 
     private Integer totalSets;
+
+    private QuestionCorrectionPolicy questionCorrectionPolicy;
 
     public ExamUpdateRequest() {}
 
@@ -190,6 +193,14 @@ public class ExamUpdateRequest {
 
     public void setTotalSets(Integer totalSets) {
         this.totalSets = totalSets;
+    }
+
+    public QuestionCorrectionPolicy getQuestionCorrectionPolicy() {
+        return questionCorrectionPolicy;
+    }
+
+    public void setQuestionCorrectionPolicy(QuestionCorrectionPolicy questionCorrectionPolicy) {
+        this.questionCorrectionPolicy = questionCorrectionPolicy;
     }
 }
 
