@@ -244,6 +244,27 @@ public class QuizAttemptService {
         long usedAttempts = quizAttemptRepository.countByQuizIdAndStudentId(quiz.getId(), currentUser.getId());
         QuizAttemptResponse response = mapToAttemptResponse(saved, quiz, serverNow, usedAttempts);
         if (summary != null) {
+            boolean isStudent = "student".equalsIgnoreCase(currentUser.getRole());
+            if (isStudent) {
+                boolean answersVisible = quiz.isCorrectAnswersVisible(serverNow);
+                boolean feedbackVisible = quiz.isFeedbackVisible(serverNow);
+                summary.setCorrectAnswersVisible(answersVisible);
+                summary.setShowCorrectAnswers(quiz.getShowCorrectAnswers());
+                if (!answersVisible) {
+                    for (QuestionEvaluationResult result : summary.getResults()) {
+                        result.redactCorrectAnswer();
+                    }
+                }
+                if (!feedbackVisible) {
+                    summary.setOverallFeedback(null);
+                    for (QuestionEvaluationResult result : summary.getResults()) {
+                        result.redactFeedback();
+                    }
+                }
+            } else {
+                summary.setCorrectAnswersVisible(true);
+                summary.setShowCorrectAnswers(quiz.getShowCorrectAnswers());
+            }
             response.setEvaluationSummary(summary);
         }
         return response;
@@ -280,6 +301,10 @@ public class QuizAttemptService {
 
         boolean feedbackEnabled = quiz.getFeedbackReleased() == null || quiz.getFeedbackReleased();
         boolean attemptPublished = Boolean.TRUE.equals(attempt.getIsPublished());
+        LocalDateTime serverNow = LocalDateTime.now(clock);
+        boolean answersVisible = !isStudent || quiz.isCorrectAnswersVisible(serverNow);
+        boolean feedbackAllowedByQuiz = !isStudent || quiz.isFeedbackVisible(serverNow);
+        boolean overallFeedbackVisible = !isStudent || (feedbackAllowedByQuiz && attemptPublished);
 
         QuizEvaluationSummary summary = new QuizEvaluationSummary();
         summary.setQuizId(quiz.getId());
@@ -287,10 +312,12 @@ public class QuizAttemptService {
         summary.setPassingMarks(quiz.getPassingMarks());
         summary.setFeedbackReleased(feedbackEnabled);
         summary.setResultsPublished(attemptPublished);
+        summary.setCorrectAnswersVisible(answersVisible);
+        summary.setShowCorrectAnswers(quiz.getShowCorrectAnswers());
 
         if (isStudent) {
-            // Student visibility: overall feedback only if feedback released and results published
-            if (feedbackEnabled && attemptPublished) {
+            // Student visibility: overall feedback only if allowed by quiz and attempt results published
+            if (overallFeedbackVisible) {
                 summary.setOverallFeedback(attempt.getOverallFeedback());
                 if (attempt.getGrader() != null) {
                     summary.setGraderId(attempt.getGrader().getId());
@@ -332,12 +359,14 @@ public class QuizAttemptService {
                     marks = BigDecimal.ZERO;
                     feedback = null;
                     requiresManual = true;
-                } else if (!feedbackEnabled) {
+                } else if (!feedbackAllowedByQuiz) {
                     feedback = null;
                 } else if (requiresManual && status != EvaluationStatus.PUBLISHED) {
                     feedback = null;
                 }
             }
+
+            String effectiveCorrectAnswer = answersVisible ? q.getCorrectAnswer() : null;
 
             QuestionEvaluationResult res = new QuestionEvaluationResult(
                     q.getId(),
@@ -346,7 +375,7 @@ public class QuizAttemptService {
                     marks,
                     ans.getMaxMarks(),
                     ans.getSubmittedAnswer(),
-                    q.getCorrectAnswer(),
+                    effectiveCorrectAnswer,
                     q.getNumericalTolerance(),
                     feedback,
                     requiresManual

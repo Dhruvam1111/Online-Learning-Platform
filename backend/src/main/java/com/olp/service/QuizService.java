@@ -115,6 +115,18 @@ public class QuizService {
         quiz.setPartialMarking(Boolean.TRUE.equals(request.getPartialMarking()));
         quiz.setNumericTolerance(request.getNumericTolerance() != null ? request.getNumericTolerance() : BigDecimal.ZERO);
 
+        boolean isExam = Boolean.TRUE.equals(request.getIsExam());
+        quiz.setIsExam(isExam);
+        if (isExam) {
+            quiz.setShowCorrectAnswers(request.getShowCorrectAnswers() != null ? request.getShowCorrectAnswers() : false);
+            quiz.setShowFeedback(request.getShowFeedback() != null ? request.getShowFeedback() : false);
+            quiz.setAnswerReleaseTiming(request.getAnswerReleaseTiming() != null ? validateAnswerReleaseTiming(request.getAnswerReleaseTiming()) : "AFTER_DEADLINE");
+        } else {
+            quiz.setShowCorrectAnswers(request.getShowCorrectAnswers() != null ? request.getShowCorrectAnswers() : true);
+            quiz.setShowFeedback(request.getShowFeedback() != null ? request.getShowFeedback() : true);
+            quiz.setAnswerReleaseTiming(request.getAnswerReleaseTiming() != null ? validateAnswerReleaseTiming(request.getAnswerReleaseTiming()) : "IMMEDIATELY");
+        }
+
         Quiz saved = quizRepository.save(quiz);
 
         List<QuizQuestion> attachedQuestions = new ArrayList<>();
@@ -265,6 +277,18 @@ public class QuizService {
         if (request.getNumericTolerance() != null) {
             quiz.setNumericTolerance(request.getNumericTolerance());
         }
+        if (request.getIsExam() != null) {
+            quiz.setIsExam(request.getIsExam());
+        }
+        if (request.getShowCorrectAnswers() != null) {
+            quiz.setShowCorrectAnswers(request.getShowCorrectAnswers());
+        }
+        if (request.getShowFeedback() != null) {
+            quiz.setShowFeedback(request.getShowFeedback());
+        }
+        if (request.getAnswerReleaseTiming() != null) {
+            quiz.setAnswerReleaseTiming(validateAnswerReleaseTiming(request.getAnswerReleaseTiming()));
+        }
         if (quiz.getMaxAttempts() == null) {
             quiz.setMaxAttempts(1);
         }
@@ -348,6 +372,18 @@ public class QuizService {
         }
         if (request.getNumericTolerance() != null) {
             quiz.setNumericTolerance(request.getNumericTolerance());
+        }
+        if (request.getIsExam() != null) {
+            quiz.setIsExam(request.getIsExam());
+        }
+        if (request.getShowCorrectAnswers() != null) {
+            quiz.setShowCorrectAnswers(request.getShowCorrectAnswers());
+        }
+        if (request.getShowFeedback() != null) {
+            quiz.setShowFeedback(request.getShowFeedback());
+        }
+        if (request.getAnswerReleaseTiming() != null) {
+            quiz.setAnswerReleaseTiming(validateAnswerReleaseTiming(request.getAnswerReleaseTiming()));
         }
 
         validateAvailabilityWindowBounds(quiz.getAvailableFrom(), quiz.getAvailableUntil());
@@ -728,6 +764,17 @@ public class QuizService {
         return trimmed;
     }
 
+    private String validateAnswerReleaseTiming(String timing) {
+        if (timing == null || timing.trim().isEmpty()) {
+            return "IMMEDIATELY";
+        }
+        String upper = timing.trim().toUpperCase();
+        if (!upper.equals("IMMEDIATELY") && !upper.equals("AFTER_DEADLINE") && !upper.equals("NEVER")) {
+            throw new IllegalArgumentException("Invalid answerReleaseTiming: " + timing + ". Must be IMMEDIATELY, AFTER_DEADLINE, or NEVER.");
+        }
+        return upper;
+    }
+
     private void validateQuizNumericFields(QuizRequest request) {
         validateNonNegative(request.getTotalMarks(), "Total marks");
         validateNonNegative(request.getPassingMarks(), "Passing marks");
@@ -859,6 +906,10 @@ public class QuizService {
         response.setNumericTolerance(quiz.getNumericTolerance());
         response.setMarkingRulesSummary(QuizSettingsResponse.computeMarkingRulesSummary(
                 quiz.getNegativeMarking(), quiz.getPartialMarking(), quiz.getNumericTolerance()));
+        response.setShowCorrectAnswers(quiz.getShowCorrectAnswers());
+        response.setShowFeedback(quiz.getShowFeedback());
+        response.setAnswerReleaseTiming(quiz.getAnswerReleaseTiming());
+        response.setIsExam(quiz.getIsExam());
         List<QuizQuestionResponse> questionResponses = questions.stream()
                 .map(this::mapToQuizQuestionResponse)
                 .toList();
@@ -898,6 +949,12 @@ public class QuizService {
         response.setNumericTolerance(quiz.getNumericTolerance());
         response.setMarkingRulesSummary(QuizSettingsResponse.computeMarkingRulesSummary(
                 quiz.getNegativeMarking(), quiz.getPartialMarking(), quiz.getNumericTolerance()));
+        response.setShowCorrectAnswers(quiz.getShowCorrectAnswers());
+        response.setShowFeedback(quiz.getShowFeedback());
+        response.setAnswerReleaseTiming(quiz.getAnswerReleaseTiming());
+        response.setIsExam(quiz.getIsExam());
+        response.setCorrectAnswersVisible(quiz.isCorrectAnswersVisible(serverNow));
+        response.setFeedbackVisible(quiz.isFeedbackVisible(serverNow));
         response.setServerTime(serverNow);
 
         boolean currentlyAvailable = quiz.getStatus() == QuizStatus.PUBLISHED;
