@@ -191,6 +191,15 @@ CREATE INDEX IF NOT EXISTS idx_assignment_submissions_assignment_id ON assignmen
 CREATE INDEX IF NOT EXISTS idx_assignment_submissions_student_id ON assignment_submissions(student_id);
 CREATE INDEX IF NOT EXISTS idx_assignment_submissions_grading_status ON assignment_submissions(grading_status);
 
+-- Step 38 / FR-I25: Create and Schedule Examinations Indexes
+CREATE INDEX IF NOT EXISTS idx_exams_course_id ON exams(course_id);
+CREATE INDEX IF NOT EXISTS idx_exams_status ON exams(status);
+CREATE INDEX IF NOT EXISTS idx_exams_window ON exams(start_window, end_window);
+CREATE INDEX IF NOT EXISTS idx_exam_questions_exam_id ON exam_questions(exam_id);
+CREATE INDEX IF NOT EXISTS idx_exam_attempts_exam_student ON exam_attempts(exam_id, student_id);
+CREATE INDEX IF NOT EXISTS idx_exam_attempts_status ON exam_attempts(status);
+
+
 
 
 

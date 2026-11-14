@@ -963,6 +963,56 @@ CREATE TABLE IF NOT EXISTS assignment_submissions (
     CONSTRAINT uq_assignment_student UNIQUE (assignment_id, student_id)
 );
 
+-- Step 38 / FR-I25: Create and Schedule Examinations
+CREATE TABLE IF NOT EXISTS exams (
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    instructions TEXT,
+    start_window TIMESTAMP NOT NULL,
+    end_window TIMESTAMP NOT NULL,
+    duration_minutes INTEGER NOT NULL,
+    time_zone VARCHAR(50) NOT NULL DEFAULT 'UTC',
+    max_marks NUMERIC(8, 2) NOT NULL DEFAULT 100.00,
+    passing_marks NUMERIC(8, 2),
+    max_attempts INTEGER NOT NULL DEFAULT 1,
+    min_progress_percentage NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
+    require_prerequisites BOOLEAN NOT NULL DEFAULT TRUE,
+    require_enrollment BOOLEAN NOT NULL DEFAULT TRUE,
+    status VARCHAR(30) NOT NULL DEFAULT 'SCHEDULED',
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS exam_questions (
+    id SERIAL PRIMARY KEY,
+    exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE RESTRICT,
+    version INTEGER NOT NULL DEFAULT 1,
+    marks NUMERIC(8, 2) NOT NULL DEFAULT 1.00,
+    order_index INTEGER NOT NULL DEFAULT 1,
+    CONSTRAINT uq_exam_question_order UNIQUE (exam_id, order_index)
+);
+
+CREATE TABLE IF NOT EXISTS exam_attempts (
+    id SERIAL PRIMARY KEY,
+    exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    attempt_number INTEGER NOT NULL DEFAULT 1,
+    started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMP NOT NULL,
+    submitted_at TIMESTAMP,
+    status VARCHAR(30) NOT NULL DEFAULT 'IN_PROGRESS',
+    total_marks NUMERIC(8, 2),
+    obtained_marks NUMERIC(8, 2),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_exam_student_attempt UNIQUE (exam_id, student_id, attempt_number)
+);
+
+
 
 
 
