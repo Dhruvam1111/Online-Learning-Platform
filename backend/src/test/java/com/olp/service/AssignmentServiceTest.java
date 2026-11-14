@@ -400,5 +400,76 @@ class AssignmentServiceTest {
         // 1 second after deadlineUtc
         assertTrue(assignment.isSubmissionLate(deadlineUtc.plusSeconds(1)), "Past deadline is late");
     }
+
+    @Test
+    void testGradeSubmission_WhenSubmissionIsLocked_ThrowsIllegalStateException() {
+        Assignment assignment = new Assignment(
+                course, null, null, instructor, "Locked Lab", "Desc", deadlineUtc,
+                new BigDecimal("100.00"), "Rubric", "FILE", "REJECT", BigDecimal.ZERO, "PUBLISHED");
+        assignment.setId(509);
+
+        AssignmentSubmission sub = new AssignmentSubmission(
+                assignment, student, "FILE", "https://s3/test.pdf", "test.pdf", 1024L, null,
+                deadlineUtc.minusHours(1), false, BigDecimal.ZERO);
+        sub.setId(908);
+        sub.setIsLocked(true);
+
+        when(courseRepository.findById(100)).thenReturn(Optional.of(course));
+        when(assignmentSubmissionRepository.findById(908)).thenReturn(Optional.of(sub));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+                assignmentService.gradeSubmission(instructor, 908, new BigDecimal("85.00"), "Good work"));
+        assertTrue(ex.getMessage().contains("locked (DR-01)"));
+    }
+
+    @Test
+    void testGetMySubmission_WhenResultsWithheld_MasksMarksAndFeedback() {
+        Assignment assignment = new Assignment(
+                course, null, null, instructor, "Lab 1", "Desc", deadlineUtc,
+                new BigDecimal("100.00"), "Rubric", "FILE", "REJECT", BigDecimal.ZERO, "PUBLISHED");
+        assignment.setId(510);
+        assignment.setResultsWithheld(true);
+
+        AssignmentSubmission sub = new AssignmentSubmission(
+                assignment, student, "FILE", "https://s3/test.pdf", "test.pdf", 1024L, null,
+                deadlineUtc.minusHours(1), false, BigDecimal.ZERO);
+        sub.setId(909);
+        sub.setAwardedMarks(new BigDecimal("95.00"));
+        sub.setFeedback("Great job!");
+        sub.setIsPublished(true);
+
+        when(assignmentSubmissionRepository.findByAssignmentIdAndStudentId(510, 20)).thenReturn(Optional.of(sub));
+
+        AssignmentSubmissionResponse res = assignmentService.getMySubmission(student, 510);
+        assertNotNull(res);
+        assertNull(res.getAwardedMarks(), "Awarded marks must be withheld from student");
+        assertNull(res.getEffectiveMarks(), "Effective marks must be withheld from student");
+        assertNull(res.getFeedback(), "Feedback must be withheld from student");
+    }
+
+    @Test
+    void testGetMySubmission_WhenResultsPublished_RevealsMarksAndFeedback() {
+        Assignment assignment = new Assignment(
+                course, null, null, instructor, "Lab 2", "Desc", deadlineUtc,
+                new BigDecimal("100.00"), "Rubric", "FILE", "REJECT", BigDecimal.ZERO, "PUBLISHED");
+        assignment.setId(511);
+        assignment.setResultsPublished(true);
+        assignment.setResultsWithheld(false);
+
+        AssignmentSubmission sub = new AssignmentSubmission(
+                assignment, student, "FILE", "https://s3/test.pdf", "test.pdf", 1024L, null,
+                deadlineUtc.minusHours(1), false, BigDecimal.ZERO);
+        sub.setId(910);
+        sub.setAwardedMarks(new BigDecimal("95.00"));
+        sub.setFeedback("Great job!");
+        sub.setIsPublished(true);
+
+        when(assignmentSubmissionRepository.findByAssignmentIdAndStudentId(511, 20)).thenReturn(Optional.of(sub));
+
+        AssignmentSubmissionResponse res = assignmentService.getMySubmission(student, 511);
+        assertNotNull(res);
+        assertEquals(new BigDecimal("95.00"), res.getAwardedMarks());
+        assertEquals("Great job!", res.getFeedback());
+    }
 }
 
