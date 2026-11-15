@@ -75,6 +75,15 @@ public class ExamAttempt {
     @Column(name = "monitoring_flags", columnDefinition = "TEXT")
     private String monitoringFlags;
 
+    @Column(name = "screen_share_consent_given", nullable = false)
+    private Boolean screenShareConsentGiven = false;
+
+    @Column(name = "screen_share_consent_at")
+    private LocalDateTime screenShareConsentAt;
+
+    @Column(name = "screen_share_active", nullable = false)
+    private Boolean screenShareActive = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -301,6 +310,30 @@ public class ExamAttempt {
 
     public void setMonitoringFlags(String monitoringFlags) {
         this.monitoringFlags = monitoringFlags;
+    }
+
+    public Boolean getScreenShareConsentGiven() {
+        return screenShareConsentGiven;
+    }
+
+    public void setScreenShareConsentGiven(Boolean screenShareConsentGiven) {
+        this.screenShareConsentGiven = screenShareConsentGiven != null ? screenShareConsentGiven : false;
+    }
+
+    public LocalDateTime getScreenShareConsentAt() {
+        return screenShareConsentAt;
+    }
+
+    public void setScreenShareConsentAt(LocalDateTime screenShareConsentAt) {
+        this.screenShareConsentAt = screenShareConsentAt;
+    }
+
+    public Boolean getScreenShareActive() {
+        return screenShareActive;
+    }
+
+    public void setScreenShareActive(Boolean screenShareActive) {
+        this.screenShareActive = screenShareActive != null ? screenShareActive : false;
     }
 }
 

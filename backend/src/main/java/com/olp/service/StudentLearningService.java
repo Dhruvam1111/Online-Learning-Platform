@@ -20,6 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -137,7 +138,7 @@ public class StudentLearningService {
         verifyEnrollment(studentId, courseId);
 
         int position = lectureProgressRepository.findByStudentIdAndLectureId(studentId, lectureId)
-                .map(LectureProgress::getPlaybackPositionSeconds)
+                .map(p -> p.getPlaybackPositionSeconds())
                 .orElse(0);
 
         return Map.of("lectureId", lectureId, "playbackPositionSeconds", position);
@@ -151,7 +152,7 @@ public class StudentLearningService {
 
         return lectureMaterialRepository.findByLectureId(lectureId).stream()
                 .filter(m -> m.getDeletedAt() == null && m.isAvailableToStudent())
-                .sorted(java.util.Comparator.comparing(LectureMaterial::getOrderIndex, java.util.Comparator.nullsLast(Integer::compareTo)))
+                .sorted(java.util.Comparator.comparing(m -> m.getOrderIndex(), java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
                 .map(this::toLectureMaterialResponse)
                 .collect(Collectors.toList());
     }
@@ -163,7 +164,7 @@ public class StudentLearningService {
         verifyEnrollment(studentId, courseId);
 
         if (lessonRepository != null) {
-            Lesson lesson = lessonRepository.findById(lessonId).orElse(null);
+            Lesson lesson = lessonRepository.findById(Objects.requireNonNull(lessonId)).orElse(null);
             if (lesson != null && !lesson.isAvailableToStudent()) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This lesson is scheduled for release and is not yet available to students.");
             }
@@ -171,7 +172,7 @@ public class StudentLearningService {
 
         return lectureMaterialRepository.findByLessonId(lessonId).stream()
                 .filter(m -> m.getDeletedAt() == null && m.isAvailableToStudent())
-                .sorted(java.util.Comparator.comparing(LectureMaterial::getOrderIndex, java.util.Comparator.nullsLast(Integer::compareTo)))
+                .sorted(java.util.Comparator.comparing(m -> m.getOrderIndex(), java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
                 .map(this::toLectureMaterialResponse)
                 .collect(Collectors.toList());
     }
@@ -184,7 +185,7 @@ public class StudentLearningService {
 
         return lectureMaterialRepository.findByModuleId(moduleId).stream()
                 .filter(m -> m.getDeletedAt() == null && m.isAvailableToStudent())
-                .sorted(java.util.Comparator.comparing(LectureMaterial::getOrderIndex, java.util.Comparator.nullsLast(Integer::compareTo)))
+                .sorted(java.util.Comparator.comparing(m -> m.getOrderIndex(), java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
                 .map(this::toLectureMaterialResponse)
                 .collect(Collectors.toList());
     }
@@ -192,7 +193,7 @@ public class StudentLearningService {
     // FR-I17, FR-I18: Secure download endpoint with enrollment & downloadable checks (DR-09, FR-I18)
     @Transactional(readOnly = true)
     public ResourceAndMetadata downloadMaterial(Integer studentId, Integer materialId) {
-        LectureMaterial material = lectureMaterialRepository.findById(materialId)
+        LectureMaterial material = lectureMaterialRepository.findById(Objects.requireNonNull(materialId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found with id: " + materialId));
 
         if (material.getDeletedAt() != null) {
@@ -207,7 +208,7 @@ public class StudentLearningService {
         }
 
         if (lessonRepository != null && material.getLessonId() != null) {
-            Lesson lesson = lessonRepository.findById(material.getLessonId()).orElse(null);
+            Lesson lesson = lessonRepository.findById(Objects.requireNonNull(material.getLessonId())).orElse(null);
             if (lesson != null && !lesson.isAvailableToStudent()) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This content item's parent lesson is scheduled for release and is not yet available to students.");
             }
@@ -229,7 +230,7 @@ public class StudentLearningService {
     // FR-I17, FR-I18: Secure view/stream endpoint for embedded viewer
     @Transactional(readOnly = true)
     public ResourceAndMetadata viewMaterial(Integer studentId, Integer materialId) {
-        LectureMaterial material = lectureMaterialRepository.findById(materialId)
+        LectureMaterial material = lectureMaterialRepository.findById(Objects.requireNonNull(materialId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found with id: " + materialId));
 
         if (material.getDeletedAt() != null) {
@@ -244,7 +245,7 @@ public class StudentLearningService {
         }
 
         if (lessonRepository != null && material.getLessonId() != null) {
-            Lesson lesson = lessonRepository.findById(material.getLessonId()).orElse(null);
+            Lesson lesson = lessonRepository.findById(Objects.requireNonNull(material.getLessonId())).orElse(null);
             if (lesson != null && !lesson.isAvailableToStudent()) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This content item's parent lesson is scheduled for release and is not yet available to students.");
             }
@@ -262,7 +263,7 @@ public class StudentLearningService {
     // FR-I17, FR-I18: Viewer metadata endpoint (does NOT expose download URL for view-only files)
     @Transactional(readOnly = true)
     public MaterialViewerResponse getMaterialViewerInfo(Integer studentId, Integer materialId) {
-        LectureMaterial material = lectureMaterialRepository.findById(materialId)
+        LectureMaterial material = lectureMaterialRepository.findById(Objects.requireNonNull(materialId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found with id: " + materialId));
 
         if (material.getDeletedAt() != null) {
@@ -277,7 +278,7 @@ public class StudentLearningService {
         }
 
         if (lessonRepository != null && material.getLessonId() != null) {
-            Lesson lesson = lessonRepository.findById(material.getLessonId()).orElse(null);
+            Lesson lesson = lessonRepository.findById(Objects.requireNonNull(material.getLessonId())).orElse(null);
             if (lesson != null && !lesson.isAvailableToStudent()) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This content item's parent lesson is scheduled for release and is not yet available to students.");
             }
@@ -295,7 +296,7 @@ public class StudentLearningService {
         if (lessonRepository == null) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Lesson repository unavailable");
         }
-        Lesson lesson = lessonRepository.findById(lessonId)
+        Lesson lesson = lessonRepository.findById(Objects.requireNonNull(lessonId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found with id: " + lessonId));
 
         if (!lesson.isAvailableToStudent()) {

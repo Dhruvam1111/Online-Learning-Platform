@@ -1094,6 +1094,178 @@ CREATE TABLE IF NOT EXISTS pending_grading_alerts (
     CONSTRAINT uq_grading_alert_digest UNIQUE (instructor_id, course_id, alert_type, digest_date)
 );
 
+-- ============================================================
+-- STUDENT BACKEND: FR-S52 TO FR-S79
+-- ============================================================
+
+-- FR-S52: Personalized Study Schedule (Section 8)
+CREATE TABLE IF NOT EXISTS study_schedules (
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    task_description TEXT,
+    item_type VARCHAR(50) NOT NULL DEFAULT 'REVISION',
+    reference_id INTEGER,
+    scheduled_start TIMESTAMP NOT NULL,
+    scheduled_end TIMESTAMP NOT NULL,
+    priority VARCHAR(20) NOT NULL DEFAULT 'MEDIUM',
+    is_completed BOOLEAN NOT NULL DEFAULT FALSE,
+    completed_at TIMESTAMP,
+    time_zone VARCHAR(50) NOT NULL DEFAULT 'UTC',
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- FR-S52 to FR-S61: Examination Monitoring and Anti-Cheating (Section 9)
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS screen_share_consent_given BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS screen_share_consent_at TIMESTAMP;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS screen_share_active BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS exam_monitoring_logs (
+    id SERIAL PRIMARY KEY,
+    attempt_id INTEGER NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    event_type VARCHAR(50) NOT NULL,
+    event_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+    duration_seconds INTEGER DEFAULT 0,
+    details TEXT,
+    severity VARCHAR(20) NOT NULL DEFAULT 'INFO',
+    rule_triggered VARCHAR(100),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- FR-S62 to FR-S65: Communication and Interaction (Section 10)
+CREATE TABLE IF NOT EXISTS course_announcements (
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    instructor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    is_pinned BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS course_discussions (
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    category VARCHAR(50) NOT NULL DEFAULT 'GENERAL',
+    lecture_id INTEGER REFERENCES lectures(id) ON DELETE SET NULL,
+    is_answered BOOLEAN NOT NULL DEFAULT FALSE,
+    upvotes INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS discussion_replies (
+    id SERIAL PRIMARY KEY,
+    discussion_id INTEGER NOT NULL REFERENCES course_discussions(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    is_instructor_reply BOOLEAN NOT NULL DEFAULT FALSE,
+    is_accepted_answer BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS student_notifications (
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    reference_id INTEGER,
+    reference_url VARCHAR(255),
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- FR-S66 to FR-S70: Gamification and Engagement (Section 11)
+CREATE TABLE IF NOT EXISTS student_gamification (
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    total_points INTEGER NOT NULL DEFAULT 0,
+    current_streak_days INTEGER NOT NULL DEFAULT 0,
+    longest_streak_days INTEGER NOT NULL DEFAULT 0,
+    last_activity_date DATE,
+    level INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS gamification_point_logs (
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    activity_type VARCHAR(50) NOT NULL,
+    points_awarded INTEGER NOT NULL,
+    reference_id INTEGER,
+    description VARCHAR(255),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS badges (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(50) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    icon_url VARCHAR(255),
+    points_required INTEGER NOT NULL DEFAULT 0,
+    category VARCHAR(50) NOT NULL DEFAULT 'GENERAL',
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS student_badges (
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    badge_id INTEGER NOT NULL REFERENCES badges(id) ON DELETE CASCADE,
+    awarded_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_student_badge UNIQUE (student_id, badge_id)
+);
+
+CREATE TABLE IF NOT EXISTS learning_challenges (
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    points_reward INTEGER NOT NULL DEFAULT 50,
+    target_type VARCHAR(50) NOT NULL,
+    target_count INTEGER NOT NULL DEFAULT 5,
+    start_date TIMESTAMP NOT NULL,
+    end_date TIMESTAMP NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS student_challenge_progress (
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    challenge_id INTEGER NOT NULL REFERENCES learning_challenges(id) ON DELETE CASCADE,
+    current_progress INTEGER NOT NULL DEFAULT 0,
+    is_completed BOOLEAN NOT NULL DEFAULT FALSE,
+    completed_at TIMESTAMP,
+    CONSTRAINT uq_student_challenge UNIQUE (student_id, challenge_id)
+);
+
+-- FR-S71 to FR-S76: AI-Based Learning Assistance (Section 12)
+CREATE TABLE IF NOT EXISTS ai_learning_queries (
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    query_type VARCHAR(50) NOT NULL,
+    context_type VARCHAR(50),
+    context_id INTEGER,
+    prompt_text TEXT NOT NULL,
+    response_text TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+
 
 
 

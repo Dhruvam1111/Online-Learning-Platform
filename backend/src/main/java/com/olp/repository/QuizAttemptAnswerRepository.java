@@ -32,6 +32,15 @@ public interface QuizAttemptAnswerRepository extends JpaRepository<QuizAttemptAn
     @Query("SELECT a FROM QuizAttemptAnswer a " +
            "JOIN FETCH a.question q " +
            "JOIN FETCH a.attempt att " +
+           "WHERE att.student.id = :studentId " +
+           "AND att.quiz.course.id = :courseId " +
+           "AND att.status = com.olp.entity.QuizAttemptStatus.SUBMITTED")
+    List<QuizAttemptAnswer> findStudentAnswersByCourse(@Param("studentId") Integer studentId,
+                                                      @Param("courseId") Integer courseId);
+
+    @Query("SELECT a FROM QuizAttemptAnswer a " +
+           "JOIN FETCH a.question q " +
+           "JOIN FETCH a.attempt att " +
            "JOIN FETCH att.student s " +
            "JOIN FETCH att.quiz qz " +
            "JOIN FETCH qz.course c " +
