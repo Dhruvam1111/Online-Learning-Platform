@@ -1,5 +1,6 @@
 package com.olp.service;
 
+import com.olp.controller.PaymentSimulationController.SavedMethodRequest;
 import com.fasterxml.jackson.databind.*;
 import com.olp.dto.*;
 import com.olp.entity.*;
@@ -24,12 +25,52 @@ public class SimulatedPaymentMethods {
     }
     @Transactional
     public Map<String,Object> create(User user,String method,boolean consent) {
+        return create(user, new SavedMethodRequest(method, consent));
+    }
+    @Transactional
+    public Map<String,Object> create(User user,SavedMethodRequest request) {
         requireUser(user);
-        if (!consent) throw new IllegalArgumentException("Explicit consent is required to save a simulated payment method.");
+        if (request == null || !request.consent()) throw new IllegalArgumentException("Explicit consent is required to save a simulated payment method.");
+        String method = request.method();
         if (!Set.of("card","upi","netbanking","wallet").contains(method)) throw new IllegalArgumentException("Unsupported payment method.");
         String token=gateway==null?"simtok_"+UUID.randomUUID().toString().replace("-",""):gateway.createMethodToken(method);
-        Map<String,Object> data=Map.of("token",token,"owner",user.getId(),"method",method,"consent",true,
-            "createdAt",Instant.now().toString(),"expiresAt",Instant.now().plusSeconds(31536000).toString());
+        Map<String,Object> data=new LinkedHashMap<>();
+        data.put("token",token);
+        data.put("owner",user.getId());
+        data.put("method",method);
+        data.put("consent",true);
+        data.put("createdAt",Instant.now().toString());
+        data.put("expiresAt",Instant.now().plusSeconds(31536000).toString());
+
+        String last4 = (request.last4() != null && !request.last4().isBlank()) ? request.last4().trim() : token.substring(token.length() - 4);
+        data.put("last4", last4);
+
+        if ("card".equalsIgnoreCase(method)) {
+            String brand = (request.cardBrand() != null && !request.cardBrand().isBlank()) ? request.cardBrand() : "Visa";
+            String expiry = (request.expiryMonth() != null && request.expiryYear() != null) ? (request.expiryMonth() + "/" + request.expiryYear()) : "12/28";
+            String holder = (request.cardholderName() != null && !request.cardholderName().isBlank()) ? request.cardholderName() : (user.getName() != null ? user.getName() : "Student Learner");
+            data.put("cardBrand", brand);
+            data.put("expiry", expiry);
+            data.put("cardholderName", holder);
+            data.put("displayName", brand + " •••• " + last4 + " (Exp " + expiry + ")");
+        } else if ("upi".equalsIgnoreCase(method)) {
+            String upiId = (request.upiId() != null && !request.upiId().isBlank()) ? request.upiId() : (user.getEmail() != null ? user.getEmail().split("@")[0] + "@okhdfcbank" : "student" + last4 + "@upi");
+            data.put("upiId", upiId);
+            data.put("displayName", "UPI: " + upiId);
+        } else if ("netbanking".equalsIgnoreCase(method)) {
+            String bank = (request.bankName() != null && !request.bankName().isBlank()) ? request.bankName() : "HDFC Bank NetBanking";
+            data.put("bankName", bank);
+            data.put("displayName", bank + " (A/C •••• " + last4 + ")");
+        } else if ("wallet".equalsIgnoreCase(method)) {
+            String wallet = (request.walletProvider() != null && !request.walletProvider().isBlank()) ? request.walletProvider() : "OLP Learner Wallet";
+            data.put("walletProvider", wallet);
+            data.put("displayName", wallet + " (Linked •••• " + last4 + ")");
+        }
+
+        if (request.displayName() != null && !request.displayName().isBlank()) {
+            data.put("displayName", request.displayName());
+        }
+
         events.save(new WebhookEvent(token,"method.created",encode(data))); return data;
     }
     @Transactional(readOnly=true)
@@ -38,7 +79,45 @@ public class SimulatedPaymentMethods {
         return events.findByEventType("method.created").stream().map(e -> decode(e.getPayload()))
             .filter(d -> ((Number)d.get("owner")).intValue()==user.getId())
             .filter(d -> !events.existsByEventId("revoked_"+d.get("token")))
-            .filter(d -> Instant.parse((String)d.get("expiresAt")).isAfter(Instant.now())).toList();
+            .filter(d -> Instant.parse((String)d.get("expiresAt")).isAfter(Instant.now()))
+            .map(this::enrichRecognizableDetails)
+            .toList();
+    }
+    private Map<String,Object> enrichRecognizableDetails(Map<String,Object> orig) {
+        Map<String,Object> res = new LinkedHashMap<>(orig);
+        String method = String.valueOf(res.get("method"));
+        String token = String.valueOf(res.get("token"));
+        String last4 = res.get("last4") != null ? String.valueOf(res.get("last4")) : (token.length() >= 4 ? token.substring(token.length() - 4) : "4242");
+        res.put("last4", last4);
+
+        if ("card".equalsIgnoreCase(method)) {
+            String brand = res.get("cardBrand") != null ? String.valueOf(res.get("cardBrand")) : "Visa";
+            String expiry = res.get("expiry") != null ? String.valueOf(res.get("expiry")) : "12/28";
+            res.put("cardBrand", brand);
+            res.put("expiry", expiry);
+            if (res.get("displayName") == null) {
+                res.put("displayName", brand + " •••• " + last4 + " (Exp " + expiry + ")");
+            }
+        } else if ("upi".equalsIgnoreCase(method)) {
+            String upiId = res.get("upiId") != null ? String.valueOf(res.get("upiId")) : "student" + last4 + "@okhdfcbank";
+            res.put("upiId", upiId);
+            if (res.get("displayName") == null) {
+                res.put("displayName", "UPI: " + upiId);
+            }
+        } else if ("netbanking".equalsIgnoreCase(method)) {
+            String bank = res.get("bankName") != null ? String.valueOf(res.get("bankName")) : "HDFC Bank NetBanking";
+            res.put("bankName", bank);
+            if (res.get("displayName") == null) {
+                res.put("displayName", bank + " (A/C •••• " + last4 + ")");
+            }
+        } else if ("wallet".equalsIgnoreCase(method)) {
+            String wallet = res.get("walletProvider") != null ? String.valueOf(res.get("walletProvider")) : "OLP Learner Wallet";
+            res.put("walletProvider", wallet);
+            if (res.get("displayName") == null) {
+                res.put("displayName", wallet + " (Linked •••• " + last4 + ")");
+            }
+        }
+        return res;
     }
     @Transactional
     public void revoke(User user,String token) {
