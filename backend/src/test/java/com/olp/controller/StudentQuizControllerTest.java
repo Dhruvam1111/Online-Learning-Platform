@@ -20,6 +20,8 @@ import org.springframework.security.core.Authentication;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -85,6 +87,37 @@ class StudentQuizControllerTest {
         assertSame(attempt, controller.getQuizAttemptStatus(10, 55, authentication).getBody());
         assertEquals("SUBMITTED", controller.submitQuizAttempt(10, 55, null, authentication).getBody().getStatus());
         assertSame(evalSummary, controller.getAttemptEvaluation(10, 55, authentication).getBody());
+    }
+    @Test
+    void testGetCourseQuizzes_Returns200WithQuizzes() {
+        when(quizAttemptService.getStudentCourseQuizzes(any(), eq(50)))
+                .thenReturn(List.of(new com.olp.dto.QuizSettingsResponse()));
+
+        ResponseEntity<?> response = controller.getCourseQuizzes(50, authentication);
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(quizAttemptService, times(1)).getStudentCourseQuizzes(any(), eq(50));
+    }
+
+    @Test
+    void testGetAttemptQuestions_Returns200WithQuestions() {
+        when(quizAttemptService.getAttemptQuestions(any(), eq(10), eq(100)))
+                .thenReturn(List.of(new com.olp.dto.StudentQuizQuestionDto()));
+
+        ResponseEntity<?> response = controller.getAttemptQuestions(10, 100, authentication);
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(quizAttemptService, times(1)).getAttemptQuestions(any(), eq(10), eq(100));
+    }
+
+    @Test
+    void testSaveAttemptAnswer_Returns200Success() {
+        com.olp.dto.SaveAnswerRequest req = new com.olp.dto.SaveAnswerRequest(201, "Answer A");
+
+        ResponseEntity<?> response = controller.saveAttemptAnswer(10, 100, req, authentication);
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(quizAttemptService, times(1)).saveAttemptAnswer(any(), eq(10), eq(100), eq(req));
     }
 }
 
