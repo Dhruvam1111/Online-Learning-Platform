@@ -137,5 +137,10 @@ CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz_student ON quiz_attempts(quiz_
 CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, is_read);
 
+-- Step 12 / FR-I39: Course Announcements Indexes
+CREATE INDEX IF NOT EXISTS idx_course_announcements_course_created ON course_announcements(course_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_course_announcements_instructor ON course_announcements(instructor_id);
+
+
 
 

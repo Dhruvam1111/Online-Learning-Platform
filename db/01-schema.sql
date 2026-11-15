@@ -4,6 +4,7 @@
 -- ============================================================
 
 -- Clean slate (safe to re-run during development)
+DROP TABLE IF EXISTS course_announcements CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS quiz_attempt_answers CASCADE;
 DROP TABLE IF EXISTS quiz_attempts CASCADE;
@@ -808,5 +809,19 @@ CREATE TABLE IF NOT EXISTS notifications (
     read_at     TIMESTAMP,
     created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
 );
+
+-- =========================
+-- Step 12 / FR-I39: Course Announcements
+-- =========================
+CREATE TABLE IF NOT EXISTS course_announcements (
+    id            SERIAL PRIMARY KEY,
+    course_id     INTEGER      NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    instructor_id INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title         VARCHAR(255) NOT NULL,
+    body          TEXT         NOT NULL,
+    created_at    TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
 
 
