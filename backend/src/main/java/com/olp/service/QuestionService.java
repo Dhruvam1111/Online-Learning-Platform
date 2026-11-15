@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.olp.dto.ApiResponse;
 import com.olp.dto.GradingPolicy;
+import com.olp.dto.QuestionBankFilterRequest;
 import com.olp.dto.QuestionEvaluationRequest;
 import com.olp.dto.QuestionEvaluationResult;
 import com.olp.dto.QuestionRequest;
@@ -17,6 +18,7 @@ import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.CourseInstructorRepository;
 import com.olp.repository.CourseRepository;
 import com.olp.repository.QuestionRepository;
+import com.olp.repository.QuizQuestionRepository;
 import com.olp.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
@@ -39,6 +41,7 @@ public class QuestionService {
     private final CourseInstructorRepository courseInstructorRepository;
     private final UserRepository userRepository;
     private final AutoGradingService autoGradingService;
+    private final QuizQuestionRepository quizQuestionRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
@@ -46,19 +49,29 @@ public class QuestionService {
                            CourseRepository courseRepository,
                            CourseInstructorRepository courseInstructorRepository,
                            UserRepository userRepository,
-                           AutoGradingService autoGradingService) {
+                           AutoGradingService autoGradingService,
+                           QuizQuestionRepository quizQuestionRepository) {
         this.questionRepository = questionRepository;
         this.courseRepository = courseRepository;
         this.courseInstructorRepository = courseInstructorRepository;
         this.userRepository = userRepository;
         this.autoGradingService = autoGradingService != null ? autoGradingService : new AutoGradingService();
+        this.quizQuestionRepository = quizQuestionRepository;
+    }
+
+    public QuestionService(QuestionRepository questionRepository,
+                           CourseRepository courseRepository,
+                           CourseInstructorRepository courseInstructorRepository,
+                           UserRepository userRepository,
+                           AutoGradingService autoGradingService) {
+        this(questionRepository, courseRepository, courseInstructorRepository, userRepository, autoGradingService, null);
     }
 
     public QuestionService(QuestionRepository questionRepository,
                            CourseRepository courseRepository,
                            CourseInstructorRepository courseInstructorRepository,
                            UserRepository userRepository) {
-        this(questionRepository, courseRepository, courseInstructorRepository, userRepository, new AutoGradingService());
+        this(questionRepository, courseRepository, courseInstructorRepository, userRepository, new AutoGradingService(), null);
     }
 
     public User resolveUser(Authentication authentication) {
@@ -107,6 +120,10 @@ public class QuestionService {
         question.setDifficulty(trimToNull(request.getDifficulty()));
         question.setExplanation(trimToNull(request.getExplanation()));
         question.setIsBankQuestion(Boolean.TRUE.equals(request.getIsBankQuestion()));
+        question.setOrigin(trimToNull(request.getOrigin()) != null ? request.getOrigin().trim().toUpperCase() : "MANUAL");
+        question.setTags(trimToNull(request.getTags()));
+        question.setVersion(1);
+        question.setIsLatest(Boolean.TRUE);
 
         Question saved = questionRepository.save(question);
         return mapToQuestionResponse(saved);
@@ -149,41 +166,93 @@ public class QuestionService {
         if (request == null) {
             throw new IllegalArgumentException("Question update request cannot be null");
         }
-        Question question = findAndVerifyQuestionAccess(questionId, currentUser);
+        Question existing = findAndVerifyQuestionAccess(questionId, currentUser);
 
+        Course course = existing.getCourse();
         if (request.getCourseId() != null) {
-            Course course = verifyCourseAssociation(request.getCourseId(), currentUser);
-            question.setCourse(course);
+            course = verifyCourseAssociation(request.getCourseId(), currentUser);
         }
 
         QuestionType questionType = QuestionType.fromString(request.getQuestionType());
         ValidatedQuestionData validated = validateAndNormalizeQuestion(questionType, request);
 
-        question.setQuestionText(validated.questionText());
-        question.setQuestionType(questionType);
-        question.setOptionsJson(validated.optionsJson());
-        question.setCorrectAnswer(validated.correctAnswer());
-        question.setDefaultMarks(validated.defaultMarks());
-        question.setNegativeMarks(validated.negativeMarks());
-        question.setNumericalTolerance(validated.numericalTolerance());
-        question.setGradingRubric(validated.gradingRubric());
-        question.setRequiresManualGrading(validated.requiresManualGrading());
+        boolean isUsedInPublishedQuiz = quizQuestionRepository != null
+                && quizQuestionRepository.isQuestionUsedInPublishedQuiz(questionId);
 
-        if (request.getTopic() != null) {
-            question.setTopic(trimToNull(request.getTopic()));
-        }
-        if (request.getDifficulty() != null) {
-            question.setDifficulty(trimToNull(request.getDifficulty()));
-        }
-        if (request.getExplanation() != null) {
-            question.setExplanation(trimToNull(request.getExplanation()));
-        }
-        if (request.getIsBankQuestion() != null) {
-            question.setIsBankQuestion(request.getIsBankQuestion());
-        }
+        if (isUsedInPublishedQuiz) {
+            // Versioning: editing a question in an already-published quiz creates a new version
+            // ensuring the published quiz and attempt records remain completely unchanged.
+            existing.setIsLatest(Boolean.FALSE);
+            questionRepository.save(existing);
 
-        Question saved = questionRepository.save(question);
-        return mapToQuestionResponse(saved);
+            Question newVersion = existing.createNextVersion(currentUser);
+            newVersion.setCourse(course);
+            newVersion.setQuestionText(validated.questionText());
+            newVersion.setQuestionType(questionType);
+            newVersion.setOptionsJson(validated.optionsJson());
+            newVersion.setCorrectAnswer(validated.correctAnswer());
+            newVersion.setDefaultMarks(validated.defaultMarks());
+            newVersion.setNegativeMarks(validated.negativeMarks());
+            newVersion.setNumericalTolerance(validated.numericalTolerance());
+            newVersion.setGradingRubric(validated.gradingRubric());
+            newVersion.setRequiresManualGrading(validated.requiresManualGrading());
+
+            if (request.getTopic() != null) {
+                newVersion.setTopic(trimToNull(request.getTopic()));
+            }
+            if (request.getDifficulty() != null) {
+                newVersion.setDifficulty(trimToNull(request.getDifficulty()));
+            }
+            if (request.getExplanation() != null) {
+                newVersion.setExplanation(trimToNull(request.getExplanation()));
+            }
+            if (request.getIsBankQuestion() != null) {
+                newVersion.setIsBankQuestion(request.getIsBankQuestion());
+            }
+            if (request.getOrigin() != null) {
+                newVersion.setOrigin(request.getOrigin());
+            }
+            if (request.getTags() != null) {
+                newVersion.setTags(trimToNull(request.getTags()));
+            }
+
+            Question savedNewVersion = questionRepository.save(newVersion);
+            return mapToQuestionResponse(savedNewVersion);
+        } else {
+            existing.setCourse(course);
+            existing.setQuestionText(validated.questionText());
+            existing.setQuestionType(questionType);
+            existing.setOptionsJson(validated.optionsJson());
+            existing.setCorrectAnswer(validated.correctAnswer());
+            existing.setDefaultMarks(validated.defaultMarks());
+            existing.setNegativeMarks(validated.negativeMarks());
+            existing.setNumericalTolerance(validated.numericalTolerance());
+            existing.setGradingRubric(validated.gradingRubric());
+            existing.setRequiresManualGrading(validated.requiresManualGrading());
+
+            if (request.getTopic() != null) {
+                existing.setTopic(trimToNull(request.getTopic()));
+            }
+            if (request.getDifficulty() != null) {
+                existing.setDifficulty(trimToNull(request.getDifficulty()));
+            }
+            if (request.getExplanation() != null) {
+                existing.setExplanation(trimToNull(request.getExplanation()));
+            }
+            if (request.getIsBankQuestion() != null) {
+                existing.setIsBankQuestion(request.getIsBankQuestion());
+            }
+            if (request.getOrigin() != null) {
+                existing.setOrigin(request.getOrigin());
+            }
+            if (request.getTags() != null) {
+                existing.setTags(trimToNull(request.getTags()));
+            }
+            existing.setIsLatest(Boolean.TRUE);
+
+            Question saved = questionRepository.save(existing);
+            return mapToQuestionResponse(saved);
+        }
     }
 
     @Transactional
@@ -633,9 +702,120 @@ public class QuestionService {
         response.setDifficulty(q.getDifficulty());
         response.setExplanation(q.getExplanation());
         response.setIsBankQuestion(q.getIsBankQuestion());
+        response.setOrigin(q.getOrigin());
+        response.setTags(q.getTags());
+        response.setVersion(q.getVersion());
+        response.setParentQuestionId(q.getParentQuestionId());
+        response.setIsLatest(q.getIsLatest());
         response.setCreatedAt(q.getCreatedAt());
         response.setUpdatedAt(q.getUpdatedAt());
         return response;
+    }
+
+    // =========================================================================
+    // QUESTION BANK & VERSIONING (FR-I24, Step 26)
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public List<QuestionResponse> searchQuestionBank(User currentUser, QuestionBankFilterRequest filter) {
+        validateInstructor(currentUser);
+        QuestionBankFilterRequest safeFilter = filter != null ? filter : new QuestionBankFilterRequest();
+
+        List<Question> candidateQuestions;
+        if (safeFilter.getCourseId() != null) {
+            verifyCourseAssociation(safeFilter.getCourseId(), currentUser);
+            candidateQuestions = questionRepository.findByCourseIdOrderByCreatedAtDesc(safeFilter.getCourseId());
+        } else if (Boolean.TRUE.equals(safeFilter.getBankOnly())) {
+            candidateQuestions = questionRepository.findBankQuestionsAccessibleByInstructorId(currentUser.getId());
+        } else {
+            candidateQuestions = questionRepository.findAccessibleByInstructorId(currentUser.getId());
+        }
+
+        String searchKeyword = trimToNull(safeFilter.getSearch()) != null
+                ? safeFilter.getSearch().trim().toLowerCase()
+                : null;
+        String topicFilter = trimToNull(safeFilter.getTopic()) != null
+                ? safeFilter.getTopic().trim().toLowerCase()
+                : null;
+        String tagFilter = trimToNull(safeFilter.getTag()) != null
+                ? safeFilter.getTag().trim().toLowerCase()
+                : null;
+        String difficultyFilter = trimToNull(safeFilter.getDifficulty()) != null
+                ? safeFilter.getDifficulty().trim().toUpperCase()
+                : null;
+        String originFilter = trimToNull(safeFilter.getOrigin()) != null
+                ? safeFilter.getOrigin().trim().toUpperCase()
+                : null;
+        QuestionType typeFilter = trimToNull(safeFilter.getQuestionType()) != null
+                ? QuestionType.fromString(safeFilter.getQuestionType())
+                : null;
+
+        return candidateQuestions.stream()
+                .filter(q -> !Boolean.TRUE.equals(safeFilter.getBankOnly()) || Boolean.TRUE.equals(q.getIsBankQuestion()))
+                .filter(q -> !Boolean.TRUE.equals(safeFilter.getIsLatest()) || q.isLatestVersion())
+                .filter(q -> topicFilter == null || (q.getTopic() != null && q.getTopic().toLowerCase().contains(topicFilter)))
+                .filter(q -> difficultyFilter == null || (q.getDifficulty() != null && q.getDifficulty().equalsIgnoreCase(difficultyFilter)))
+                .filter(q -> typeFilter == null || q.getQuestionType() == typeFilter)
+                .filter(q -> originFilter == null || (q.getOrigin() != null && q.getOrigin().equalsIgnoreCase(originFilter)))
+                .filter(q -> tagFilter == null || containsTag(q.getTags(), tagFilter))
+                .filter(q -> searchKeyword == null || matchesSearch(q, searchKeyword))
+                .map(this::mapToQuestionResponse)
+                .toList();
+    }
+
+    private boolean containsTag(String tags, String targetTag) {
+        if (tags == null || targetTag == null) {
+            return false;
+        }
+        for (String tag : tags.split(",")) {
+            if (tag.trim().equalsIgnoreCase(targetTag)) {
+                return true;
+            }
+        }
+        return tags.toLowerCase().contains(targetTag);
+    }
+
+    private boolean matchesSearch(Question q, String keyword) {
+        if (q.getQuestionText() != null && q.getQuestionText().toLowerCase().contains(keyword)) {
+            return true;
+        }
+        if (q.getTopic() != null && q.getTopic().toLowerCase().contains(keyword)) {
+            return true;
+        }
+        if (q.getTags() != null && q.getTags().toLowerCase().contains(keyword)) {
+            return true;
+        }
+        if (q.getExplanation() != null && q.getExplanation().toLowerCase().contains(keyword)) {
+            return true;
+        }
+        return false;
+    }
+
+    @Transactional(readOnly = true)
+    public List<QuestionResponse> getQuestionVersions(User currentUser, Integer questionId) {
+        validateInstructor(currentUser);
+        Question question = findAndVerifyQuestionAccess(questionId, currentUser);
+        Integer rootId = question.getParentQuestion() != null ? question.getParentQuestion().getId() : question.getId();
+        List<Question> lineage = questionRepository.findVersionLineage(rootId);
+        if (lineage.isEmpty()) {
+            lineage = List.of(question);
+        }
+        return lineage.stream().map(this::mapToQuestionResponse).toList();
+    }
+
+    @Transactional
+    public QuestionResponse copyQuestion(User currentUser, Integer questionId, Integer targetCourseId) {
+        validateInstructor(currentUser);
+        Question source = findAndVerifyQuestionAccess(questionId, currentUser);
+
+        Course targetCourse = targetCourseId != null
+                ? verifyCourseAssociation(targetCourseId, currentUser)
+                : source.getCourse();
+
+        Question copy = source.cloneForReuse(targetCourse, currentUser);
+        copy.setOrigin("BANK_COPY");
+        Question saved = questionRepository.save(copy);
+        return mapToQuestionResponse(saved);
     }
 }
 

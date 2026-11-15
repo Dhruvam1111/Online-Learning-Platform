@@ -585,6 +585,11 @@ CREATE TABLE quizzes (
     negative_marking    BOOLEAN       NOT NULL DEFAULT FALSE,
     partial_marking     BOOLEAN       NOT NULL DEFAULT FALSE,
     numeric_tolerance   NUMERIC(8,2)  DEFAULT 0.00,
+    feedback_released   BOOLEAN       NOT NULL DEFAULT TRUE,
+    show_correct_answers BOOLEAN      NOT NULL DEFAULT TRUE,
+    show_feedback       BOOLEAN       NOT NULL DEFAULT TRUE,
+    answer_release_timing VARCHAR(30) NOT NULL DEFAULT 'IMMEDIATELY',
+    is_exam             BOOLEAN       NOT NULL DEFAULT FALSE,
     created_at          TIMESTAMP     NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMP     NOT NULL DEFAULT NOW(),
 
@@ -636,6 +641,11 @@ CREATE TABLE questions (
     difficulty              VARCHAR(30),
     explanation             TEXT,
     is_bank_question        BOOLEAN       NOT NULL DEFAULT FALSE,
+    origin                  VARCHAR(30)   NOT NULL DEFAULT 'MANUAL',
+    tags                    TEXT,
+    version                 INTEGER       NOT NULL DEFAULT 1,
+    parent_question_id      INTEGER,
+    is_latest               BOOLEAN       NOT NULL DEFAULT TRUE,
     created_at              TIMESTAMP     NOT NULL DEFAULT NOW(),
     updated_at              TIMESTAMP     NOT NULL DEFAULT NOW(),
 
@@ -647,6 +657,11 @@ CREATE TABLE questions (
     CONSTRAINT fk_questions_created_by
         FOREIGN KEY (created_by)
         REFERENCES users(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_questions_parent
+        FOREIGN KEY (parent_question_id)
+        REFERENCES questions(id)
         ON DELETE SET NULL,
 
     CONSTRAINT chk_question_type
@@ -911,6 +926,296 @@ ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS is_overridden BOOLEAN NOT NUL
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS negative_marking BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS partial_marking BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS numeric_tolerance NUMERIC(8,2) DEFAULT 0.00;
+
+-- Step 26 / FR-I24: Question Bank & Versioning
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS origin VARCHAR(30) NOT NULL DEFAULT 'MANUAL';
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS tags TEXT;
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS parent_question_id INTEGER REFERENCES questions(id) ON DELETE SET NULL;
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS is_latest BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- Step 27 / FR-I23: Answer Review and Feedback Toggle
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS show_correct_answers BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS show_feedback BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS answer_release_timing VARCHAR(30) NOT NULL DEFAULT 'IMMEDIATELY';
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_exam BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Step 28 / FR-I68: Assignments & Submissions
+CREATE TABLE IF NOT EXISTS assignments (
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    module_id INTEGER REFERENCES course_modules(id) ON DELETE SET NULL,
+    lesson_id INTEGER REFERENCES lessons(id) ON DELETE SET NULL,
+    created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(200) NOT NULL,
+    instructions TEXT,
+    deadline TIMESTAMP NOT NULL,
+    max_marks NUMERIC(8, 2) NOT NULL DEFAULT 100.00,
+    rubric TEXT,
+    submission_type VARCHAR(50) NOT NULL DEFAULT 'FILE',
+    late_policy VARCHAR(50) NOT NULL DEFAULT 'REJECT',
+    late_penalty_percentage NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
+    status VARCHAR(30) NOT NULL DEFAULT 'PUBLISHED',
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS assignment_submissions (
+    id SERIAL PRIMARY KEY,
+    assignment_id INTEGER NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    submission_type VARCHAR(50) NOT NULL DEFAULT 'FILE',
+    file_url VARCHAR(500),
+    file_name VARCHAR(255),
+    file_size_bytes BIGINT,
+    text_content TEXT,
+    submitted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    is_late BOOLEAN NOT NULL DEFAULT FALSE,
+    applied_penalty_percentage NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
+    grading_status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+    awarded_marks NUMERIC(8, 2),
+    feedback TEXT,
+    grader_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    graded_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_assignment_student UNIQUE (assignment_id, student_id)
+);
+
+-- Step 38 / FR-I25: Create and Schedule Examinations
+CREATE TABLE IF NOT EXISTS exams (
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    instructions TEXT,
+    start_window TIMESTAMP NOT NULL,
+    end_window TIMESTAMP NOT NULL,
+    duration_minutes INTEGER NOT NULL,
+    time_zone VARCHAR(50) NOT NULL DEFAULT 'UTC',
+    max_marks NUMERIC(8, 2) NOT NULL DEFAULT 100.00,
+    passing_marks NUMERIC(8, 2),
+    max_attempts INTEGER NOT NULL DEFAULT 1,
+    min_progress_percentage NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
+    require_prerequisites BOOLEAN NOT NULL DEFAULT TRUE,
+    require_enrollment BOOLEAN NOT NULL DEFAULT TRUE,
+    status VARCHAR(30) NOT NULL DEFAULT 'SCHEDULED',
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS exam_questions (
+    id SERIAL PRIMARY KEY,
+    exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE RESTRICT,
+    version INTEGER NOT NULL DEFAULT 1,
+    marks NUMERIC(8, 2) NOT NULL DEFAULT 1.00,
+    order_index INTEGER NOT NULL DEFAULT 1,
+    CONSTRAINT uq_exam_question_order UNIQUE (exam_id, order_index)
+);
+
+CREATE TABLE IF NOT EXISTS exam_attempts (
+    id SERIAL PRIMARY KEY,
+    exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    attempt_number INTEGER NOT NULL DEFAULT 1,
+    started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMP NOT NULL,
+    submitted_at TIMESTAMP,
+    status VARCHAR(30) NOT NULL DEFAULT 'IN_PROGRESS',
+    total_marks NUMERIC(8, 2),
+    obtained_marks NUMERIC(8, 2),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_exam_student_attempt UNIQUE (exam_id, student_id, attempt_number)
+);
+
+-- Step 39 / FR-I27: Randomised Exam Sets
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS is_randomized BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS random_seed BIGINT;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS total_sets INTEGER NOT NULL DEFAULT 1;
+
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS set_label VARCHAR(50);
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS random_seed BIGINT;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS question_order TEXT;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS option_shuffle_map TEXT;
+
+CREATE TABLE IF NOT EXISTS exam_blueprints (
+    id SERIAL PRIMARY KEY,
+    exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    topic VARCHAR(100),
+    difficulty VARCHAR(30),
+    question_count INTEGER NOT NULL DEFAULT 1,
+    marks_per_question NUMERIC(8, 2) NOT NULL DEFAULT 1.00,
+    order_index INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Step 40 / FR-I26: Examination Monitoring Rules
+CREATE TABLE IF NOT EXISTS exam_monitoring_configs (
+    id SERIAL PRIMARY KEY,
+    exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    tab_switch_detection BOOLEAN NOT NULL DEFAULT TRUE,
+    tab_switch_limit INTEGER NOT NULL DEFAULT 3,
+    require_fullscreen BOOLEAN NOT NULL DEFAULT TRUE,
+    fullscreen_exit_limit INTEGER NOT NULL DEFAULT 2,
+    require_screen_share BOOLEAN NOT NULL DEFAULT FALSE,
+    require_webcam BOOLEAN NOT NULL DEFAULT FALSE,
+    require_microphone BOOLEAN NOT NULL DEFAULT FALSE,
+    require_student_consent BOOLEAN NOT NULL DEFAULT TRUE,
+    unsupported_browser_policy VARCHAR(30) NOT NULL DEFAULT 'WARN',
+    consent_text TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_exam_monitoring_exam UNIQUE (exam_id)
+);
+
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS consent_given BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS consent_given_at TIMESTAMP;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS tab_switch_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS fullscreen_exit_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS monitoring_flags TEXT;
+
+-- Step 41 / FR-I66: Question Correction Policy
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS question_correction_policy VARCHAR(30) NOT NULL DEFAULT 'AWARD_FULL_MARKS';
+
+-- Step 49 / FR-I74: Result Change History
+CREATE TABLE IF NOT EXISTS result_versions (
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    assessment_type VARCHAR(30) NOT NULL,
+    assessment_id INTEGER NOT NULL,
+    assessment_title VARCHAR(255),
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    attempt_id INTEGER,
+    old_score NUMERIC(8, 2),
+    new_score NUMERIC(8, 2),
+    old_value VARCHAR(255) NOT NULL,
+    new_value VARCHAR(255) NOT NULL,
+    reason TEXT NOT NULL,
+    actor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Step 50 / FR-I33: Pending Grading Alerts
+CREATE TABLE IF NOT EXISTS pending_grading_alerts (
+    id SERIAL PRIMARY KEY,
+    instructor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    alert_type VARCHAR(30) NOT NULL,
+    pending_count INTEGER NOT NULL DEFAULT 0,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    sent_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    digest_date DATE,
+    CONSTRAINT uq_grading_alert_digest UNIQUE (instructor_id, course_id, alert_type, digest_date)
+);
+
+-- Step 51 / FR-I34: Publish or Withhold Results
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS results_published BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS results_published_at TIMESTAMP;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS results_withheld BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE assignments ADD COLUMN IF NOT EXISTS results_published BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE assignments ADD COLUMN IF NOT EXISTS results_published_at TIMESTAMP;
+ALTER TABLE assignments ADD COLUMN IF NOT EXISTS results_withheld BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS results_published BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS results_published_at TIMESTAMP;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS results_withheld BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS published_at TIMESTAMP;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS published_at TIMESTAMP;
+ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS published_at TIMESTAMP;
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Step 56 / FR-I69: Flag and Escalate Attempts
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS review_status VARCHAR(30) NOT NULL DEFAULT 'NONE';
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS review_notes TEXT;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS escalated_at TIMESTAMP;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS escalation_reason TEXT;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS escalation_recommendation VARCHAR(100);
+
+CREATE TABLE IF NOT EXISTS exam_attempt_review_history (
+    id SERIAL PRIMARY KEY,
+    attempt_id INTEGER NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+    previous_status VARCHAR(30),
+    new_status VARCHAR(30) NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    notes TEXT,
+    recommendation VARCHAR(100),
+    reviewed_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Step 52 / FR-I35 & Step 53 / FR-I36: Reported Questions
+CREATE TABLE IF NOT EXISTS reported_questions (
+    id SERIAL PRIMARY KEY,
+    assessment_type VARCHAR(20) NOT NULL,
+    assessment_id INTEGER NOT NULL,
+    question_id INTEGER NOT NULL,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    report_count INTEGER NOT NULL DEFAULT 1,
+    status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+    latest_reason VARCHAR(255),
+    latest_explanation TEXT,
+    first_reported_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_reported_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    escalate_at TIMESTAMP,
+    escalated_to_admin BOOLEAN NOT NULL DEFAULT FALSE,
+    escalated_at TIMESTAMP,
+    resolution_action VARCHAR(50),
+    resolution_comment TEXT,
+    resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    resolved_at TIMESTAMP,
+    correction_applied BOOLEAN NOT NULL DEFAULT FALSE,
+    correction_applied_at TIMESTAMP,
+    correction_applied_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    correction_policy VARCHAR(50),
+    affected_attempts_count INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_reported_question_assessment UNIQUE (assessment_type, assessment_id, question_id)
+);
+
+CREATE TABLE IF NOT EXISTS student_question_reports (
+    id SERIAL PRIMARY KEY,
+    reported_question_id INTEGER NOT NULL REFERENCES reported_questions(id) ON DELETE CASCADE,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    attempt_id INTEGER,
+    reason VARCHAR(255) NOT NULL,
+    explanation TEXT,
+    reported_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_student_question_report UNIQUE (reported_question_id, student_id)
+);
+
+-- Step 55 / FR-I29: Examination Monitoring Logs
+CREATE TABLE IF NOT EXISTS exam_monitoring_events (
+    id SERIAL PRIMARY KEY,
+    attempt_id INTEGER NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+    event_type VARCHAR(50) NOT NULL,
+    severity VARCHAR(20) NOT NULL DEFAULT 'LOW',
+    event_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    duration_seconds INTEGER,
+    metadata_json TEXT,
+    notes VARCHAR(255)
+);
+
+
+
+
+
+
 
 
 

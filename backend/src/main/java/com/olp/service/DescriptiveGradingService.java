@@ -168,8 +168,9 @@ public class DescriptiveGradingService {
 
         verifyAnswerAssociation(answer, currentUser);
 
-        if (answer.getEvaluationStatus() == EvaluationStatus.PUBLISHED) {
-            throw new IllegalStateException("Cannot modify evaluation or feedback: answer results have already been published");
+        if (answer.getEvaluationStatus() == EvaluationStatus.PUBLISHED ||
+                (answer.getAttempt() != null && Boolean.TRUE.equals(answer.getAttempt().getIsLocked()))) {
+            throw new IllegalStateException("Cannot modify evaluation or feedback: answer results have already been published and locked (DR-01)");
         }
 
         // Marks bounds validation

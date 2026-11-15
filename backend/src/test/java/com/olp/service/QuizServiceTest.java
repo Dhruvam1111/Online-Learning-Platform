@@ -426,6 +426,38 @@ class QuizServiceTest {
     }
 
     @Test
+    void testAddQuestionToQuiz_ReuseByCopy_ClonesQuestion() {
+        Quiz quiz = new Quiz(course, module, null, owner, "Quiz", null, null, QuizStatus.DRAFT);
+        quiz.setId(30);
+
+        Question source = new Question(course, owner, "Original question", QuestionType.MULTIPLE_CHOICE,
+                "[\"A\",\"B\"]", "A", new BigDecimal("2.00"), BigDecimal.ZERO);
+        source.setId(400);
+
+        when(quizRepository.findByIdWithDetails(30)).thenReturn(Optional.of(quiz));
+        when(courseRepository.findById(10)).thenReturn(Optional.of(course));
+        when(questionRepository.findById(400)).thenReturn(Optional.of(source));
+        when(questionRepository.save(any(Question.class))).thenAnswer(inv -> {
+            Question cloned = inv.getArgument(0);
+            cloned.setId(777);
+            return cloned;
+        });
+        when(quizQuestionRepository.save(any(QuizQuestion.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(quizQuestionRepository.findByQuizIdOrderByOrderIndexAsc(30)).thenReturn(List.of());
+        when(quizRepository.save(quiz)).thenReturn(quiz);
+
+        QuizQuestionRequest req = new QuizQuestionRequest();
+        req.setQuestionId(400);
+        req.setReuseMode("COPY");
+        req.setMarks(new BigDecimal("2.00"));
+
+        QuizQuestionResponse res = quizService.addQuestionToQuiz(owner, 30, req);
+        assertNotNull(res);
+        assertEquals(777, res.getQuestionId());
+        verify(questionRepository, times(1)).save(any(Question.class));
+    }
+
+    @Test
     void testUpdateAndRemoveQuizQuestion_RenumbersAndRecalculatesTotalMarks() {
         Quiz quiz = new Quiz(course, module, null, owner, "Quiz", null, null, QuizStatus.DRAFT);
         quiz.setId(31);

@@ -9,6 +9,11 @@ const events = ['payment.confirmed', 'payment.failed', 'payment.pending', 'refun
 export default function PaymentSimulation({ user }) {
   const [methods, setMethods] = useState([]);
   const [method, setMethod] = useState('card');
+  const [cardBrand, setCardBrand] = useState('Visa');
+  const [cardLast4, setCardLast4] = useState('4242');
+  const [upiId, setUpiId] = useState('student@okhdfcbank');
+  const [bankName, setBankName] = useState('HDFC Bank NetBanking');
+  const [walletProvider, setWalletProvider] = useState('OLP Learner Wallet');
   const [consent, setConsent] = useState(false);
   const [orderId, setOrderId] = useState('');
   const [courseId, setCourseId] = useState('');
@@ -59,14 +64,51 @@ export default function PaymentSimulation({ user }) {
           <label className="block">Method<select className={field} value={method} onChange={e => setMethod(e.target.value)}>
             <option value="card">Demo card</option><option value="upi">Demo UPI</option><option value="netbanking">Demo net banking</option><option value="wallet">Demo digital wallet</option>
           </select></label>
+
+          {method === 'card' && (
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">Card Brand<select className={field} value={cardBrand} onChange={e => setCardBrand(e.target.value)}>
+                <option value="Visa">Visa</option><option value="Mastercard">Mastercard</option><option value="RuPay">RuPay</option>
+              </select></label>
+              <label className="block">Last 4 Digits<input className={field} maxLength="4" value={cardLast4} onChange={e => setCardLast4(e.target.value.replace(/\D/g, ''))} /></label>
+            </div>
+          )}
+
+          {method === 'upi' && (
+            <label className="block">UPI ID / VPA<input className={field} value={upiId} onChange={e => setUpiId(e.target.value)} /></label>
+          )}
+
+          {method === 'netbanking' && (
+            <label className="block">Bank Name<select className={field} value={bankName} onChange={e => setBankName(e.target.value)}>
+              <option value="HDFC Bank NetBanking">HDFC Bank</option>
+              <option value="State Bank of India NetBanking">State Bank of India (SBI)</option>
+              <option value="ICICI Bank NetBanking">ICICI Bank</option>
+              <option value="Axis Bank NetBanking">Axis Bank</option>
+            </select></label>
+          )}
+
+          {method === 'wallet' && (
+            <label className="block">Wallet Provider<select className={field} value={walletProvider} onChange={e => setWalletProvider(e.target.value)}>
+              <option value="OLP Learner Wallet">OLP Student Wallet</option>
+              <option value="Paytm Wallet">Paytm Wallet</option>
+              <option value="PhonePe Wallet">PhonePe Wallet</option>
+            </select></label>
+          )}
+
           <label className="block"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} /> I consent to saving this demo method for purchases and subscription renewals I authorize.</label>
-          <button className={button} disabled={busy || !consent} onClick={() => run(async () => { await sim.saveMethod(method, consent); setConsent(false); setMessage('Demo method saved. You can revoke it at any time.'); })}>Save demo method</button>
+          <button className={button} disabled={busy || !consent} onClick={() => run(async () => {
+            await sim.saveMethod(method, consent, { cardBrand, last4: cardLast4, upiId, bankName, walletProvider });
+            setConsent(false);
+            setMessage('Demo method saved with recognizable details. You can revoke it at any time.');
+          })}>Save demo method</button>
           <label className="block">Order ID<input className={field} value={orderId} onChange={e => setOrderId(e.target.value)} placeholder="OLP-…" /></label>
           {methods.length === 0 && <p>No saved methods.</p>}
-          <ul className="space-y-3">{methods.map(m => <li key={m.token} className="border rounded-lg p-3 flex flex-wrap items-center gap-3">
-            <span>{m.method} · {m.token.slice(-8)}</span>
-            <button className={button} disabled={busy || !orderId.trim()} onClick={() => run(async () => { const { data } = await sim.pay(m.token, orderId.trim()); setMessage(`Payment ${data.status}. Order ${data.orderId}.`); })}>Pay this order</button>
-            <button className="underline" disabled={busy} onClick={() => run(async () => { await sim.revokeMethod(m.token); setMessage('Saved method revoked.'); })}>Revoke</button>
+          <ul className="space-y-3">{methods.map(m => <li key={m.token} className="border rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 bg-white">
+            <span className="font-semibold text-gray-800">{m.displayName || `${m.cardBrand || m.method} · ${m.last4 || m.token.slice(-4)}`}</span>
+            <div className="flex items-center gap-3">
+              <button className={button} disabled={busy || !orderId.trim()} onClick={() => run(async () => { const { data } = await sim.pay(m.token, orderId.trim()); setMessage(`Payment ${data.status}. Order ${data.orderId}.`); })}>Pay this order</button>
+              <button className="underline text-sm text-rose-700" disabled={busy} onClick={() => run(async () => { await sim.revokeMethod(m.token); setMessage('Saved method revoked.'); })}>Revoke</button>
+            </div>
           </li>)}</ul>
           <p className="text-sm">Each renewal uses a new order. Retrying the same order does not create another payment.</p>
         </section>

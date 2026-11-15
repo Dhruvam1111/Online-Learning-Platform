@@ -52,6 +52,8 @@ public class QuestionRequest {
 
     private String explanation;
     private Boolean isBankQuestion;
+    private String origin;
+    private String tags;
 
     public QuestionRequest() {}
 
@@ -189,6 +191,22 @@ public class QuestionRequest {
 
     public void setIsBankQuestion(Boolean isBankQuestion) {
         this.isBankQuestion = isBankQuestion;
+    }
+
+    public String getOrigin() {
+        return origin;
+    }
+
+    public void setOrigin(String origin) {
+        this.origin = origin;
+    }
+
+    public String getTags() {
+        return tags;
+    }
+
+    public void setTags(String tags) {
+        this.tags = tags;
     }
 }
 

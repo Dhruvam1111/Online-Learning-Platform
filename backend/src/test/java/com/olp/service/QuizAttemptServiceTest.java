@@ -557,4 +557,33 @@ class QuizAttemptServiceTest {
                 assertTrue(studentSummary.getFeedbackReleased());
                 assertEquals("Excellent performance throughout!", studentSummary.getOverallFeedback());
         }
+
+        @Test
+        void testGetAttemptEvaluation_StudentCannotSeeMarksWhenResultsWithheld() {
+                publishedQuiz.setResultsWithheld(true);
+                QuizAttempt submitted = new QuizAttempt(
+                                publishedQuiz, enrolledStudent, 1, baseTime, baseTime.plusMinutes(30));
+                submitted.setId(807);
+                submitted.setStatus(QuizAttemptStatus.SUBMITTED);
+                submitted.setObtainedMarks(new BigDecimal("10.00"));
+                submitted.setIsPublished(true);
+
+                when(quizAttemptRepository.findByIdAndQuizId(807, 100)).thenReturn(Optional.of(submitted));
+
+                Question q = new Question(course, instructor, "Question 1", QuestionType.MULTIPLE_CHOICE, "[]", "A",
+                                new BigDecimal("10.00"), BigDecimal.ZERO, BigDecimal.ZERO, null, false);
+                q.setId(55);
+                QuizAttemptAnswer ans = new QuizAttemptAnswer(submitted, q, "A",
+                                new BigDecimal("10.00"), new BigDecimal("10.00"), EvaluationStatus.PUBLISHED, "Good", baseTime);
+                when(quizAttemptAnswerRepository.findByAttemptId(807)).thenReturn(List.of(ans));
+
+                QuizEvaluationSummary studentSummary = attemptService.getAttemptEvaluation(enrolledStudent, 100, 807);
+
+                assertNotNull(studentSummary);
+                assertFalse(studentSummary.getResultsPublished());
+                assertNull(studentSummary.getTotalAwardedMarks());
+                assertNull(studentSummary.getPassed());
+                assertEquals(BigDecimal.ZERO, studentSummary.getResults().get(0).getAwardedMarks());
+                assertNull(studentSummary.getResults().get(0).getFeedback());
+        }
 }

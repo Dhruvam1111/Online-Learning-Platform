@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import StudentWallet from './StudentWallet';
+import StudentSubscriptions from './StudentSubscriptions';
 import DailyStreakCalendar from './DailyStreakCalendar';
 import CourseSyllabusTree from './CourseSyllabusTree';
 import RazorpayPaymentModal from './RazorpayPaymentModal';
@@ -28,6 +29,7 @@ export default function StudentDashboard({ onNavigateHome }) {
   const [isApiLoading, setIsApiLoading] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [walletRevision, setWalletRevision] = useState(0);
+  const [activeSubscriptionsCount, setActiveSubscriptionsCount] = useState(0);
 
   // Refund Modal State
   const [refundModalTx, setRefundModalTx] = useState(null);
@@ -140,6 +142,15 @@ export default function StudentDashboard({ onNavigateHome }) {
   }, [activeMenu]);
 
   useEffect(() => { api.get('/payments/policy/catalog').then(res => setCatalogPrices(Object.fromEntries(res.data.map(row => [row.courseId, Number(row.amount)])))).catch(() => setCatalogPrices({})); }, [activeMenu]);
+  useEffect(() => {
+    api.get('/payments/subscriptions')
+      .then(res => {
+        if (Array.isArray(res.data)) {
+          setActiveSubscriptionsCount(res.data.filter(s => s.status !== 'cancelled').length);
+        }
+      })
+      .catch(() => {});
+  }, [activeMenu]);
   const pricingFor = course => { const amount = catalogPrices[course.courseId || course.id]; return amount == null ? { ...getCoursePricing(course), formatted: 'Loading current price…' } : getCoursePricing({ ...course, price: amount }); };
   const displayName = profile?.name || user?.name || 'Student Learner';
   const displayRole = profile?.bio || profile?.interests || 'Active Student Workspace';
@@ -286,6 +297,7 @@ export default function StudentDashboard({ onNavigateHome }) {
   const menuItems = [
     { name: 'Overview', icon: 'grid_view' },
     { name: 'Courses', icon: 'video_library', badge: enrolledCourses.length > 0 ? enrolledCourses.length : null },
+    { name: 'Subscriptions', icon: 'autorenew', badge: activeSubscriptionsCount > 0 ? activeSubscriptionsCount : null },
     { name: 'Transactions', icon: 'receipt_long', badge: transactions.filter((t) => t.status !== 'created').length > 0 ? transactions.filter((t) => t.status !== 'created').length : null },
     { name: 'Wallet', icon: 'account_balance_wallet' },
     { name: 'Bookmarks', icon: 'bookmark', badge: bookmarks.length > 0 ? bookmarks.length : null },
@@ -421,14 +433,25 @@ export default function StudentDashboard({ onNavigateHome }) {
           </div>
 
           <div className="pt-4 mt-6 border-t border-[#fae8dc]">
-            <a href="#payments" className="block px-4 py-3 underline">Subscriptions &amp; saved methods</a>
+            <button
+              type="button"
+              onClick={() => setActiveMenu('Subscriptions')}
+              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-[13.5px] font-semibold w-full transition-all cursor-pointer ${
+                activeMenu === 'Subscriptions'
+                  ? 'bg-[#fff0eb] text-[#ff5a36] font-bold'
+                  : 'text-[#6d635c] hover:bg-[#fff7f4] hover:text-[#ff5a36]'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[20px]">autorenew</span>
+              <span>Subscriptions</span>
+            </button>
             <button
               type="button"
               onClick={() => {
                 logout();
                 if (onNavigateHome) onNavigateHome();
               }}
-              className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-rose-600 hover:bg-rose-50 text-[13.5px] font-semibold w-full transition-colors cursor-pointer"
+              className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-rose-600 hover:bg-rose-50 text-[13.5px] font-semibold w-full transition-colors cursor-pointer mt-1"
             >
               <span className="material-symbols-outlined text-[20px]">logout</span>
               <span>Sign Out</span>
@@ -830,6 +853,16 @@ export default function StudentDashboard({ onNavigateHome }) {
                 </div>
               )}
             </div>
+          )}
+
+          {/* ========================================================
+              TAB: COURSE SUBSCRIPTIONS & SAVED METHODS
+              ======================================================== */}
+          {activeMenu === 'Subscriptions' && (
+            <StudentSubscriptions
+              user={user}
+              catalogCourses={catalogCourses.length > 0 ? catalogCourses : enrolledCourses}
+            />
           )}
 
           {/* ========================================================

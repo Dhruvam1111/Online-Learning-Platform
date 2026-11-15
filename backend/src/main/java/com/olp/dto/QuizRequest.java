@@ -51,6 +51,11 @@ public class QuizRequest {
     @JsonAlias({ "showFeedback", "feedbackVisible", "reviewEnabled" })
     private Boolean feedbackReleased;
 
+    private Boolean showCorrectAnswers;
+    private Boolean showFeedback;
+    private String answerReleaseTiming;
+    private Boolean isExam;
+
     private Boolean negativeMarking;
     private Boolean partialMarking;
     private BigDecimal numericTolerance;
@@ -180,14 +185,6 @@ public class QuizRequest {
         this.feedbackReleased = feedbackReleased;
     }
 
-    public Boolean getShowFeedback() {
-        return feedbackReleased;
-    }
-
-    public void setShowFeedback(Boolean showFeedback) {
-        this.feedbackReleased = showFeedback;
-    }
-
     public Boolean getNegativeMarking() {
         return negativeMarking;
     }
@@ -210,6 +207,38 @@ public class QuizRequest {
 
     public void setNumericTolerance(BigDecimal numericTolerance) {
         this.numericTolerance = numericTolerance;
+    }
+
+    public Boolean getShowCorrectAnswers() {
+        return showCorrectAnswers;
+    }
+
+    public void setShowCorrectAnswers(Boolean showCorrectAnswers) {
+        this.showCorrectAnswers = showCorrectAnswers;
+    }
+
+    public Boolean getShowFeedback() {
+        return showFeedback;
+    }
+
+    public void setShowFeedback(Boolean showFeedback) {
+        this.showFeedback = showFeedback;
+    }
+
+    public String getAnswerReleaseTiming() {
+        return answerReleaseTiming;
+    }
+
+    public void setAnswerReleaseTiming(String answerReleaseTiming) {
+        this.answerReleaseTiming = answerReleaseTiming;
+    }
+
+    public Boolean getIsExam() {
+        return isExam;
+    }
+
+    public void setIsExam(Boolean exam) {
+        this.isExam = exam;
     }
 
     public List<QuizQuestionRequest> getQuestions() {
