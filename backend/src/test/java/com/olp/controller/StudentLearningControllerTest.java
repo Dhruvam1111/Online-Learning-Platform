@@ -3,6 +3,7 @@ package com.olp.controller;
 import com.olp.dto.LectureBookmarkResponse;
 import com.olp.dto.LectureMaterialResponse;
 import com.olp.dto.LectureSearchResult;
+import com.olp.dto.LessonResponse;
 import com.olp.dto.MaterialViewerResponse;
 import com.olp.dto.PlaybackPositionRequest;
 import com.olp.dto.ResourceAndMetadata;
@@ -98,6 +99,22 @@ class StudentLearningControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(1, Objects.requireNonNull(response.getBody()).size());
+    }
+
+    @Test
+    void testGetLesson() {
+        LessonResponse resp = new LessonResponse();
+        resp.setId(20);
+        resp.setTitle("Introduction to Spring");
+
+        when(studentLearningService.getLessonForStudent(1, 20)).thenReturn(resp);
+
+        ResponseEntity<LessonResponse> response = studentLearningController.getLesson(20, authentication);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(20, response.getBody().getId());
+        assertEquals("Introduction to Spring", response.getBody().getTitle());
     }
 
     @Test
