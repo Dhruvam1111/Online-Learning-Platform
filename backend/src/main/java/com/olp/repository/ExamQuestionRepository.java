@@ -21,6 +21,9 @@ public interface ExamQuestionRepository extends JpaRepository<ExamQuestion, Inte
     @Query("SELECT COUNT(eq) FROM ExamQuestion eq WHERE eq.exam.id = :examId")
     long countByExamId(@Param("examId") Integer examId);
 
+    @Query("SELECT eq FROM ExamQuestion eq WHERE eq.exam.id = :examId AND eq.question.id = :questionId")
+    java.util.Optional<ExamQuestion> findByExamIdAndQuestionId(@Param("examId") Integer examId, @Param("questionId") Integer questionId);
+
     @Query("SELECT CASE WHEN COUNT(eq) > 0 THEN true ELSE false END FROM ExamQuestion eq WHERE eq.exam.id = :examId AND eq.question.id = :questionId")
     boolean existsByExamIdAndQuestionId(@Param("examId") Integer examId, @Param("questionId") Integer questionId);
 

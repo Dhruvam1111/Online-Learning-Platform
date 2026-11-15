@@ -1159,6 +1159,11 @@ CREATE TABLE IF NOT EXISTS reported_questions (
     resolution_comment TEXT,
     resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
     resolved_at TIMESTAMP,
+    correction_applied BOOLEAN NOT NULL DEFAULT FALSE,
+    correction_applied_at TIMESTAMP,
+    correction_applied_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    correction_policy VARCHAR(50),
+    affected_attempts_count INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_reported_question_assessment UNIQUE (assessment_type, assessment_id, question_id)
