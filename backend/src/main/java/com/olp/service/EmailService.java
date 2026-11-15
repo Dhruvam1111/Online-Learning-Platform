@@ -1322,4 +1322,153 @@ public class EmailService {
             log.warn("[EmailService] Failed to dispatch video processing notification to {}: {}", toEmail, e.getMessage());
         }
     }
+
+    /**
+     * Sends an official subscription confirmation email with plan details, duration, pricing, and renewal terms.
+     */
+    public void sendSubscriptionConfirmationEmail(String toEmail, String name, String courseTitle,
+                                                  String planName, Integer durationMonths,
+                                                  BigDecimal monthlyPrice, BigDecimal totalAmount,
+                                                  String nextRenewalDate, String paymentMethodSummary,
+                                                  String subscriptionId) {
+        String displayName = (name != null && !name.isBlank()) ? name.trim() : toEmail;
+        log.info("[EmailService] Dispatched Subscription Confirmation Email to {} for Course '{}' (SubId: {}, Plan: {}, Total: ₹{})",
+                toEmail, courseTitle, subscriptionId, planName, totalAmount);
+
+        if (senderEmail == null || senderEmail.isBlank()) {
+            return;
+        }
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(senderEmail, "Focotech");
+            helper.setTo(toEmail);
+            helper.setSubject("Subscription Confirmed: " + courseTitle + " (" + (planName != null ? planName : "Active Plan") + ")");
+
+            String html = buildSubscriptionConfirmationHtml(displayName, toEmail, courseTitle, planName,
+                    durationMonths, monthlyPrice, totalAmount, nextRenewalDate, paymentMethodSummary, subscriptionId);
+            helper.setText(html, true);
+
+            mailSender.send(message);
+            log.info("[EmailService] Subscription confirmation email sent successfully to {}", toEmail);
+        } catch (Exception e) {
+            log.warn("[EmailService] Failed to send subscription confirmation email via SMTP ({}), continuing transaction.", e.getMessage());
+        }
+    }
+
+    private String buildSubscriptionConfirmationHtml(String name, String toEmail, String courseTitle,
+                                                     String planName, Integer durationMonths,
+                                                     BigDecimal monthlyPrice, BigDecimal totalAmount,
+                                                     String nextRenewalDate, String paymentMethodSummary,
+                                                     String subscriptionId) {
+        String safePlan = (planName != null && !planName.isBlank()) ? planName : "Monthly Plan";
+        int duration = (durationMonths != null && durationMonths > 0) ? durationMonths : 1;
+        BigDecimal mPrice = (monthlyPrice != null) ? monthlyPrice : new BigDecimal("499.00");
+        BigDecimal tPrice = (totalAmount != null) ? totalAmount : mPrice.multiply(BigDecimal.valueOf(duration));
+        String method = (paymentMethodSummary != null && !paymentMethodSummary.isBlank()) ? paymentMethodSummary : "Saved Method";
+        String renewalDate = (nextRenewalDate != null && nextRenewalDate.length() >= 10) ? nextRenewalDate.substring(0, 10) : "In 30 days";
+        String subId = (subscriptionId != null) ? subscriptionId : "sub_active";
+
+        return """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                  <meta charset="UTF-8">
+                  <title>Subscription Confirmation</title>
+                </head>
+                <body style="margin: 0; padding: 0; background-color: #f7f4f1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+                  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%%" style="background-color: #f7f4f1; padding: 36px 12px;">
+                    <tr>
+                      <td align="center">
+                        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%%" style="max-width: 580px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e8e2dc; box-shadow: 0 4px 20px rgba(30, 27, 25, 0.05); overflow: hidden;">
+                          <tr>
+                            <td style="background-color: #ff5a36; height: 4px;"></td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 28px 32px 8px 32px; text-align: left;">
+                              <div style="font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: #1e1b19;">
+                                FOCO<span style="color: #ff5a36;">TECH</span>
+                              </div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 12px 32px 28px 32px;">
+                              <h1 style="margin: 0 0 10px 0; font-size: 22px; font-weight: 800; color: #1e1b19;">
+                                Subscription Activated! 🎉
+                              </h1>
+                              <p style="margin: 0 0 14px 0; font-size: 14px; line-height: 22px; color: #443e3a;">
+                                Hello, <strong style="color: #1e1b19;">%s</strong>
+                              </p>
+                              <p style="margin: 0 0 18px 0; font-size: 14px; line-height: 22px; color: #443e3a;">
+                                Your subscription for <strong style="color: #1e1b19;">"%s"</strong> has been successfully configured. Full course access is active on your student dashboard.
+                              </p>
+
+                              <div style="background-color: #fbf8f5; border: 1px solid #ebdcd1; border-radius: 10px; padding: 18px 20px; margin: 18px 0;">
+                                <table style="width: 100%%; font-size: 13px; line-height: 22px; border-collapse: collapse;">
+                                  <tr>
+                                    <td style="padding: 4px 0; color: #786f68; font-weight: 600;">Selected Plan:</td>
+                                    <td style="padding: 4px 0; font-weight: 700; color: #1e1b19; text-align: right;">%s (%d Month%s)</td>
+                                  </tr>
+                                  <tr>
+                                    <td style="padding: 4px 0; color: #786f68; font-weight: 600;">Monthly Price:</td>
+                                    <td style="padding: 4px 0; font-weight: 700; color: #1e1b19; text-align: right;">&#8377;%s / month (incl. GST)</td>
+                                  </tr>
+                                  <tr>
+                                    <td style="padding: 4px 0; color: #786f68; font-weight: 600;">Total Plan Cost:</td>
+                                    <td style="padding: 4px 0; font-weight: 800; color: #ff5a36; text-align: right;">&#8377;%s</td>
+                                  </tr>
+                                  <tr>
+                                    <td style="padding: 4px 0; color: #786f68; font-weight: 600;">Subscription Ref:</td>
+                                    <td style="padding: 4px 0; font-family: monospace; color: #1e1b19; text-align: right;">%s</td>
+                                  </tr>
+                                  <tr>
+                                    <td style="padding: 4px 0; color: #786f68; font-weight: 600;">Payment Method:</td>
+                                    <td style="padding: 4px 0; font-weight: 600; color: #1e1b19; text-align: right;">%s</td>
+                                  </tr>
+                                  <tr>
+                                    <td style="padding: 4px 0; color: #786f68; font-weight: 600;">Next Renewal Due:</td>
+                                    <td style="padding: 4px 0; font-weight: 700; color: #0284c7; text-align: right;">%s</td>
+                                  </tr>
+                                </table>
+                              </div>
+
+                              <div style="background-color: #fff9f6; border-left: 4px solid #ff5a36; border-radius: 4px; padding: 12px 16px; margin: 18px 0; font-size: 12px; line-height: 18px; color: #5a4b41;">
+                                <strong style="color: #ff5a36;">Transparency & Renewal Terms:</strong><br/>
+                                &bull; <strong>No Automatic Unattended Debit:</strong> Each renewal cycle requires your authenticated manual approval before funds are debited.<br/>
+                                &bull; <strong>Advance Notice:</strong> You will receive a notification in your inbox at least 24 hours prior to your renewal date.<br/>
+                                &bull; <strong>Cancel Anytime:</strong> You may cancel this subscription anytime from your Student Dashboard before the renewal date with zero penalties.<br/>
+                                &bull; <strong>Refund Guarantee:</strong> 30-day money-back eligibility to your original payment method.
+                              </div>
+
+                              <p style="margin: 20px 0 0 0; font-size: 13px; line-height: 20px; color: #685b53;">
+                                Manage or review your subscription anytime under the <strong>Subscriptions</strong> tab in your Student Dashboard.
+                              </p>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="background-color: #faf6f2; padding: 16px 32px; text-align: center; font-size: 11px; color: #8c7e75; border-top: 1px solid #f0dfd3;">
+                              &copy; 2026 FOCOTECH Online Learning Technologies Pvt. Ltd. All rights reserved.
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(
+                name,
+                courseTitle,
+                safePlan,
+                duration,
+                duration > 1 ? "s" : "",
+                mPrice.toPlainString(),
+                tPrice.toPlainString(),
+                subId,
+                method,
+                renewalDate
+        );
+    }
 }
