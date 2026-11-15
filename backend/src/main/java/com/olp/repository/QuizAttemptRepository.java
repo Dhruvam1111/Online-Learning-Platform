@@ -28,5 +28,11 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Intege
 
     @Query("SELECT COUNT(a) FROM QuizAttempt a WHERE a.quiz.id = :quizId AND a.student.id = :studentId")
     long countByQuizIdAndStudentId(@Param("quizId") Integer quizId, @Param("studentId") Integer studentId);
+
+    @Query("SELECT a FROM QuizAttempt a WHERE a.quiz.id = :quizId")
+    List<QuizAttempt> findByQuizId(@Param("quizId") Integer quizId);
+
+    @Query("SELECT COUNT(a) FROM QuizAttempt a WHERE a.quiz.id = :quizId")
+    long countByQuizId(@Param("quizId") Integer quizId);
 }
 

@@ -28,6 +28,8 @@ public class QuizEvaluationSummary {
     private Boolean feedbackReleased;
     private Boolean resultsPublished;
     private Boolean isOverridden = false;
+    private Boolean correctAnswersVisible;
+    private Boolean showCorrectAnswers;
     private List<QuestionEvaluationResult> results = new ArrayList<>();
 
     public QuizEvaluationSummary() {}
@@ -178,6 +180,20 @@ public class QuizEvaluationSummary {
 
     public void setIsOverridden(Boolean isOverridden) {
         this.isOverridden = isOverridden != null ? isOverridden : false;
+    public Boolean getCorrectAnswersVisible() {
+        return correctAnswersVisible;
+    }
+
+    public void setCorrectAnswersVisible(Boolean correctAnswersVisible) {
+        this.correctAnswersVisible = correctAnswersVisible;
+    }
+
+    public Boolean getShowCorrectAnswers() {
+        return showCorrectAnswers;
+    }
+
+    public void setShowCorrectAnswers(Boolean showCorrectAnswers) {
+        this.showCorrectAnswers = showCorrectAnswers;
     }
 
     public List<QuestionEvaluationResult> getResults() {

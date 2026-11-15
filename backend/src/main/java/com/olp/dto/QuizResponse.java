@@ -35,6 +35,10 @@ public class QuizResponse {
     private Boolean partialMarking;
     private BigDecimal numericTolerance;
     private String markingRulesSummary;
+    private Boolean showCorrectAnswers;
+    private Boolean showFeedback;
+    private String answerReleaseTiming;
+    private Boolean isExam;
     private Integer questionCount;
     private List<QuizQuestionResponse> questions = new ArrayList<>();
     private LocalDateTime createdAt;
@@ -210,14 +214,6 @@ public class QuizResponse {
         this.feedbackReleased = feedbackReleased;
     }
 
-    public Boolean getShowFeedback() {
-        return feedbackReleased;
-    }
-
-    public void setShowFeedback(Boolean showFeedback) {
-        this.feedbackReleased = showFeedback;
-    }
-
     public Integer getQuestionCount() {
         return questionCount;
     }
@@ -280,6 +276,38 @@ public class QuizResponse {
 
     public void setMarkingRulesSummary(String markingRulesSummary) {
         this.markingRulesSummary = markingRulesSummary;
+    }
+
+    public Boolean getShowCorrectAnswers() {
+        return showCorrectAnswers;
+    }
+
+    public void setShowCorrectAnswers(Boolean showCorrectAnswers) {
+        this.showCorrectAnswers = showCorrectAnswers;
+    }
+
+    public Boolean getShowFeedback() {
+        return showFeedback;
+    }
+
+    public void setShowFeedback(Boolean showFeedback) {
+        this.showFeedback = showFeedback;
+    }
+
+    public String getAnswerReleaseTiming() {
+        return answerReleaseTiming;
+    }
+
+    public void setAnswerReleaseTiming(String answerReleaseTiming) {
+        this.answerReleaseTiming = answerReleaseTiming;
+    }
+
+    public Boolean getIsExam() {
+        return isExam;
+    }
+
+    public void setIsExam(Boolean exam) {
+        this.isExam = exam;
     }
 }
 

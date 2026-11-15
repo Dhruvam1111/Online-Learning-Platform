@@ -45,5 +45,12 @@ public interface QuizRepository extends JpaRepository<Quiz, Integer> {
 
     @Query("SELECT q FROM Quiz q WHERE q.course.id = :courseId AND q.partialMarking = true ORDER BY q.createdAt DESC")
     List<Quiz> findByCourseIdAndPartialMarkingTrue(@Param("courseId") Integer courseId);
+
+    @Query("SELECT q FROM Quiz q WHERE q.course.id = :courseId AND q.isExam = true ORDER BY q.createdAt DESC")
+    List<Quiz> findByCourseIdAndIsExamTrue(@Param("courseId") Integer courseId);
+
+    @Query("SELECT q FROM Quiz q WHERE q.course.id = :courseId AND q.answerReleaseTiming = :timing ORDER BY q.createdAt DESC")
+    List<Quiz> findByCourseIdAndAnswerReleaseTiming(@Param("courseId") Integer courseId,
+                                                    @Param("timing") String timing);
 }
 
