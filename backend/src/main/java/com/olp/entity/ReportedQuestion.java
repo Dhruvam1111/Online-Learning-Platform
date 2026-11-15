@@ -78,6 +78,22 @@ public class ReportedQuestion {
     @Column(name = "resolved_at")
     private LocalDateTime resolvedAt;
 
+    @Column(name = "correction_applied", nullable = false)
+    private Boolean correctionApplied = false;
+
+    @Column(name = "correction_applied_at")
+    private LocalDateTime correctionAppliedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "correction_applied_by")
+    private User correctionAppliedBy;
+
+    @Column(name = "correction_policy", length = 50)
+    private String correctionPolicy;
+
+    @Column(name = "affected_attempts_count", nullable = false)
+    private Integer affectedAttemptsCount = 0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -119,6 +135,12 @@ public class ReportedQuestion {
         }
         if (this.escalatedToAdmin == null) {
             this.escalatedToAdmin = false;
+        }
+        if (this.correctionApplied == null) {
+            this.correctionApplied = false;
+        }
+        if (this.affectedAttemptsCount == null) {
+            this.affectedAttemptsCount = 0;
         }
     }
 
@@ -271,6 +293,46 @@ public class ReportedQuestion {
 
     public void setResolvedAt(LocalDateTime resolvedAt) {
         this.resolvedAt = resolvedAt;
+    }
+
+    public Boolean getCorrectionApplied() {
+        return correctionApplied;
+    }
+
+    public void setCorrectionApplied(Boolean correctionApplied) {
+        this.correctionApplied = correctionApplied;
+    }
+
+    public LocalDateTime getCorrectionAppliedAt() {
+        return correctionAppliedAt;
+    }
+
+    public void setCorrectionAppliedAt(LocalDateTime correctionAppliedAt) {
+        this.correctionAppliedAt = correctionAppliedAt;
+    }
+
+    public User getCorrectionAppliedBy() {
+        return correctionAppliedBy;
+    }
+
+    public void setCorrectionAppliedBy(User correctionAppliedBy) {
+        this.correctionAppliedBy = correctionAppliedBy;
+    }
+
+    public String getCorrectionPolicy() {
+        return correctionPolicy;
+    }
+
+    public void setCorrectionPolicy(String correctionPolicy) {
+        this.correctionPolicy = correctionPolicy;
+    }
+
+    public Integer getAffectedAttemptsCount() {
+        return affectedAttemptsCount;
+    }
+
+    public void setAffectedAttemptsCount(Integer affectedAttemptsCount) {
+        this.affectedAttemptsCount = affectedAttemptsCount;
     }
 
     public LocalDateTime getCreatedAt() {
