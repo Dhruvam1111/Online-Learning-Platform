@@ -251,14 +251,9 @@ CREATE INDEX IF NOT EXISTS idx_student_question_reports_student ON student_quest
 CREATE INDEX IF NOT EXISTS idx_monitoring_events_attempt ON exam_monitoring_events(attempt_id, event_timestamp ASC);
 CREATE INDEX IF NOT EXISTS idx_monitoring_events_severity ON exam_monitoring_events(severity);
 
-
-
-
-
-
-
-
-
-
-
-
+-- Exceptional refund review queue and exact student email lookup.
+CREATE INDEX IF NOT EXISTS idx_refund_exception_queue
+    ON webhook_events (processed_at, id) WHERE event_type = 'refund.exception.request';
+CREATE INDEX IF NOT EXISTS idx_refund_exception_order
+    ON webhook_events (substring(event_id, 11)) WHERE event_type = 'refund.exception.request';
+CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users (lower(email));

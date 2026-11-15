@@ -176,7 +176,8 @@ export const adminAPI = {
   processExceptionalRefund: (paymentId, reason) =>
     api.post('/payments/refunds/exceptions', { paymentId, reason }),
   getRefundExceptions: () => api.get('/payments/refunds/exceptions'),
-  decideRefundException: (id, decision, reason) => api.post(`/payments/refunds/exceptions/${id}/decision`, {decision, reason}),
+  getRefundQueue: (params, signal) => api.get('/payments/refunds/exceptions/queue', { params, signal }),
+  decideRefundException: (id, decision, reason, approvedAmount = null) => api.post(`/payments/refunds/exceptions/${id}/decision`, {decision, reason, approvedAmount}),
   getReconciliation: () => api.get('/payments/reconciliation/report'),
 };
 
