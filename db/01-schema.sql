@@ -2,8 +2,8 @@
 -- Online Learning Platform — Sprint 1 Schema
 -- Run this FIRST. Creates all tables from scratch.
 -- ============================================================
-
 -- Clean slate (safe to re-run during development)
+DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS quiz_attempt_answers CASCADE;
 DROP TABLE IF EXISTS quiz_attempts CASCADE;
 DROP TABLE IF EXISTS quiz_questions CASCADE;
@@ -26,36 +26,31 @@ DROP TABLE IF EXISTS instructor_profiles CASCADE;
 DROP TABLE IF EXISTS student_profiles CASCADE;
 DROP TABLE IF EXISTS courses CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
-
 -- =========================
 -- TABLE: users
 -- =========================
 -- Stores both students and instructors in one table.
 -- The 'role' column distinguishes them.
 -- Admin role is NOT needed this sprint.
-
 CREATE TABLE users (
-    id              SERIAL PRIMARY KEY,
-    name            VARCHAR(100) NOT NULL,
-    email           VARCHAR(255) UNIQUE NOT NULL,
-    password_hash   VARCHAR(255) NOT NULL,
-    role            VARCHAR(20)  NOT NULL,
-    account_status  VARCHAR(20)  NOT NULL DEFAULT 'active',
-    created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
-
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    account_status VARCHAR(20) NOT NULL DEFAULT 'active',
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     -- Enforce that role is one of the allowed values
     CONSTRAINT chk_users_role CHECK (role IN ('student', 'instructor', 'admin')),
-
     -- Enforce account lifecycle status
-    CONSTRAINT chk_users_account_status CHECK (account_status IN ('active', 'pending', 'suspended', 'rejected'))
+    CONSTRAINT chk_users_account_status CHECK (
+        account_status IN ('active', 'pending', 'suspended', 'rejected')
+    )
 );
-
 -- Why VARCHAR for role instead of ENUM?
 -- PostgreSQL ENUMs are hard to alter later (adding 'admin' in Sprint 2
 -- would require ALTER TYPE). A VARCHAR with a CHECK constraint is
 -- easier to extend: just ALTER the CHECK constraint.
-
-
 -- =========================
 -- TABLE: courses
 -- =========================
@@ -65,434 +60,427 @@ CREATE TABLE users (
 --         'published' means students can see it in the catalog.
 --         'archived' means hidden from catalog while preserving data.
 --         'rejected' means returned by admin with feedback.
-
 CREATE TABLE courses (
-    id              SERIAL PRIMARY KEY,
-    instructor_id   INTEGER      NOT NULL,
-    title           VARCHAR(200) NOT NULL,
-    description     TEXT,
-    category        VARCHAR(100) NOT NULL DEFAULT 'General',
+    id SERIAL PRIMARY KEY,
+    instructor_id INTEGER NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    category VARCHAR(100) NOT NULL DEFAULT 'General',
     learning_outcomes TEXT,
-    status          VARCHAR(20)  NOT NULL DEFAULT 'draft',
+    status VARCHAR(20) NOT NULL DEFAULT 'draft',
     rejection_reason TEXT,
-    price           NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
-    discount_type   VARCHAR(20),
-    discount_value  NUMERIC(10, 2) DEFAULT 0.00,
+    price NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    discount_type VARCHAR(20),
+    discount_value NUMERIC(10, 2) DEFAULT 0.00,
     discount_start_date TIMESTAMP,
-    discount_end_date   TIMESTAMP,
+    discount_end_date TIMESTAMP,
     enrollment_limit INTEGER,
-    is_deleted      BOOLEAN      NOT NULL DEFAULT FALSE,
-    deleted_at      TIMESTAMP,
-    created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_courses_instructor
-        FOREIGN KEY (instructor_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT chk_courses_status CHECK (status IN ('draft', 'pending_review', 'published', 'archived', 'rejected'))
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_courses_instructor FOREIGN KEY (instructor_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT chk_courses_status CHECK (
+        status IN (
+            'draft',
+            'pending_review',
+            'published',
+            'archived',
+            'rejected'
+        )
+    )
 );
-
 -- ON DELETE CASCADE: If an instructor account is deleted, their courses
 -- are also deleted. This is acceptable for Sprint 1. In production you
 -- might want RESTRICT or soft-delete instead.
-
-
 -- =========================
 -- TABLE: course_instructors
 -- =========================
 -- Many-to-many relationship supporting co-instructors and ownership (FR-I05, FR-I59)
 CREATE TABLE course_instructors (
-    id            SERIAL PRIMARY KEY,
-    course_id     INTEGER NOT NULL,
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER NOT NULL,
     instructor_id INTEGER NOT NULL,
-    role          VARCHAR(50) NOT NULL DEFAULT 'owner',
-    created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_course_instructors_course
-        FOREIGN KEY (course_id)
-        REFERENCES courses(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_course_instructors_user
-        FOREIGN KEY (instructor_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT uq_course_instructor
-        UNIQUE (course_id, instructor_id),
-
-    CONSTRAINT chk_course_instructor_role
-        CHECK (role IN ('owner', 'co-instructor', 'OWNER', 'CO_INSTRUCTOR'))
+    role VARCHAR(50) NOT NULL DEFAULT 'owner',
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_course_instructors_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    CONSTRAINT fk_course_instructors_user FOREIGN KEY (instructor_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT uq_course_instructor UNIQUE (course_id, instructor_id),
+    CONSTRAINT chk_course_instructor_role CHECK (
+        role IN (
+            'owner',
+            'co-instructor',
+            'OWNER',
+            'CO_INSTRUCTOR'
+        )
+    )
 );
-
-
 -- =========================
 -- TABLE: course_association_requests
 -- =========================
 -- Instructor requests to join existing courses as co-instructors (FR-I58, FR-I59)
 CREATE TABLE course_association_requests (
-    id             SERIAL PRIMARY KEY,
-    course_id      INTEGER     NOT NULL,
-    instructor_id  INTEGER     NOT NULL,
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER NOT NULL,
+    instructor_id INTEGER NOT NULL,
     requested_role VARCHAR(50) NOT NULL DEFAULT 'co-instructor',
-    message        TEXT,
-    status         VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    admin_notes    TEXT,
-    reviewed_by    INTEGER,
-    reviewed_at    TIMESTAMP,
-    created_at     TIMESTAMP   NOT NULL DEFAULT NOW(),
-    updated_at     TIMESTAMP   NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_assoc_req_course
-        FOREIGN KEY (course_id)
-        REFERENCES courses(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_assoc_req_instructor
-        FOREIGN KEY (instructor_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_assoc_req_reviewer
-        FOREIGN KEY (reviewed_by)
-        REFERENCES users(id)
-        ON DELETE SET NULL,
-
-    CONSTRAINT chk_assoc_req_status
-        CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
-
-    CONSTRAINT chk_assoc_req_role
-        CHECK (requested_role IN ('co-instructor'))
+    message TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    admin_notes TEXT,
+    reviewed_by INTEGER,
+    reviewed_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_assoc_req_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    CONSTRAINT fk_assoc_req_instructor FOREIGN KEY (instructor_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_assoc_req_reviewer FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE
+    SET NULL,
+        CONSTRAINT chk_assoc_req_status CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+        CONSTRAINT chk_assoc_req_role CHECK (requested_role IN ('co-instructor'))
 );
-
-
 -- =========================
 -- TABLE: course_prerequisites
 -- =========================
 -- Structured prerequisite requirements for courses and skills (FR-I05)
 -- Reusable for student enrollment eligibility verification.
 CREATE TABLE course_prerequisites (
-    id                  SERIAL PRIMARY KEY,
-    course_id           INTEGER NOT NULL,
-    prerequisite_type   VARCHAR(20) NOT NULL DEFAULT 'SKILL',
-    required_course_id  INTEGER,
-    title               VARCHAR(200) NOT NULL,
-    description         VARCHAR(500),
-    created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_course_prerequisites_course
-        FOREIGN KEY (course_id)
-        REFERENCES courses(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_course_prerequisites_required_course
-        FOREIGN KEY (required_course_id)
-        REFERENCES courses(id)
-        ON DELETE SET NULL,
-
-    CONSTRAINT chk_course_prerequisite_type
-        CHECK (prerequisite_type IN ('COURSE', 'SKILL'))
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER NOT NULL,
+    prerequisite_type VARCHAR(20) NOT NULL DEFAULT 'SKILL',
+    required_course_id INTEGER,
+    title VARCHAR(200) NOT NULL,
+    description VARCHAR(500),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_course_prerequisites_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    CONSTRAINT fk_course_prerequisites_required_course FOREIGN KEY (required_course_id) REFERENCES courses(id) ON DELETE
+    SET NULL,
+        CONSTRAINT chk_course_prerequisite_type CHECK (prerequisite_type IN ('COURSE', 'SKILL'))
 );
-
-
 -- =========================
 -- TABLE: course_modules
 -- =========================
 -- Course hierarchy Level 1: Modules grouping content within a course (FR-I06)
 CREATE TABLE course_modules (
-    id          SERIAL PRIMARY KEY,
-    course_id   INTEGER      NOT NULL,
-    title       VARCHAR(200) NOT NULL,
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER NOT NULL,
+    title VARCHAR(200) NOT NULL,
     description TEXT,
-    order_index INTEGER      NOT NULL DEFAULT 0,
-    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_course_modules_course
-        FOREIGN KEY (course_id)
-        REFERENCES courses(id)
-        ON DELETE CASCADE
+    order_index INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_course_modules_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
 );
-
-
 -- =========================
 -- TABLE: course_sections
 -- =========================
 -- Course hierarchy Level 2: Sections dividing a module into logical topics (FR-I06)
 CREATE TABLE course_sections (
-    id          SERIAL PRIMARY KEY,
-    module_id   INTEGER      NOT NULL,
-    title       VARCHAR(200) NOT NULL,
+    id SERIAL PRIMARY KEY,
+    module_id INTEGER NOT NULL,
+    title VARCHAR(200) NOT NULL,
     description TEXT,
-    order_index INTEGER      NOT NULL DEFAULT 0,
-    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_course_sections_module
-        FOREIGN KEY (module_id)
-        REFERENCES course_modules(id)
-        ON DELETE CASCADE
+    order_index INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_course_sections_module FOREIGN KEY (module_id) REFERENCES course_modules(id) ON DELETE CASCADE
 );
-
-
 -- =========================
 -- TABLE: lessons
 -- =========================
 -- Course hierarchy Level 3: Individual learning units with specific types (FR-I06)
 -- Extensible for quizzes, assignments, materials, and SCORM/xAPI packaging (DR-14)
 CREATE TABLE lessons (
-    id               SERIAL PRIMARY KEY,
-    section_id       INTEGER      NOT NULL,
-    title            VARCHAR(200) NOT NULL,
-    lesson_type      VARCHAR(50)  NOT NULL DEFAULT 'VIDEO',
-    content          TEXT,
-    content_url      VARCHAR(500),
+    id SERIAL PRIMARY KEY,
+    section_id INTEGER NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    lesson_type VARCHAR(50) NOT NULL DEFAULT 'VIDEO',
+    content TEXT,
+    content_url VARCHAR(500),
     duration_minutes INTEGER,
-    order_index      INTEGER      NOT NULL DEFAULT 0,
-    metadata         TEXT,
-    release_at       TIMESTAMP,
-    is_released      BOOLEAN      NOT NULL DEFAULT TRUE,
-    time_zone        VARCHAR(50)  DEFAULT 'Asia/Kolkata',
-    created_at       TIMESTAMP    NOT NULL DEFAULT NOW(),
-    updated_at       TIMESTAMP    NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_lessons_section
-        FOREIGN KEY (section_id)
-        REFERENCES course_sections(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT chk_lesson_type
-        CHECK (lesson_type IN ('VIDEO', 'MATERIAL', 'QUIZ', 'ASSIGNMENT'))
+    order_index INTEGER NOT NULL DEFAULT 0,
+    metadata TEXT,
+    release_at TIMESTAMP,
+    is_released BOOLEAN NOT NULL DEFAULT TRUE,
+    time_zone VARCHAR(50) DEFAULT 'Asia/Kolkata',
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_lessons_section FOREIGN KEY (section_id) REFERENCES course_sections(id) ON DELETE CASCADE,
+    CONSTRAINT chk_lesson_type CHECK (
+        lesson_type IN ('VIDEO', 'MATERIAL', 'QUIZ', 'ASSIGNMENT')
+    )
 );
-
-
 -- =========================
 -- TABLE: lectures
 -- =========================
 -- Each lecture belongs to exactly one course.
 -- A lecture is a YouTube link (no file upload this sprint).
 -- order_index controls the display order within a course.
-
 CREATE TABLE lectures (
-    id              SERIAL PRIMARY KEY,
-    course_id       INTEGER      NOT NULL,
-    title           VARCHAR(200) NOT NULL,
-    youtube_url     VARCHAR(500) NOT NULL,
-    video_id        VARCHAR(20),
-    order_index     INTEGER      NOT NULL DEFAULT 0,
-    created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_lectures_course
-        FOREIGN KEY (course_id)
-        REFERENCES courses(id)
-        ON DELETE CASCADE
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    youtube_url VARCHAR(500) NOT NULL,
+    video_id VARCHAR(20),
+    order_index INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_lectures_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
 );
-
 -- video_id: The extracted YouTube video ID (e.g., 'dQw4w9WgXcQ').
 -- The backend should extract this from youtube_url at insert time.
 -- Storing it separately makes it trivial to build embed URLs and
 -- thumbnail URLs on the frontend without parsing every time.
 --
 -- ON DELETE CASCADE: If a course is deleted, its lectures go too.
-
-
 -- =========================
 -- TABLE: enrollments
 -- =========================
 -- Join table between students and courses.
 -- A student can enroll in many courses; a course can have many students.
 -- No payment this sprint — enrollment is free and instant.
-
 CREATE TABLE enrollments (
-    id              SERIAL PRIMARY KEY,
-    student_id      INTEGER      NOT NULL,
-    course_id       INTEGER      NOT NULL,
-    enrolled_at     TIMESTAMP    NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_enrollments_student
-        FOREIGN KEY (student_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_enrollments_course
-        FOREIGN KEY (course_id)
-        REFERENCES courses(id)
-        ON DELETE CASCADE,
-
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER NOT NULL,
+    course_id INTEGER NOT NULL,
+    enrolled_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_enrollments_student FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_enrollments_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
     -- Prevent the same student from enrolling in the same course twice
     CONSTRAINT uq_enrollment UNIQUE (student_id, course_id)
 );
-
-
 -- =========================
 -- TABLE: reviews
 -- =========================
 CREATE TABLE reviews (
-    id          SERIAL PRIMARY KEY,
-    student_id  INTEGER  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    course_id   INTEGER  NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-    rating      INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
-    comment     TEXT,
-    created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    rating INTEGER NOT NULL CHECK (
+        rating BETWEEN 1 AND 5
+    ),
+    comment TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (student_id, course_id)
 );
-
 -- =========================
 -- TABLE: bookmarks
 -- =========================
 CREATE TABLE bookmarks (
-    id          SERIAL PRIMARY KEY,
-    student_id  INTEGER   NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    course_id   INTEGER   NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-    created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (student_id, course_id)
 );
-
 -- =========================
 -- TABLE: student_profiles
 -- =========================
 CREATE TABLE student_profiles (
-    id              SERIAL PRIMARY KEY,
-    student_id      INT NOT NULL UNIQUE,
+    id SERIAL PRIMARY KEY,
+    student_id INT NOT NULL UNIQUE,
     education_level VARCHAR(100),
-    interests       VARCHAR(1000),
-    learning_goals  VARCHAR(1000),
-    bio             VARCHAR(2000),
-    updated_at      TIMESTAMP,
+    interests VARCHAR(1000),
+    learning_goals VARCHAR(1000),
+    bio VARCHAR(2000),
+    updated_at TIMESTAMP,
     CONSTRAINT fk_student_profiles_user FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE
 );
-
 -- =========================
 -- TABLE: instructor_profiles
 -- =========================
 CREATE TABLE instructor_profiles (
-    id                  SERIAL PRIMARY KEY,
-    instructor_id       INTEGER NOT NULL UNIQUE,
-    qualifications      TEXT,
-    expertise_areas     TEXT,
-    bio                 TEXT,
+    id SERIAL PRIMARY KEY,
+    instructor_id INTEGER NOT NULL UNIQUE,
+    qualifications TEXT,
+    expertise_areas TEXT,
+    bio TEXT,
     profile_picture_url VARCHAR(500),
-    created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_instructor_profiles_user FOREIGN KEY (instructor_id) REFERENCES users(id) ON DELETE CASCADE
 );
-
 -- =========================
 -- TABLE: instructor_credentials
 -- =========================
 -- Stores private credential verification documents (degrees, certificates, identity)
 -- uploaded by instructors. Access is restricted to the owning instructor and admins.
 CREATE TABLE instructor_credentials (
-    id                 SERIAL PRIMARY KEY,
-    instructor_id      INTEGER NOT NULL,
+    id SERIAL PRIMARY KEY,
+    instructor_id INTEGER NOT NULL,
     original_file_name VARCHAR(255) NOT NULL,
-    stored_file_name   VARCHAR(255) NOT NULL,
-    content_type       VARCHAR(100) NOT NULL,
-    file_size          BIGINT NOT NULL,
-    document_type      VARCHAR(100) NOT NULL DEFAULT 'CREDENTIAL',
-    status             VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
-    uploaded_at        TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at         TIMESTAMP NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_instructor_credentials_user
-        FOREIGN KEY (instructor_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT chk_credential_status
-        CHECK (status IN ('ACTIVE', 'REPLACED', 'DELETED'))
+    stored_file_name VARCHAR(255) NOT NULL,
+    content_type VARCHAR(100) NOT NULL,
+    file_size BIGINT NOT NULL,
+    document_type VARCHAR(100) NOT NULL DEFAULT 'CREDENTIAL',
+    status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+    uploaded_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_instructor_credentials_user FOREIGN KEY (instructor_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT chk_credential_status CHECK (status IN ('ACTIVE', 'REPLACED', 'DELETED'))
 );
-
 -- =========================
 -- TABLE: instructor_upload_history
 -- =========================
 -- Audit trail tracking upload, replacement, and deletion lifecycle events
 -- for instructor profile pictures and credential documents.
 CREATE TABLE instructor_upload_history (
-    id                 SERIAL PRIMARY KEY,
-    instructor_id      INTEGER NOT NULL,
-    category           VARCHAR(50) NOT NULL,
-    action             VARCHAR(50) NOT NULL,
+    id SERIAL PRIMARY KEY,
+    instructor_id INTEGER NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    action VARCHAR(50) NOT NULL,
     original_file_name VARCHAR(255) NOT NULL,
-    stored_file_name   VARCHAR(255) NOT NULL,
-    content_type       VARCHAR(100) NOT NULL,
-    file_size          BIGINT NOT NULL,
-    details            TEXT,
-    created_at         TIMESTAMP NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_instructor_upload_history_user
-        FOREIGN KEY (instructor_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT chk_upload_category
-        CHECK (category IN ('PROFILE_PICTURE', 'CREDENTIAL')),
-
-    CONSTRAINT chk_upload_action
-        CHECK (action IN ('UPLOADED', 'REPLACED', 'DELETED'))
+    stored_file_name VARCHAR(255) NOT NULL,
+    content_type VARCHAR(100) NOT NULL,
+    file_size BIGINT NOT NULL,
+    details TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_instructor_upload_history_user FOREIGN KEY (instructor_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT chk_upload_category CHECK (category IN ('PROFILE_PICTURE', 'CREDENTIAL')),
+    CONSTRAINT chk_upload_action CHECK (action IN ('UPLOADED', 'REPLACED', 'DELETED'))
 );
-
 -- =========================
 -- TABLE: lecture_progress
 -- =========================
 CREATE TABLE lecture_progress (
-    id                         SERIAL PRIMARY KEY,
-    student_id                 INTEGER   NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    lecture_id                 INTEGER   NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
-    completed_at               TIMESTAMP NOT NULL DEFAULT NOW(),
-    playback_position_seconds  INTEGER   NOT NULL DEFAULT 0,
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    lecture_id INTEGER NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
+    completed_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    playback_position_seconds INTEGER NOT NULL DEFAULT 0,
     UNIQUE (student_id, lecture_id)
 );
-
-
 -- =========================
 -- TABLE: lecture_materials (FR-S14, FR-I14)
 -- =========================
 CREATE TABLE IF NOT EXISTS lecture_materials (
-    id                SERIAL PRIMARY KEY,
-    lecture_id        INTEGER REFERENCES lectures(id) ON DELETE CASCADE,
-    lesson_id         INTEGER REFERENCES lessons(id) ON DELETE CASCADE,
-    module_id         INTEGER REFERENCES course_modules(id) ON DELETE CASCADE,
-    uploader_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    title             VARCHAR(255) NOT NULL,
-    original_filename VARCHAR(255),
-    file_url          VARCHAR(500) NOT NULL,
-    file_type         VARCHAR(50) NOT NULL DEFAULT 'pdf',
-    mime_type         VARCHAR(100),
-    file_size_bytes   BIGINT,
-    is_downloadable   BOOLEAN NOT NULL DEFAULT FALSE,
-    scan_status       VARCHAR(30) NOT NULL DEFAULT 'CLEAN',
-    order_index       INTEGER NOT NULL DEFAULT 1,
-    deleted_at        TIMESTAMP,
-    release_at        TIMESTAMP,
-    is_released       BOOLEAN NOT NULL DEFAULT TRUE,
-    time_zone         VARCHAR(50) DEFAULT 'Asia/Kolkata',
-    created_at        TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at        TIMESTAMP NOT NULL DEFAULT NOW()
+    id SERIAL PRIMARY KEY,
+    lecture_id INTEGER REFERENCES lectures(id) ON DELETE CASCADE,
+    lesson_id INTEGER REFERENCES lessons(id) ON DELETE CASCADE,
+    module_id INTEGER REFERENCES course_modules(id) ON DELETE CASCADE,
+    uploader_id INTEGER REFERENCES users(id) ON DELETE
+    SET NULL,
+        title VARCHAR(255) NOT NULL,
+        original_filename VARCHAR(255),
+        file_url VARCHAR(500) NOT NULL,
+        file_type VARCHAR(50) NOT NULL DEFAULT 'pdf',
+        mime_type VARCHAR(100),
+        file_size_bytes BIGINT,
+        is_downloadable BOOLEAN NOT NULL DEFAULT FALSE,
+        scan_status VARCHAR(30) NOT NULL DEFAULT 'CLEAN',
+        order_index INTEGER NOT NULL DEFAULT 1,
+        deleted_at TIMESTAMP,
+        release_at TIMESTAMP,
+        is_released BOOLEAN NOT NULL DEFAULT TRUE,
+        time_zone VARCHAR(50) DEFAULT 'Asia/Kolkata',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
-
 -- =========================
 -- TABLE: lecture_bookmarks (FR-S17)
 -- =========================
 CREATE TABLE IF NOT EXISTS lecture_bookmarks (
-    id                SERIAL PRIMARY KEY,
-    student_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    lecture_id        INTEGER NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
-    created_at        TIMESTAMP NOT NULL DEFAULT NOW(),
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    lecture_id INTEGER NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_student_lecture_bookmark UNIQUE (student_id, lecture_id)
 );
 -- Simulated payments. Apply on a disposable DB first, then reviewed Neon dev migration.
-CREATE TABLE IF NOT EXISTS payments (amount numeric(10,2) not null, course_id integer not null REFERENCES courses(id), discount_amount numeric(10,2), id integer generated by default as identity, instructor_earning numeric(10,2), platform_fee numeric(10,2), refund_amount numeric(10,2), risk_score integer, student_id integer not null REFERENCES users(id), wallet_amount_used numeric(10,2), created_at timestamp(6) not null, updated_at timestamp(6) not null, currency varchar(10) not null, refund_status varchar(20), status varchar(20) not null, coupon_code varchar(50), payment_method varchar(50), invoice_number varchar(100), order_id varchar(100) not null unique, payment_id varchar(100), failure_reason TEXT, refund_reason TEXT, signature varchar(255), primary key (id));
-CREATE TABLE IF NOT EXISTS wallets (balance numeric(10,2) not null, id integer generated by default as identity, student_id integer not null REFERENCES users(id) unique, updated_at timestamp(6) not null, primary key (id));
-CREATE TABLE IF NOT EXISTS wallet_transactions (amount numeric(10,2) not null, id integer generated by default as identity, wallet_id integer not null REFERENCES wallets(id), created_at timestamp(6) not null, type varchar(20) not null, description varchar(255) not null, primary key (id));
-CREATE TABLE IF NOT EXISTS coupons (fixed_discount_amount numeric(10,2), discount_percentage numeric(5,2) not null, id integer generated by default as identity, is_active boolean, max_discount_amount numeric(10,2), min_order_amount numeric(10,2), times_used integer, usage_limit integer, created_at timestamp(6) not null, valid_until timestamp(6) not null, code varchar(50) not null unique, primary key (id));
-CREATE TABLE IF NOT EXISTS coupon_usages (coupon_id integer not null REFERENCES coupons(id), discount_applied numeric(10,2) not null, id integer generated by default as identity, student_id integer not null REFERENCES users(id), used_at timestamp(6) not null, order_id varchar(100) not null, primary key (id));
-CREATE TABLE IF NOT EXISTS refunds (amount numeric(10,2) not null, id integer generated by default as identity, payment_id integer not null REFERENCES payments(id), created_at timestamp(6) not null, status varchar(20) not null, razorpay_refund_id varchar(100) not null unique, reason TEXT, primary key (id));
-CREATE TABLE IF NOT EXISTS instructor_earnings (course_id integer not null REFERENCES courses(id), gross_amount numeric(10,2) not null, id integer generated by default as identity, instructor_id integer not null REFERENCES users(id), net_instructor_earning numeric(10,2) not null, payment_id integer not null REFERENCES payments(id), platform_commission numeric(10,2) not null, created_at timestamp(6) not null, payout_status varchar(20) not null, primary key (id));
-CREATE TABLE IF NOT EXISTS webhook_events (id integer generated by default as identity, processed_at timestamp(6) not null, event_type varchar(50) not null, event_id varchar(100) not null unique, payload TEXT, primary key (id));
-ALTER TABLE coupons ADD COLUMN IF NOT EXISTS fixed_discount_amount NUMERIC(10,2);
-
+CREATE TABLE IF NOT EXISTS payments (
+    amount numeric(10, 2) not null,
+    course_id integer not null REFERENCES courses(id),
+    discount_amount numeric(10, 2),
+    id integer generated by default as identity,
+    instructor_earning numeric(10, 2),
+    platform_fee numeric(10, 2),
+    refund_amount numeric(10, 2),
+    risk_score integer,
+    student_id integer not null REFERENCES users(id),
+    wallet_amount_used numeric(10, 2),
+    created_at timestamp(6) not null,
+    updated_at timestamp(6) not null,
+    currency varchar(10) not null,
+    refund_status varchar(20),
+    status varchar(20) not null,
+    coupon_code varchar(50),
+    payment_method varchar(50),
+    invoice_number varchar(100),
+    order_id varchar(100) not null unique,
+    payment_id varchar(100),
+    failure_reason TEXT,
+    refund_reason TEXT,
+    signature varchar(255),
+    primary key (id)
+);
+CREATE TABLE IF NOT EXISTS wallets (
+    balance numeric(10, 2) not null,
+    id integer generated by default as identity,
+    student_id integer not null REFERENCES users(id) unique,
+    updated_at timestamp(6) not null,
+    primary key (id)
+);
+CREATE TABLE IF NOT EXISTS wallet_transactions (
+    amount numeric(10, 2) not null,
+    id integer generated by default as identity,
+    wallet_id integer not null REFERENCES wallets(id),
+    created_at timestamp(6) not null,
+    type varchar(20) not null,
+    description varchar(255) not null,
+    primary key (id)
+);
+CREATE TABLE IF NOT EXISTS coupons (
+    fixed_discount_amount numeric(10, 2),
+    discount_percentage numeric(5, 2) not null,
+    id integer generated by default as identity,
+    is_active boolean,
+    max_discount_amount numeric(10, 2),
+    min_order_amount numeric(10, 2),
+    times_used integer,
+    usage_limit integer,
+    created_at timestamp(6) not null,
+    valid_until timestamp(6) not null,
+    code varchar(50) not null unique,
+    primary key (id)
+);
+CREATE TABLE IF NOT EXISTS coupon_usages (
+    coupon_id integer not null REFERENCES coupons(id),
+    discount_applied numeric(10, 2) not null,
+    id integer generated by default as identity,
+    student_id integer not null REFERENCES users(id),
+    used_at timestamp(6) not null,
+    order_id varchar(100) not null,
+    primary key (id)
+);
+CREATE TABLE IF NOT EXISTS refunds (
+    amount numeric(10, 2) not null,
+    id integer generated by default as identity,
+    payment_id integer not null REFERENCES payments(id),
+    created_at timestamp(6) not null,
+    status varchar(20) not null,
+    razorpay_refund_id varchar(100) not null unique,
+    reason TEXT,
+    primary key (id)
+);
+CREATE TABLE IF NOT EXISTS instructor_earnings (
+    course_id integer not null REFERENCES courses(id),
+    gross_amount numeric(10, 2) not null,
+    id integer generated by default as identity,
+    instructor_id integer not null REFERENCES users(id),
+    net_instructor_earning numeric(10, 2) not null,
+    payment_id integer not null REFERENCES payments(id),
+    platform_commission numeric(10, 2) not null,
+    created_at timestamp(6) not null,
+    payout_status varchar(20) not null,
+    primary key (id)
+);
+CREATE TABLE IF NOT EXISTS webhook_events (
+    id integer generated by default as identity,
+    processed_at timestamp(6) not null,
+    event_type varchar(50) not null,
+    event_id varchar(100) not null unique,
+    payload TEXT,
+    primary key (id)
+);
+ALTER TABLE coupons
+ADD COLUMN IF NOT EXISTS fixed_discount_amount NUMERIC(10, 2);
 -- Payment audit hardening; incremental migration is also supplied.
 -- Apply only after 20261110-payment-claims.sql. No automatic Hibernate DDL.
 -- Indefinite retention: no scheduled deletion. Operators must maintain verified backups.
@@ -507,38 +495,68 @@ CREATE TABLE IF NOT EXISTS financial_ledger (
     new_record jsonb
 );
 CREATE INDEX IF NOT EXISTS idx_financial_ledger_recorded_at ON financial_ledger(recorded_at);
-CREATE OR REPLACE FUNCTION protect_financial_history() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-    RAISE EXCEPTION 'Financial history is append-only; corrections require new entries';
+CREATE OR REPLACE FUNCTION protect_financial_history() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'Financial history is append-only; corrections require new entries';
 END;
 $$;
 DROP TRIGGER IF EXISTS protect_financial_ledger ON financial_ledger;
-CREATE TRIGGER protect_financial_ledger BEFORE UPDATE OR DELETE OR TRUNCATE ON financial_ledger
-FOR EACH STATEMENT EXECUTE FUNCTION protect_financial_history();
+CREATE TRIGGER protect_financial_ledger BEFORE
+UPDATE
+    OR DELETE
+    OR TRUNCATE ON financial_ledger FOR EACH STATEMENT EXECUTE FUNCTION protect_financial_history();
 DROP TRIGGER IF EXISTS protect_webhook_history ON webhook_events;
-CREATE TRIGGER protect_webhook_history BEFORE UPDATE OR DELETE OR TRUNCATE ON webhook_events
-FOR EACH STATEMENT EXECUTE FUNCTION protect_financial_history();
-CREATE OR REPLACE FUNCTION public.record_financial_change() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
-BEGIN
-    IF TG_TABLE_SCHEMA <> 'public' OR TG_RELID NOT IN ('public.payments'::regclass,'public.refunds'::regclass,'public.instructor_earnings'::regclass,'public.wallets'::regclass,'public.wallet_transactions'::regclass,'public.coupons'::regclass,'public.coupon_usages'::regclass) THEN
-        RAISE EXCEPTION 'Unexpected financial audit source';
-    END IF;
-    INSERT INTO public.financial_ledger(table_name, operation, old_record, new_record)
-    VALUES(TG_TABLE_NAME,TG_OP,
-      CASE WHEN TG_OP IN ('UPDATE','DELETE') THEN to_jsonb(OLD) - 'signature' ELSE NULL END,
-      CASE WHEN TG_OP IN ('INSERT','UPDATE') THEN to_jsonb(NEW) - 'signature' ELSE NULL END);
-    RETURN NULL;
+CREATE TRIGGER protect_webhook_history BEFORE
+UPDATE
+    OR DELETE
+    OR TRUNCATE ON webhook_events FOR EACH STATEMENT EXECUTE FUNCTION protect_financial_history();
+CREATE OR REPLACE FUNCTION public.record_financial_change() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog,
+    public AS $$ BEGIN IF TG_TABLE_SCHEMA <> 'public'
+    OR TG_RELID NOT IN (
+        'public.payments'::regclass,
+        'public.refunds'::regclass,
+        'public.instructor_earnings'::regclass,
+        'public.wallets'::regclass,
+        'public.wallet_transactions'::regclass,
+        'public.coupons'::regclass,
+        'public.coupon_usages'::regclass
+    ) THEN RAISE EXCEPTION 'Unexpected financial audit source';
+END IF;
+INSERT INTO public.financial_ledger(table_name, operation, old_record, new_record)
+VALUES(
+        TG_TABLE_NAME,
+        TG_OP,
+        CASE
+            WHEN TG_OP IN ('UPDATE', 'DELETE') THEN to_jsonb(OLD) - 'signature'
+            ELSE NULL
+        END,
+        CASE
+            WHEN TG_OP IN ('INSERT', 'UPDATE') THEN to_jsonb(NEW) - 'signature'
+            ELSE NULL
+        END
+    );
+RETURN NULL;
 END;
 $$;
-DO $$ DECLARE item text; BEGIN
-    FOREACH item IN ARRAY ARRAY['payments','refunds','instructor_earnings','wallets','wallet_transactions','coupons','coupon_usages'] LOOP
-        EXECUTE format('DROP TRIGGER IF EXISTS financial_history ON %I',item);
-        EXECUTE format('CREATE TRIGGER financial_history AFTER INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION record_financial_change()',item);
-        EXECUTE format('DROP TRIGGER IF EXISTS prevent_financial_truncate ON %I',item);
-        EXECUTE format('CREATE TRIGGER prevent_financial_truncate BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION protect_financial_history()',item);
-    END LOOP;
+DO $$
+DECLARE item text;
+BEGIN FOREACH item IN ARRAY ARRAY ['payments','refunds','instructor_earnings','wallets','wallet_transactions','coupons','coupon_usages'] LOOP EXECUTE format(
+    'DROP TRIGGER IF EXISTS financial_history ON %I',
+    item
+);
+EXECUTE format(
+    'CREATE TRIGGER financial_history AFTER INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION record_financial_change()',
+    item
+);
+EXECUTE format(
+    'DROP TRIGGER IF EXISTS prevent_financial_truncate ON %I',
+    item
+);
+EXECUTE format(
+    'CREATE TRIGGER prevent_financial_truncate BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION protect_financial_history()',
+    item
+);
+END LOOP;
 END $$;
-
 -- Step 14 / FR-I64: Content Ownership Declarations
 CREATE TABLE IF NOT EXISTS content_declarations (
     id SERIAL PRIMARY KEY,
@@ -558,204 +576,156 @@ CREATE TABLE IF NOT EXISTS content_declarations (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 COMMIT;
-
 -- =========================
 -- FR-I19: QUIZZES, QUESTIONS & QUIZ_QUESTIONS
 -- =========================
 -- Quizzes linked to a Course or Module, with optional Lesson position.
 CREATE TABLE quizzes (
-    id                 SERIAL PRIMARY KEY,
-    course_id          INTEGER       NOT NULL,
-    module_id          INTEGER,
-    lesson_id          INTEGER,
-    created_by         INTEGER,
-    title              VARCHAR(200)  NOT NULL,
-    description        TEXT,
-    instructions       TEXT,
-    status             VARCHAR(20)   NOT NULL DEFAULT 'DRAFT',
-    total_marks         NUMERIC(8,2)  NOT NULL DEFAULT 0.00,
-    passing_marks       NUMERIC(8,2),
-    time_limit_minutes  INTEGER,
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER NOT NULL,
+    module_id INTEGER,
+    lesson_id INTEGER,
+    created_by INTEGER,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    instructions TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
+    total_marks NUMERIC(8, 2) NOT NULL DEFAULT 0.00,
+    passing_marks NUMERIC(8, 2),
+    time_limit_minutes INTEGER,
     number_of_questions INTEGER,
-    max_attempts        INTEGER       NOT NULL DEFAULT 1,
-    available_from      TIMESTAMP,
-    available_until     TIMESTAMP,
-    negative_marking    BOOLEAN       NOT NULL DEFAULT FALSE,
-    partial_marking     BOOLEAN       NOT NULL DEFAULT FALSE,
-    numeric_tolerance   NUMERIC(8,2)  DEFAULT 0.00,
-    feedback_released   BOOLEAN       NOT NULL DEFAULT TRUE,
-    show_correct_answers BOOLEAN      NOT NULL DEFAULT TRUE,
-    show_feedback       BOOLEAN       NOT NULL DEFAULT TRUE,
+    max_attempts INTEGER NOT NULL DEFAULT 1,
+    available_from TIMESTAMP,
+    available_until TIMESTAMP,
+    negative_marking BOOLEAN NOT NULL DEFAULT FALSE,
+    partial_marking BOOLEAN NOT NULL DEFAULT FALSE,
+    numeric_tolerance NUMERIC(8, 2) DEFAULT 0.00,
+    feedback_released BOOLEAN NOT NULL DEFAULT TRUE,
+    show_correct_answers BOOLEAN NOT NULL DEFAULT TRUE,
+    show_feedback BOOLEAN NOT NULL DEFAULT TRUE,
     answer_release_timing VARCHAR(30) NOT NULL DEFAULT 'IMMEDIATELY',
-    is_exam             BOOLEAN       NOT NULL DEFAULT FALSE,
-    created_at          TIMESTAMP     NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMP     NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_quizzes_course
-        FOREIGN KEY (course_id)
-        REFERENCES courses(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_quizzes_module
-        FOREIGN KEY (module_id)
-        REFERENCES course_modules(id)
-        ON DELETE SET NULL,
-
-    CONSTRAINT fk_quizzes_lesson
-        FOREIGN KEY (lesson_id)
-        REFERENCES lessons(id)
-        ON DELETE SET NULL,
-
-    CONSTRAINT fk_quizzes_created_by
-        FOREIGN KEY (created_by)
-        REFERENCES users(id)
-        ON DELETE SET NULL,
-
-    CONSTRAINT chk_quiz_status
-        CHECK (status IN ('DRAFT', 'PUBLISHED')),
-
-    CONSTRAINT chk_quiz_max_attempts
-        CHECK (max_attempts >= 1),
-
-    CONSTRAINT chk_quiz_availability_window
-        CHECK (available_from IS NULL OR available_until IS NULL OR available_from < available_until)
+    is_exam BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_quizzes_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    CONSTRAINT fk_quizzes_module FOREIGN KEY (module_id) REFERENCES course_modules(id) ON DELETE
+    SET NULL,
+        CONSTRAINT fk_quizzes_lesson FOREIGN KEY (lesson_id) REFERENCES lessons(id) ON DELETE
+    SET NULL,
+        CONSTRAINT fk_quizzes_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE
+    SET NULL,
+        CONSTRAINT chk_quiz_status CHECK (status IN ('DRAFT', 'PUBLISHED')),
+        CONSTRAINT chk_quiz_max_attempts CHECK (max_attempts >= 1),
+        CONSTRAINT chk_quiz_availability_window CHECK (
+            available_from IS NULL
+            OR available_until IS NULL
+            OR available_from < available_until
+        )
 );
-
 -- Reusable Questions table (extensible for FR-I21 question types, FR-I22 marking schemes, FR-I24 question bank)
 CREATE TABLE questions (
-    id                      SERIAL PRIMARY KEY,
-    course_id               INTEGER,
-    created_by              INTEGER,
-    question_text           TEXT          NOT NULL,
-    question_type           VARCHAR(30)   NOT NULL DEFAULT 'MULTIPLE_CHOICE',
-    options_json            TEXT,
-    correct_answer          TEXT,
-    default_marks           NUMERIC(8,2)  NOT NULL DEFAULT 1.00,
-    negative_marks          NUMERIC(8,2)  NOT NULL DEFAULT 0.00,
-    numerical_tolerance     NUMERIC(8,2)  DEFAULT 0.00,
-    grading_rubric          TEXT,
-    requires_manual_grading BOOLEAN       NOT NULL DEFAULT FALSE,
-    topic                   VARCHAR(100),
-    difficulty              VARCHAR(30),
-    explanation             TEXT,
-    is_bank_question        BOOLEAN       NOT NULL DEFAULT FALSE,
-    origin                  VARCHAR(30)   NOT NULL DEFAULT 'MANUAL',
-    tags                    TEXT,
-    version                 INTEGER       NOT NULL DEFAULT 1,
-    parent_question_id      INTEGER,
-    is_latest               BOOLEAN       NOT NULL DEFAULT TRUE,
-    created_at              TIMESTAMP     NOT NULL DEFAULT NOW(),
-    updated_at              TIMESTAMP     NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_questions_course
-        FOREIGN KEY (course_id)
-        REFERENCES courses(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_questions_created_by
-        FOREIGN KEY (created_by)
-        REFERENCES users(id)
-        ON DELETE SET NULL,
-
-    CONSTRAINT fk_questions_parent
-        FOREIGN KEY (parent_question_id)
-        REFERENCES questions(id)
-        ON DELETE SET NULL,
-
-    CONSTRAINT chk_question_type
-        CHECK (question_type IN ('MULTIPLE_CHOICE', 'MULTIPLE_SELECT', 'TRUE_FALSE', 'NUMERICAL', 'DESCRIPTIVE', 'SHORT_ANSWER'))
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER,
+    created_by INTEGER,
+    question_text TEXT NOT NULL,
+    question_type VARCHAR(30) NOT NULL DEFAULT 'MULTIPLE_CHOICE',
+    options_json TEXT,
+    correct_answer TEXT,
+    default_marks NUMERIC(8, 2) NOT NULL DEFAULT 1.00,
+    negative_marks NUMERIC(8, 2) NOT NULL DEFAULT 0.00,
+    numerical_tolerance NUMERIC(8, 2) DEFAULT 0.00,
+    grading_rubric TEXT,
+    requires_manual_grading BOOLEAN NOT NULL DEFAULT FALSE,
+    topic VARCHAR(100),
+    difficulty VARCHAR(30),
+    explanation TEXT,
+    is_bank_question BOOLEAN NOT NULL DEFAULT FALSE,
+    origin VARCHAR(30) NOT NULL DEFAULT 'MANUAL',
+    tags TEXT,
+    version INTEGER NOT NULL DEFAULT 1,
+    parent_question_id INTEGER,
+    is_latest BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_questions_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    CONSTRAINT fk_questions_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE
+    SET NULL,
+        CONSTRAINT fk_questions_parent FOREIGN KEY (parent_question_id) REFERENCES questions(id) ON DELETE
+    SET NULL,
+        CONSTRAINT chk_question_type CHECK (
+            question_type IN (
+                'MULTIPLE_CHOICE',
+                'MULTIPLE_SELECT',
+                'TRUE_FALSE',
+                'NUMERICAL',
+                'DESCRIPTIVE',
+                'SHORT_ANSWER'
+            )
+        )
 );
-
 -- Ordered mapping between Quizzes and Questions (FR-I19)
 CREATE TABLE quiz_questions (
-    id             SERIAL PRIMARY KEY,
-    quiz_id        INTEGER       NOT NULL,
-    question_id    INTEGER       NOT NULL,
-    order_index    INTEGER       NOT NULL DEFAULT 1,
-    marks          NUMERIC(8,2),
-    negative_marks NUMERIC(8,2),
-    is_required    BOOLEAN       NOT NULL DEFAULT TRUE,
-    created_at     TIMESTAMP     NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_quiz_questions_quiz
-        FOREIGN KEY (quiz_id)
-        REFERENCES quizzes(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_quiz_questions_question
-        FOREIGN KEY (question_id)
-        REFERENCES questions(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT uq_quiz_questions_quiz_question
-        UNIQUE (quiz_id, question_id)
+    id SERIAL PRIMARY KEY,
+    quiz_id INTEGER NOT NULL,
+    question_id INTEGER NOT NULL,
+    order_index INTEGER NOT NULL DEFAULT 1,
+    marks NUMERIC(8, 2),
+    negative_marks NUMERIC(8, 2),
+    is_required BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_quiz_questions_quiz FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE,
+    CONSTRAINT fk_quiz_questions_question FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE,
+    CONSTRAINT uq_quiz_questions_quiz_question UNIQUE (quiz_id, question_id)
 );
-
 -- Persistent server-side quiz attempt tracking for FR-I20 / DR-ED06 / S19, S22, S24
 CREATE TABLE quiz_attempts (
-    id             SERIAL PRIMARY KEY,
-    quiz_id        INTEGER      NOT NULL,
-    student_id     INTEGER      NOT NULL,
-    attempt_number INTEGER      NOT NULL,
-    status         VARCHAR(20)  NOT NULL DEFAULT 'IN_PROGRESS',
-    started_at     TIMESTAMP    NOT NULL DEFAULT NOW(),
-    expires_at     TIMESTAMP,
-    submitted_at   TIMESTAMP,
-    obtained_marks NUMERIC(8,2),
-    created_at     TIMESTAMP    NOT NULL DEFAULT NOW(),
-    updated_at     TIMESTAMP    NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_quiz_attempts_quiz
-        FOREIGN KEY (quiz_id)
-        REFERENCES quizzes(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_quiz_attempts_student
-        FOREIGN KEY (student_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT uq_quiz_attempts_quiz_student_num
-        UNIQUE (quiz_id, student_id, attempt_number),
-
-    CONSTRAINT chk_quiz_attempt_status
-        CHECK (status IN ('IN_PROGRESS', 'SUBMITTED', 'EXPIRED')),
-
-    CONSTRAINT chk_quiz_attempt_number
-        CHECK (attempt_number >= 1)
+    id SERIAL PRIMARY KEY,
+    quiz_id INTEGER NOT NULL,
+    student_id INTEGER NOT NULL,
+    attempt_number INTEGER NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'IN_PROGRESS',
+    started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMP,
+    submitted_at TIMESTAMP,
+    obtained_marks NUMERIC(8, 2),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_quiz_attempts_quiz FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE,
+    CONSTRAINT fk_quiz_attempts_student FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT uq_quiz_attempts_quiz_student_num UNIQUE (quiz_id, student_id, attempt_number),
+    CONSTRAINT chk_quiz_attempt_status CHECK (
+        status IN ('IN_PROGRESS', 'SUBMITTED', 'EXPIRED')
+    ),
+    CONSTRAINT chk_quiz_attempt_number CHECK (attempt_number >= 1)
 );
-
 -- FR-I22: Persistent evaluated answers and marking records for quiz attempts
 CREATE TABLE quiz_attempt_answers (
-    id                SERIAL PRIMARY KEY,
-    attempt_id        INTEGER       NOT NULL,
-    question_id       INTEGER       NOT NULL,
-    submitted_answer  TEXT,
-    awarded_marks     NUMERIC(8,2)  NOT NULL DEFAULT 0.00,
-    max_marks         NUMERIC(8,2)  NOT NULL DEFAULT 0.00,
-    evaluation_status VARCHAR(30)   NOT NULL DEFAULT 'UNANSWERED',
-    feedback          TEXT,
-    evaluated_at      TIMESTAMP,
-    created_at        TIMESTAMP     NOT NULL DEFAULT NOW(),
-    updated_at        TIMESTAMP     NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_quiz_attempt_answers_attempt
-        FOREIGN KEY (attempt_id)
-        REFERENCES quiz_attempts(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_quiz_attempt_answers_question
-        FOREIGN KEY (question_id)
-        REFERENCES questions(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT uq_quiz_attempt_answers_attempt_question
-        UNIQUE (attempt_id, question_id),
-
-    CONSTRAINT chk_attempt_answer_status
-        CHECK (evaluation_status IN ('CORRECT', 'INCORRECT', 'PARTIALLY_CORRECT', 'MANUAL_GRADING_REQUIRED', 'PENDING', 'UNANSWERED', 'INVALID_SUBMISSION'))
+    id SERIAL PRIMARY KEY,
+    attempt_id INTEGER NOT NULL,
+    question_id INTEGER NOT NULL,
+    submitted_answer TEXT,
+    awarded_marks NUMERIC(8, 2) NOT NULL DEFAULT 0.00,
+    max_marks NUMERIC(8, 2) NOT NULL DEFAULT 0.00,
+    evaluation_status VARCHAR(30) NOT NULL DEFAULT 'UNANSWERED',
+    feedback TEXT,
+    evaluated_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_quiz_attempt_answers_attempt FOREIGN KEY (attempt_id) REFERENCES quiz_attempts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_quiz_attempt_answers_question FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE,
+    CONSTRAINT uq_quiz_attempt_answers_attempt_question UNIQUE (attempt_id, question_id),
+    CONSTRAINT chk_attempt_answer_status CHECK (
+        evaluation_status IN (
+            'CORRECT',
+            'INCORRECT',
+            'PARTIALLY_CORRECT',
+            'MANUAL_GRADING_REQUIRED',
+            'PENDING',
+            'UNANSWERED',
+            'INVALID_SUBMISSION'
+        )
+    )
 );
 -- Step 13 / FR-I13: Chunked and Resumable Video Uploads
 CREATE TABLE IF NOT EXISTS video_uploads (
@@ -777,15 +747,19 @@ CREATE TABLE IF NOT EXISTS video_uploads (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 -- FR-I10: Course Pricing, Discounts and Enrollment Limits
-ALTER TABLE courses ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) NOT NULL DEFAULT 0.00;
-ALTER TABLE courses ADD COLUMN IF NOT EXISTS discount_type VARCHAR(20);
-ALTER TABLE courses ADD COLUMN IF NOT EXISTS discount_value NUMERIC(10, 2) DEFAULT 0.00;
-ALTER TABLE courses ADD COLUMN IF NOT EXISTS discount_start_date TIMESTAMP;
-ALTER TABLE courses ADD COLUMN IF NOT EXISTS discount_end_date TIMESTAMP;
-ALTER TABLE courses ADD COLUMN IF NOT EXISTS enrollment_limit INTEGER;
-
+ALTER TABLE courses
+ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) NOT NULL DEFAULT 0.00;
+ALTER TABLE courses
+ADD COLUMN IF NOT EXISTS discount_type VARCHAR(20);
+ALTER TABLE courses
+ADD COLUMN IF NOT EXISTS discount_value NUMERIC(10, 2) DEFAULT 0.00;
+ALTER TABLE courses
+ADD COLUMN IF NOT EXISTS discount_start_date TIMESTAMP;
+ALTER TABLE courses
+ADD COLUMN IF NOT EXISTS discount_end_date TIMESTAMP;
+ALTER TABLE courses
+ADD COLUMN IF NOT EXISTS enrollment_limit INTEGER;
 -- Step 34 / FR-I08: Course Submission History
 CREATE TABLE IF NOT EXISTS course_submissions (
     id SERIAL PRIMARY KEY,
@@ -798,17 +772,14 @@ CREATE TABLE IF NOT EXISTS course_submissions (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
-
-
-
 -- STUDENT QUIZ SUBSYSTEM ADDITIONS (FR-S18 to FR-S26)
-
 -- Ensure quiz_attempts has grading and pass/fail summary columns
-ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS total_marks INT DEFAULT 0;
-ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS percentage DECIMAL(5,2) DEFAULT 0.00;
-ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS is_passed BOOLEAN DEFAULT FALSE;
-
+ALTER TABLE quiz_attempts
+ADD COLUMN IF NOT EXISTS total_marks INT DEFAULT 0;
+ALTER TABLE quiz_attempts
+ADD COLUMN IF NOT EXISTS percentage DECIMAL(5, 2) DEFAULT 0.00;
+ALTER TABLE quiz_attempts
+ADD COLUMN IF NOT EXISTS is_passed BOOLEAN DEFAULT FALSE;
 -- Student Selected Answers / Autosave Table (FR-S21, FR-S24)
 CREATE TABLE IF NOT EXISTS quiz_attempt_answers (
     id SERIAL PRIMARY KEY,
@@ -820,15 +791,40 @@ CREATE TABLE IF NOT EXISTS quiz_attempt_answers (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_attempt_question UNIQUE (attempt_id, question_id)
 );
-
+-- =========================
+-- Step 5 / FR-I70: Notification Centre
+-- =========================
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
+    title VARCHAR(255),
+    message TEXT NOT NULL,
+    link VARCHAR(500),
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    read_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
 -- Step 35 / FR-I71: Course Review Status and Resubmit
 ALTER TABLE courses DROP CONSTRAINT IF EXISTS chk_courses_status;
-ALTER TABLE courses ADD CONSTRAINT chk_courses_status CHECK (status IN ('draft', 'pending_review', 'published', 'archived', 'rejected', 'changes_requested', 'unpublished'));
-ALTER TABLE courses ADD COLUMN IF NOT EXISTS review_comments TEXT;
-
-ALTER TABLE course_submissions ADD COLUMN IF NOT EXISTS review_comments TEXT;
-ALTER TABLE course_submissions ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP;
-
+ALTER TABLE courses
+ADD CONSTRAINT chk_courses_status CHECK (
+        status IN (
+            'draft',
+            'pending_review',
+            'published',
+            'archived',
+            'rejected',
+            'changes_requested',
+            'unpublished'
+        )
+    );
+ALTER TABLE courses
+ADD COLUMN IF NOT EXISTS review_comments TEXT;
+ALTER TABLE course_submissions
+ADD COLUMN IF NOT EXISTS review_comments TEXT;
+ALTER TABLE course_submissions
+ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP;
 -- Step 36 / FR-I09: Edit and Unpublish Course Audits
 CREATE TABLE IF NOT EXISTS course_audits (
     id SERIAL PRIMARY KEY,
@@ -840,11 +836,11 @@ CREATE TABLE IF NOT EXISTS course_audits (
     new_values TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
-
 -- Step 37 / FR-I12: Course Archiving, Soft Deletion, and Certificates
-ALTER TABLE courses ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE courses ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
-
+ALTER TABLE courses
+ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE courses
+ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
 CREATE TABLE IF NOT EXISTS certificates (
     id SERIAL PRIMARY KEY,
     course_id INT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
@@ -852,7 +848,6 @@ CREATE TABLE IF NOT EXISTS certificates (
     certificate_code VARCHAR(100) UNIQUE,
     issued_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
-
 -- Step 44 / FR-I56: Certificate Completion Criteria and Rules (DR-03)
 CREATE TABLE IF NOT EXISTS course_completion_criteria (
     id SERIAL PRIMARY KEY,
@@ -867,7 +862,6 @@ CREATE TABLE IF NOT EXISTS course_completion_criteria (
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
-
 CREATE TABLE IF NOT EXISTS lesson_progress (
     id SERIAL PRIMARY KEY,
     student_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -876,90 +870,125 @@ CREATE TABLE IF NOT EXISTS lesson_progress (
     is_completed BOOLEAN NOT NULL DEFAULT TRUE,
     UNIQUE (student_id, lesson_id)
 );
-
 -- Step 46 / FR-I30: Descriptive Submissions Grading & Grader Attribution
-ALTER TABLE quiz_attempt_answers ADD COLUMN IF NOT EXISTS grader_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE quiz_attempt_answers
+ADD COLUMN IF NOT EXISTS grader_id INTEGER REFERENCES users(id) ON DELETE
+SET NULL;
 ALTER TABLE quiz_attempt_answers DROP CONSTRAINT IF EXISTS chk_attempt_answer_status;
-ALTER TABLE quiz_attempt_answers ADD CONSTRAINT chk_attempt_answer_status
-    CHECK (evaluation_status IN ('CORRECT', 'INCORRECT', 'PARTIALLY_CORRECT', 'MANUAL_GRADING_REQUIRED', 'EVALUATED_UNPUBLISHED', 'PUBLISHED', 'PENDING', 'UNANSWERED', 'INVALID_SUBMISSION'));
+ALTER TABLE quiz_attempt_answers
+ADD CONSTRAINT chk_attempt_answer_status CHECK (
+        evaluation_status IN (
+            'CORRECT',
+            'INCORRECT',
+            'PARTIALLY_CORRECT',
+            'MANUAL_GRADING_REQUIRED',
+            'EVALUATED_UNPUBLISHED',
+            'PUBLISHED',
+            'PENDING',
+            'UNANSWERED',
+            'INVALID_SUBMISSION'
+        )
+    );
 -- Step 19 / FR-I16: Content Reorder, Replace and Remove
-ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS order_index INTEGER NOT NULL DEFAULT 1;
-ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
-
+ALTER TABLE lecture_materials
+ADD COLUMN IF NOT EXISTS order_index INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE lecture_materials
+ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
 -- Step 20 / FR-I18: Scheduled Content Release
-ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS release_at TIMESTAMP;
-ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS is_released BOOLEAN NOT NULL DEFAULT TRUE;
-ALTER TABLE lecture_materials ADD COLUMN IF NOT EXISTS time_zone VARCHAR(50) DEFAULT 'Asia/Kolkata';
-
-ALTER TABLE lessons ADD COLUMN IF NOT EXISTS release_at TIMESTAMP;
-ALTER TABLE lessons ADD COLUMN IF NOT EXISTS is_released BOOLEAN NOT NULL DEFAULT TRUE;
-ALTER TABLE lessons ADD COLUMN IF NOT EXISTS time_zone VARCHAR(50) DEFAULT 'Asia/Kolkata';
-
+ALTER TABLE lecture_materials
+ADD COLUMN IF NOT EXISTS release_at TIMESTAMP;
+ALTER TABLE lecture_materials
+ADD COLUMN IF NOT EXISTS is_released BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE lecture_materials
+ADD COLUMN IF NOT EXISTS time_zone VARCHAR(50) DEFAULT 'Asia/Kolkata';
+ALTER TABLE lessons
+ADD COLUMN IF NOT EXISTS release_at TIMESTAMP;
+ALTER TABLE lessons
+ADD COLUMN IF NOT EXISTS is_released BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE lessons
+ADD COLUMN IF NOT EXISTS time_zone VARCHAR(50) DEFAULT 'Asia/Kolkata';
 -- Step 47 / FR-I31 & FR-I23: Feedback on Graded Work & Visibility Settings
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS feedback_released BOOLEAN NOT NULL DEFAULT TRUE;
-ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS overall_feedback TEXT;
-ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS grader_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
-ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS feedback_at TIMESTAMP;
-ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE quiz_attempt_answers ADD COLUMN IF NOT EXISTS feedback_at TIMESTAMP;
-
+ALTER TABLE quizzes
+ADD COLUMN IF NOT EXISTS feedback_released BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE quiz_attempts
+ADD COLUMN IF NOT EXISTS overall_feedback TEXT;
+ALTER TABLE quiz_attempts
+ADD COLUMN IF NOT EXISTS grader_id INTEGER REFERENCES users(id) ON DELETE
+SET NULL;
+ALTER TABLE quiz_attempts
+ADD COLUMN IF NOT EXISTS feedback_at TIMESTAMP;
+ALTER TABLE quiz_attempts
+ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE quiz_attempt_answers
+ADD COLUMN IF NOT EXISTS feedback_at TIMESTAMP;
 -- Step 48 / FR-I32: Override Grades with Justification & Result Versioning (DR-01, DR-ED04)
 CREATE TABLE IF NOT EXISTS grading_result_versions (
     id SERIAL PRIMARY KEY,
     attempt_id INTEGER NOT NULL REFERENCES quiz_attempts(id) ON DELETE CASCADE,
     answer_id INTEGER REFERENCES quiz_attempt_answers(id) ON DELETE CASCADE,
     version_number INTEGER NOT NULL DEFAULT 1,
-    previous_marks NUMERIC(8,2) NOT NULL,
-    new_marks NUMERIC(8,2) NOT NULL,
-    max_marks NUMERIC(8,2) NOT NULL,
+    previous_marks NUMERIC(8, 2) NOT NULL,
+    new_marks NUMERIC(8, 2) NOT NULL,
+    max_marks NUMERIC(8, 2) NOT NULL,
     justification TEXT NOT NULL,
     instructor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     status_before VARCHAR(30),
     status_after VARCHAR(30),
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
-
-ALTER TABLE quiz_attempt_answers ADD COLUMN IF NOT EXISTS is_overridden BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS is_overridden BOOLEAN NOT NULL DEFAULT FALSE;
-
+ALTER TABLE quiz_attempt_answers
+ADD COLUMN IF NOT EXISTS is_overridden BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE quiz_attempts
+ADD COLUMN IF NOT EXISTS is_overridden BOOLEAN NOT NULL DEFAULT FALSE;
 -- Step 25 / FR-I65: Marking Rules (Negative, Partial, Tolerance)
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS negative_marking BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS partial_marking BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS numeric_tolerance NUMERIC(8,2) DEFAULT 0.00;
-
+ALTER TABLE quizzes
+ADD COLUMN IF NOT EXISTS negative_marking BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE quizzes
+ADD COLUMN IF NOT EXISTS partial_marking BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE quizzes
+ADD COLUMN IF NOT EXISTS numeric_tolerance NUMERIC(8, 2) DEFAULT 0.00;
 -- Step 26 / FR-I24: Question Bank & Versioning
-ALTER TABLE questions ADD COLUMN IF NOT EXISTS origin VARCHAR(30) NOT NULL DEFAULT 'MANUAL';
-ALTER TABLE questions ADD COLUMN IF NOT EXISTS tags TEXT;
-ALTER TABLE questions ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
-ALTER TABLE questions ADD COLUMN IF NOT EXISTS parent_question_id INTEGER REFERENCES questions(id) ON DELETE SET NULL;
-ALTER TABLE questions ADD COLUMN IF NOT EXISTS is_latest BOOLEAN NOT NULL DEFAULT TRUE;
-
+ALTER TABLE questions
+ADD COLUMN IF NOT EXISTS origin VARCHAR(30) NOT NULL DEFAULT 'MANUAL';
+ALTER TABLE questions
+ADD COLUMN IF NOT EXISTS tags TEXT;
+ALTER TABLE questions
+ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE questions
+ADD COLUMN IF NOT EXISTS parent_question_id INTEGER REFERENCES questions(id) ON DELETE
+SET NULL;
+ALTER TABLE questions
+ADD COLUMN IF NOT EXISTS is_latest BOOLEAN NOT NULL DEFAULT TRUE;
 -- Step 27 / FR-I23: Answer Review and Feedback Toggle
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS show_correct_answers BOOLEAN NOT NULL DEFAULT TRUE;
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS show_feedback BOOLEAN NOT NULL DEFAULT TRUE;
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS answer_release_timing VARCHAR(30) NOT NULL DEFAULT 'IMMEDIATELY';
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_exam BOOLEAN NOT NULL DEFAULT FALSE;
-
+ALTER TABLE quizzes
+ADD COLUMN IF NOT EXISTS show_correct_answers BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE quizzes
+ADD COLUMN IF NOT EXISTS show_feedback BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE quizzes
+ADD COLUMN IF NOT EXISTS answer_release_timing VARCHAR(30) NOT NULL DEFAULT 'IMMEDIATELY';
+ALTER TABLE quizzes
+ADD COLUMN IF NOT EXISTS is_exam BOOLEAN NOT NULL DEFAULT FALSE;
 -- Step 28 / FR-I68: Assignments & Submissions
 CREATE TABLE IF NOT EXISTS assignments (
     id SERIAL PRIMARY KEY,
     course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-    module_id INTEGER REFERENCES course_modules(id) ON DELETE SET NULL,
-    lesson_id INTEGER REFERENCES lessons(id) ON DELETE SET NULL,
-    created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    title VARCHAR(200) NOT NULL,
-    instructions TEXT,
-    deadline TIMESTAMP NOT NULL,
-    max_marks NUMERIC(8, 2) NOT NULL DEFAULT 100.00,
-    rubric TEXT,
-    submission_type VARCHAR(50) NOT NULL DEFAULT 'FILE',
-    late_policy VARCHAR(50) NOT NULL DEFAULT 'REJECT',
-    late_penalty_percentage NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
-    status VARCHAR(30) NOT NULL DEFAULT 'PUBLISHED',
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    module_id INTEGER REFERENCES course_modules(id) ON DELETE
+    SET NULL,
+        lesson_id INTEGER REFERENCES lessons(id) ON DELETE
+    SET NULL,
+        created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL,
+        instructions TEXT,
+        deadline TIMESTAMP NOT NULL,
+        max_marks NUMERIC(8, 2) NOT NULL DEFAULT 100.00,
+        rubric TEXT,
+        submission_type VARCHAR(50) NOT NULL DEFAULT 'FILE',
+        late_policy VARCHAR(50) NOT NULL DEFAULT 'REJECT',
+        late_penalty_percentage NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
+        status VARCHAR(30) NOT NULL DEFAULT 'PUBLISHED',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
-
 CREATE TABLE IF NOT EXISTS assignment_submissions (
     id SERIAL PRIMARY KEY,
     assignment_id INTEGER NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
@@ -975,13 +1004,13 @@ CREATE TABLE IF NOT EXISTS assignment_submissions (
     grading_status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
     awarded_marks NUMERIC(8, 2),
     feedback TEXT,
-    grader_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    graded_at TIMESTAMP,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_assignment_student UNIQUE (assignment_id, student_id)
+    grader_id INTEGER REFERENCES users(id) ON DELETE
+    SET NULL,
+        graded_at TIMESTAMP,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        CONSTRAINT uq_assignment_student UNIQUE (assignment_id, student_id)
 );
-
 -- Step 38 / FR-I25: Create and Schedule Examinations
 CREATE TABLE IF NOT EXISTS exams (
     id SERIAL PRIMARY KEY,
@@ -1004,7 +1033,6 @@ CREATE TABLE IF NOT EXISTS exams (
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
-
 CREATE TABLE IF NOT EXISTS exam_questions (
     id SERIAL PRIMARY KEY,
     exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
@@ -1014,7 +1042,6 @@ CREATE TABLE IF NOT EXISTS exam_questions (
     order_index INTEGER NOT NULL DEFAULT 1,
     CONSTRAINT uq_exam_question_order UNIQUE (exam_id, order_index)
 );
-
 CREATE TABLE IF NOT EXISTS exam_attempts (
     id SERIAL PRIMARY KEY,
     exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
@@ -1030,17 +1057,21 @@ CREATE TABLE IF NOT EXISTS exam_attempts (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_exam_student_attempt UNIQUE (exam_id, student_id, attempt_number)
 );
-
 -- Step 39 / FR-I27: Randomised Exam Sets
-ALTER TABLE exams ADD COLUMN IF NOT EXISTS is_randomized BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE exams ADD COLUMN IF NOT EXISTS random_seed BIGINT;
-ALTER TABLE exams ADD COLUMN IF NOT EXISTS total_sets INTEGER NOT NULL DEFAULT 1;
-
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS set_label VARCHAR(50);
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS random_seed BIGINT;
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS question_order TEXT;
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS option_shuffle_map TEXT;
-
+ALTER TABLE exams
+ADD COLUMN IF NOT EXISTS is_randomized BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE exams
+ADD COLUMN IF NOT EXISTS random_seed BIGINT;
+ALTER TABLE exams
+ADD COLUMN IF NOT EXISTS total_sets INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS set_label VARCHAR(50);
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS random_seed BIGINT;
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS question_order TEXT;
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS option_shuffle_map TEXT;
 CREATE TABLE IF NOT EXISTS exam_blueprints (
     id SERIAL PRIMARY KEY,
     exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
@@ -1051,7 +1082,6 @@ CREATE TABLE IF NOT EXISTS exam_blueprints (
     order_index INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
-
 -- Step 40 / FR-I26: Examination Monitoring Rules
 CREATE TABLE IF NOT EXISTS exam_monitoring_configs (
     id SERIAL PRIMARY KEY,
@@ -1070,16 +1100,19 @@ CREATE TABLE IF NOT EXISTS exam_monitoring_configs (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_exam_monitoring_exam UNIQUE (exam_id)
 );
-
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS consent_given BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS consent_given_at TIMESTAMP;
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS tab_switch_count INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS fullscreen_exit_count INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS monitoring_flags TEXT;
-
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS consent_given BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS consent_given_at TIMESTAMP;
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS tab_switch_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS fullscreen_exit_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS monitoring_flags TEXT;
 -- Step 41 / FR-I66: Question Correction Policy
-ALTER TABLE exams ADD COLUMN IF NOT EXISTS question_correction_policy VARCHAR(30) NOT NULL DEFAULT 'AWARD_FULL_MARKS';
-
+ALTER TABLE exams
+ADD COLUMN IF NOT EXISTS question_correction_policy VARCHAR(30) NOT NULL DEFAULT 'AWARD_FULL_MARKS';
 -- Step 49 / FR-I74: Result Change History
 CREATE TABLE IF NOT EXISTS result_versions (
     id SERIAL PRIMARY KEY,
@@ -1097,7 +1130,6 @@ CREATE TABLE IF NOT EXISTS result_versions (
     actor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
-
 -- Step 50 / FR-I33: Pending Grading Alerts
 CREATE TABLE IF NOT EXISTS pending_grading_alerts (
     id SERIAL PRIMARY KEY,
@@ -1110,42 +1142,64 @@ CREATE TABLE IF NOT EXISTS pending_grading_alerts (
     is_read BOOLEAN NOT NULL DEFAULT FALSE,
     sent_at TIMESTAMP NOT NULL DEFAULT NOW(),
     digest_date DATE,
-    CONSTRAINT uq_grading_alert_digest UNIQUE (instructor_id, course_id, alert_type, digest_date)
+    CONSTRAINT uq_grading_alert_digest UNIQUE (
+        instructor_id,
+        course_id,
+        alert_type,
+        digest_date
+    )
 );
-
 -- Step 51 / FR-I34: Publish or Withhold Results
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS results_published BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS results_published_at TIMESTAMP;
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS results_withheld BOOLEAN NOT NULL DEFAULT FALSE;
-
-ALTER TABLE assignments ADD COLUMN IF NOT EXISTS results_published BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE assignments ADD COLUMN IF NOT EXISTS results_published_at TIMESTAMP;
-ALTER TABLE assignments ADD COLUMN IF NOT EXISTS results_withheld BOOLEAN NOT NULL DEFAULT FALSE;
-
-ALTER TABLE exams ADD COLUMN IF NOT EXISTS results_published BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE exams ADD COLUMN IF NOT EXISTS results_published_at TIMESTAMP;
-ALTER TABLE exams ADD COLUMN IF NOT EXISTS results_withheld BOOLEAN NOT NULL DEFAULT FALSE;
-
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS published_at TIMESTAMP;
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE;
-
-ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS published_at TIMESTAMP;
-ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE;
-
-ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS published_at TIMESTAMP;
-ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE;
-
+ALTER TABLE quizzes
+ADD COLUMN IF NOT EXISTS results_published BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE quizzes
+ADD COLUMN IF NOT EXISTS results_published_at TIMESTAMP;
+ALTER TABLE quizzes
+ADD COLUMN IF NOT EXISTS results_withheld BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE assignments
+ADD COLUMN IF NOT EXISTS results_published BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE assignments
+ADD COLUMN IF NOT EXISTS results_published_at TIMESTAMP;
+ALTER TABLE assignments
+ADD COLUMN IF NOT EXISTS results_withheld BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE exams
+ADD COLUMN IF NOT EXISTS results_published BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE exams
+ADD COLUMN IF NOT EXISTS results_published_at TIMESTAMP;
+ALTER TABLE exams
+ADD COLUMN IF NOT EXISTS results_withheld BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS published_at TIMESTAMP;
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE assignment_submissions
+ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE assignment_submissions
+ADD COLUMN IF NOT EXISTS published_at TIMESTAMP;
+ALTER TABLE assignment_submissions
+ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE quiz_attempts
+ADD COLUMN IF NOT EXISTS published_at TIMESTAMP;
+ALTER TABLE quiz_attempts
+ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE;
 -- Step 56 / FR-I69: Flag and Escalate Attempts
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS review_status VARCHAR(30) NOT NULL DEFAULT 'NONE';
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS review_notes TEXT;
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP;
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS escalated_at TIMESTAMP;
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS escalation_reason TEXT;
-ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS escalation_recommendation VARCHAR(100);
-
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS review_status VARCHAR(30) NOT NULL DEFAULT 'NONE';
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS review_notes TEXT;
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS reviewed_by INTEGER REFERENCES users(id) ON DELETE
+SET NULL;
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP;
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS escalated_at TIMESTAMP;
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS escalation_reason TEXT;
+ALTER TABLE exam_attempts
+ADD COLUMN IF NOT EXISTS escalation_recommendation VARCHAR(100);
 CREATE TABLE IF NOT EXISTS exam_attempt_review_history (
     id SERIAL PRIMARY KEY,
     attempt_id INTEGER NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
@@ -1157,7 +1211,6 @@ CREATE TABLE IF NOT EXISTS exam_attempt_review_history (
     reviewed_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 -- Step 52 / FR-I35 & Step 53 / FR-I36: Reported Questions
 CREATE TABLE IF NOT EXISTS reported_questions (
     id SERIAL PRIMARY KEY,
@@ -1176,18 +1229,19 @@ CREATE TABLE IF NOT EXISTS reported_questions (
     escalated_at TIMESTAMP,
     resolution_action VARCHAR(50),
     resolution_comment TEXT,
-    resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    resolved_at TIMESTAMP,
-    correction_applied BOOLEAN NOT NULL DEFAULT FALSE,
-    correction_applied_at TIMESTAMP,
-    correction_applied_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    correction_policy VARCHAR(50),
-    affected_attempts_count INTEGER NOT NULL DEFAULT 0,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_reported_question_assessment UNIQUE (assessment_type, assessment_id, question_id)
+    resolved_by INTEGER REFERENCES users(id) ON DELETE
+    SET NULL,
+        resolved_at TIMESTAMP,
+        correction_applied BOOLEAN NOT NULL DEFAULT FALSE,
+        correction_applied_at TIMESTAMP,
+        correction_applied_by INTEGER REFERENCES users(id) ON DELETE
+    SET NULL,
+        correction_policy VARCHAR(50),
+        affected_attempts_count INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_reported_question_assessment UNIQUE (assessment_type, assessment_id, question_id)
 );
-
 CREATE TABLE IF NOT EXISTS student_question_reports (
     id SERIAL PRIMARY KEY,
     reported_question_id INTEGER NOT NULL REFERENCES reported_questions(id) ON DELETE CASCADE,
@@ -1198,7 +1252,6 @@ CREATE TABLE IF NOT EXISTS student_question_reports (
     reported_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_student_question_report UNIQUE (reported_question_id, student_id)
 );
-
 -- Step 55 / FR-I29: Examination Monitoring Logs
 CREATE TABLE IF NOT EXISTS exam_monitoring_events (
     id SERIAL PRIMARY KEY,
@@ -1210,14 +1263,3 @@ CREATE TABLE IF NOT EXISTS exam_monitoring_events (
     metadata_json TEXT,
     notes VARCHAR(255)
 );
-
-
-
-
-
-
-
-
-
-
-
