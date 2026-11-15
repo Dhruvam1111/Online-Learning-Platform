@@ -1492,4 +1492,66 @@ public class EmailService {
                 renewalDate
         );
     }
+
+    /**
+     * Step 5 / FR-I70: Sends a general notification email for in-app NotificationService events.
+     */
+    public void sendNotificationEmail(
+            String toEmail,
+            String name,
+            String notificationType,
+            String title,
+            String bodyMessage,
+            String actionLink) {
+        if (toEmail == null || toEmail.isBlank()) {
+            return;
+        }
+        String displayName = (name != null && !name.isBlank()) ? name.trim() : toEmail;
+        String safeTitle = (title != null && !title.isBlank()) ? title.trim() : "New Platform Notification";
+        String safeMessage = (bodyMessage != null && !bodyMessage.isBlank()) ? bodyMessage.trim() : "";
+
+        log.info("[EmailService] Notification email queued for {} [{}]: {}", toEmail, notificationType, safeTitle);
+
+        if (senderEmail == null || senderEmail.isBlank()) {
+            return;
+        }
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(senderEmail, "Focotech");
+            helper.setTo(toEmail);
+            helper.setSubject(safeTitle + " — Focotech");
+
+            String linkBlock = (actionLink != null && !actionLink.isBlank())
+                    ? "<p style=\"margin: 16px 0 0 0; font-size: 13px; color: #0284c7;\">Reference: " + actionLink + "</p>"
+                    : "";
+
+            String html = """
+                    <!DOCTYPE html>
+                    <html lang="en">
+                    <head><meta charset="UTF-8"><title>%s</title></head>
+                    <body style="margin: 0; padding: 24px; background-color: #f7f4f1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                      <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e8e2dc; padding: 28px;">
+                        <div style="font-size: 20px; font-weight: 800; color: #1e1b19; margin-bottom: 16px;">
+                          FOCO<span style="color: #ff5a36;">TECH</span>
+                        </div>
+                        <h2 style="margin: 0 0 12px 0; font-size: 18px; color: #1e1b19;">%s</h2>
+                        <p style="margin: 0 0 12px 0; font-size: 14px; color: #443e3a;">Hello <strong>%s</strong>,</p>
+                        <div style="background: #fbf8f5; border-left: 4px solid #0284c7; padding: 14px 16px; border-radius: 6px; font-size: 14px; line-height: 22px; color: #1e1b19;">
+                          %s
+                        </div>
+                        %s
+                      </div>
+                    </body>
+                    </html>
+                    """.formatted(safeTitle, safeTitle, displayName, safeMessage, linkBlock);
+
+            helper.setText(html, true);
+            mailSender.send(message);
+        } catch (Exception e) {
+            log.warn("[EmailService] Notification email delivery skipped ({}): {}", toEmail, e.getMessage());
+        }
+    }
 }

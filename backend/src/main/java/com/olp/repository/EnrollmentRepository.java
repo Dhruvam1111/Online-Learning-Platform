@@ -2,6 +2,7 @@ package com.olp.repository;
 
 import com.olp.dto.MyCourseResponse;
 import com.olp.entity.Enrollment;
+import com.olp.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -42,4 +43,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Integer>
 
     @Query("SELECT e.course.id, COUNT(e) FROM Enrollment e WHERE e.course.id IN :courseIds GROUP BY e.course.id")
     List<Object[]> countEnrollmentsByCourseIds(@Param("courseIds") List<Integer> courseIds);
+
+    @Query("SELECT e.student FROM Enrollment e WHERE e.course.id = :courseId ORDER BY e.enrolledAt ASC")
+    List<User> findEnrolledStudentsByCourseId(@Param("courseId") Integer courseId);
 }

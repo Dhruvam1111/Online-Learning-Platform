@@ -1211,13 +1211,59 @@ CREATE TABLE IF NOT EXISTS exam_monitoring_events (
     notes VARCHAR(255)
 );
 
+-- =========================
+-- Step 5 / FR-I70: Notification Centre
+-- =========================
+CREATE TABLE IF NOT EXISTS notifications (
+    id          SERIAL PRIMARY KEY,
+    user_id     INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type        VARCHAR(50)  NOT NULL DEFAULT 'SYSTEM',
+    title       VARCHAR(255),
+    message     TEXT         NOT NULL,
+    link        VARCHAR(500),
+    is_read     BOOLEAN      NOT NULL DEFAULT FALSE,
+    read_at     TIMESTAMP,
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
 
+-- =========================
+-- Step 12 / FR-I39: Course Announcements
+-- =========================
+CREATE TABLE IF NOT EXISTS course_announcements (
+    id            SERIAL PRIMARY KEY,
+    course_id     INTEGER      NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    instructor_id INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title         VARCHAR(255) NOT NULL,
+    content       TEXT         NOT NULL,
+    created_at    TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMP    NOT NULL DEFAULT NOW()
+);
 
+-- =========================
+-- Step 29 / FR-I40 & FR-S63/S64: Course Q&A Discussions and Replies
+-- =========================
+CREATE TABLE IF NOT EXISTS course_discussions (
+    id          SERIAL PRIMARY KEY,
+    course_id   INTEGER      NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    lecture_id  INTEGER      REFERENCES lectures(id) ON DELETE SET NULL,
+    author_id   INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title       VARCHAR(255) NOT NULL,
+    content     TEXT         NOT NULL,
+    is_answered BOOLEAN      NOT NULL DEFAULT FALSE,
+    is_pinned   BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
 
-
-
-
-
-
+CREATE TABLE IF NOT EXISTS course_discussion_replies (
+    id                 SERIAL PRIMARY KEY,
+    discussion_id      INTEGER     NOT NULL REFERENCES course_discussions(id) ON DELETE CASCADE,
+    author_id          INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    author_role        VARCHAR(20) NOT NULL DEFAULT 'student',
+    content            TEXT        NOT NULL,
+    is_official_answer BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_at         TIMESTAMP   NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMP   NOT NULL DEFAULT NOW()
+);
 
 
