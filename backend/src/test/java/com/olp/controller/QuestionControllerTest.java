@@ -99,5 +99,29 @@ class QuestionControllerTest {
         assertSame(qRes, controller.sendForManualGrading(12, Map.of("gradingRubric", "Rubric"), authentication).getBody());
         assertSame(evalRes, controller.evaluateQuestion(12, new QuestionEvaluationRequest("TRUE"), authentication).getBody());
     }
+
+    @Test
+    void testQuestionBankAndVersioningEndpoints() {
+        givenResolvedUser();
+        QuestionResponse qRes = new QuestionResponse();
+        qRes.setId(12);
+
+        when(questionService.searchQuestionBank(eq(instructor), any())).thenReturn(List.of(qRes));
+        when(questionService.copyQuestion(instructor, 12, 100)).thenReturn(qRes);
+        when(questionService.getQuestionVersions(instructor, 12)).thenReturn(List.of(qRes));
+
+        ResponseEntity<List<QuestionResponse>> searchRes = controller.searchQuestionBank(
+                100, "Math", "algebra", "EASY", "MULTIPLE_CHOICE", "MANUAL", "query", true, true, authentication);
+        assertEquals(200, searchRes.getStatusCode().value());
+        assertEquals(1, searchRes.getBody().size());
+
+        ResponseEntity<QuestionResponse> copyRes = controller.copyQuestion(12, 100, authentication);
+        assertEquals(201, copyRes.getStatusCode().value());
+        assertEquals(12, copyRes.getBody().getId());
+
+        ResponseEntity<List<QuestionResponse>> versionRes = controller.getQuestionVersions(12, authentication);
+        assertEquals(200, versionRes.getStatusCode().value());
+        assertEquals(1, versionRes.getBody().size());
+    }
 }
 

@@ -24,6 +24,8 @@ public class CourseStructureService {
     private final LessonRepository lessonRepository;
     private final CourseInstructorRepository courseInstructorRepository;
     private final UserRepository userRepository;
+    private final CourseSubmissionService courseSubmissionService;
+    private final CourseAuditService courseAuditService;
 
     public CourseStructureService(
             CourseRepository courseRepository,
@@ -31,7 +33,17 @@ public class CourseStructureService {
             CourseSectionRepository courseSectionRepository,
             LessonRepository lessonRepository,
             UserRepository userRepository) {
-        this(courseRepository, courseModuleRepository, courseSectionRepository, lessonRepository, null, userRepository);
+        this(courseRepository, courseModuleRepository, courseSectionRepository, lessonRepository, null, userRepository, null, null);
+    }
+
+    public CourseStructureService(
+            CourseRepository courseRepository,
+            CourseModuleRepository courseModuleRepository,
+            CourseSectionRepository courseSectionRepository,
+            LessonRepository lessonRepository,
+            CourseInstructorRepository courseInstructorRepository,
+            UserRepository userRepository) {
+        this(courseRepository, courseModuleRepository, courseSectionRepository, lessonRepository, courseInstructorRepository, userRepository, null, null);
     }
 
     @Autowired
@@ -41,13 +53,17 @@ public class CourseStructureService {
             CourseSectionRepository courseSectionRepository,
             LessonRepository lessonRepository,
             @Autowired(required = false) CourseInstructorRepository courseInstructorRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            @Autowired(required = false) CourseSubmissionService courseSubmissionService,
+            @Autowired(required = false) CourseAuditService courseAuditService) {
         this.courseRepository = courseRepository;
         this.courseModuleRepository = courseModuleRepository;
         this.courseSectionRepository = courseSectionRepository;
         this.lessonRepository = lessonRepository;
         this.courseInstructorRepository = courseInstructorRepository;
         this.userRepository = userRepository;
+        this.courseSubmissionService = courseSubmissionService;
+        this.courseAuditService = courseAuditService;
     }
 
     public User resolveUser(Authentication authentication) {
@@ -90,6 +106,7 @@ public class CourseStructureService {
     @Transactional
     public CourseModuleResponse createModule(User currentUser, Integer courseId, CourseModuleRequest request) {
         Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
 
         if (request == null || request.getTitle() == null || request.getTitle().trim().isEmpty()) {
             throw new IllegalArgumentException("Module title cannot be blank");
@@ -113,6 +130,7 @@ public class CourseStructureService {
                 orderIndex);
 
         CourseModule saved = courseModuleRepository.save(module);
+        handlePublishedCourseModification(course, currentUser, "Created module: " + saved.getTitle());
         return CourseModuleResponse.fromEntity(saved, false);
     }
 
@@ -135,7 +153,8 @@ public class CourseStructureService {
     @Transactional
     public CourseModuleResponse updateModule(User currentUser, Integer courseId, Integer moduleId,
             CourseModuleRequest request) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         CourseModule module = findAndVerifyModule(courseId, moduleId);
 
         if (request == null || request.getTitle() == null || request.getTitle().trim().isEmpty()) {
@@ -155,21 +174,25 @@ public class CourseStructureService {
         }
 
         CourseModule updated = courseModuleRepository.save(module);
+        handlePublishedCourseModification(course, currentUser, "Updated module: " + updated.getTitle());
         return CourseModuleResponse.fromEntity(updated, true);
     }
 
     @Transactional
     public ApiResponse deleteModule(User currentUser, Integer courseId, Integer moduleId) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         CourseModule module = findAndVerifyModule(courseId, moduleId);
         courseModuleRepository.delete(module);
+        handlePublishedCourseModification(course, currentUser, "Deleted module ID: " + moduleId);
         return new ApiResponse(true, "Module deleted successfully");
     }
 
     @Transactional
     public List<CourseModuleResponse> reorderModules(User currentUser, Integer courseId,
             ReorderStructureRequest request) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
 
         if (request == null || request.getOrderedIds() == null || request.getOrderedIds().isEmpty()) {
             throw new IllegalArgumentException("Ordered IDs list cannot be empty");
@@ -185,6 +208,7 @@ public class CourseStructureService {
             courseModuleRepository.save(module);
         }
 
+        handlePublishedCourseModification(course, currentUser, "Reordered modules");
         return getModules(currentUser, courseId);
     }
 
@@ -195,7 +219,8 @@ public class CourseStructureService {
     @Transactional
     public CourseSectionResponse createSection(User currentUser, Integer courseId, Integer moduleId,
             CourseSectionRequest request) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         CourseModule module = findAndVerifyModule(courseId, moduleId);
 
         if (request == null || request.getTitle() == null || request.getTitle().trim().isEmpty()) {
@@ -220,6 +245,7 @@ public class CourseStructureService {
                 orderIndex);
 
         CourseSection saved = courseSectionRepository.save(section);
+        handlePublishedCourseModification(course, currentUser, "Created section: " + saved.getTitle());
         return CourseSectionResponse.fromEntity(saved, false);
     }
 
@@ -245,7 +271,8 @@ public class CourseStructureService {
     @Transactional
     public CourseSectionResponse updateSection(User currentUser, Integer courseId, Integer moduleId, Integer sectionId,
             CourseSectionRequest request) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         findAndVerifyModule(courseId, moduleId);
         CourseSection section = findAndVerifySection(moduleId, sectionId);
 
@@ -266,22 +293,26 @@ public class CourseStructureService {
         }
 
         CourseSection updated = courseSectionRepository.save(section);
+        handlePublishedCourseModification(course, currentUser, "Updated section: " + updated.getTitle());
         return CourseSectionResponse.fromEntity(updated, true);
     }
 
     @Transactional
     public ApiResponse deleteSection(User currentUser, Integer courseId, Integer moduleId, Integer sectionId) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         findAndVerifyModule(courseId, moduleId);
         CourseSection section = findAndVerifySection(moduleId, sectionId);
         courseSectionRepository.delete(section);
+        handlePublishedCourseModification(course, currentUser, "Deleted section ID: " + sectionId);
         return new ApiResponse(true, "Section deleted successfully");
     }
 
     @Transactional
     public List<CourseSectionResponse> reorderSections(User currentUser, Integer courseId, Integer moduleId,
             ReorderStructureRequest request) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         findAndVerifyModule(courseId, moduleId);
 
         if (request == null || request.getOrderedIds() == null || request.getOrderedIds().isEmpty()) {
@@ -298,6 +329,7 @@ public class CourseStructureService {
             courseSectionRepository.save(section);
         }
 
+        handlePublishedCourseModification(course, currentUser, "Reordered sections");
         return getSections(currentUser, courseId, moduleId);
     }
 
@@ -308,7 +340,8 @@ public class CourseStructureService {
     @Transactional
     public LessonResponse createLesson(User currentUser, Integer courseId, Integer moduleId, Integer sectionId,
             LessonRequest request) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         findAndVerifyModule(courseId, moduleId);
         CourseSection section = findAndVerifySection(moduleId, sectionId);
 
@@ -340,6 +373,7 @@ public class CourseStructureService {
                 request.getMetadata());
 
         Lesson saved = lessonRepository.save(lesson);
+        handlePublishedCourseModification(course, currentUser, "Created lesson: " + saved.getTitle());
         return LessonResponse.fromEntity(saved);
     }
 
@@ -368,7 +402,8 @@ public class CourseStructureService {
     @Transactional
     public LessonResponse updateLesson(User currentUser, Integer courseId, Integer moduleId, Integer sectionId,
             Integer lessonId, LessonRequest request) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         findAndVerifyModule(courseId, moduleId);
         findAndVerifySection(moduleId, sectionId);
         Lesson lesson = findAndVerifyLesson(sectionId, lessonId);
@@ -402,24 +437,28 @@ public class CourseStructureService {
         }
 
         Lesson updated = lessonRepository.save(lesson);
+        handlePublishedCourseModification(course, currentUser, "Updated lesson: " + updated.getTitle());
         return LessonResponse.fromEntity(updated);
     }
 
     @Transactional
     public ApiResponse deleteLesson(User currentUser, Integer courseId, Integer moduleId, Integer sectionId,
             Integer lessonId) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         findAndVerifyModule(courseId, moduleId);
         findAndVerifySection(moduleId, sectionId);
         Lesson lesson = findAndVerifyLesson(sectionId, lessonId);
         lessonRepository.delete(lesson);
+        handlePublishedCourseModification(course, currentUser, "Deleted lesson ID: " + lessonId);
         return new ApiResponse(true, "Lesson deleted successfully");
     }
 
     @Transactional
     public List<LessonResponse> reorderLessons(User currentUser, Integer courseId, Integer moduleId, Integer sectionId,
             ReorderStructureRequest request) {
-        verifyCourseAssociation(courseId, currentUser);
+        Course course = verifyCourseAssociation(courseId, currentUser);
+        verifyCourseNotUnderReview(course);
         findAndVerifyModule(courseId, moduleId);
         findAndVerifySection(moduleId, sectionId);
 
@@ -437,6 +476,7 @@ public class CourseStructureService {
             lessonRepository.save(lesson);
         }
 
+        handlePublishedCourseModification(course, currentUser, "Reordered lessons");
         return getLessons(currentUser, courseId, moduleId, sectionId);
     }
 
@@ -465,6 +505,35 @@ public class CourseStructureService {
         }
 
         return course;
+    }
+
+    private void verifyCourseNotUnderReview(Course course) {
+        if (course != null && course.getStatus() == CourseStatus.PENDING_REVIEW) {
+            throw new IllegalStateException("Cannot modify course structure while course is under review (status is PENDING_REVIEW)");
+        }
+    }
+
+    private void handlePublishedCourseModification(Course course, User currentUser, String actionDetails) {
+        if (course != null && course.getStatus() == CourseStatus.PUBLISHED) {
+            if (courseSubmissionService != null) {
+                courseSubmissionService.triggerReReview(
+                        currentUser,
+                        course,
+                        "Course structure modification on published course (" + actionDetails + ") triggered re-review");
+            } else {
+                course.setStatus(CourseStatus.PENDING_REVIEW);
+                courseRepository.save(course);
+            }
+            if (courseAuditService != null) {
+                courseAuditService.recordAudit(
+                        course,
+                        currentUser,
+                        "COURSE_STRUCTURE_EDIT_MAJOR",
+                        "curriculum",
+                        "status: PUBLISHED",
+                        "status: PENDING_REVIEW, details: " + actionDetails);
+            }
+        }
     }
 
     private CourseModule findAndVerifyModule(Integer courseId, Integer moduleId) {

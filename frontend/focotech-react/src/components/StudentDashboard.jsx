@@ -287,6 +287,7 @@ export default function StudentDashboard({ onNavigateHome }) {
     { name: 'Overview', icon: 'grid_view' },
     { name: 'Courses', icon: 'video_library', badge: enrolledCourses.length > 0 ? enrolledCourses.length : null },
     { name: 'Transactions', icon: 'receipt_long', badge: transactions.filter((t) => t.status !== 'created').length > 0 ? transactions.filter((t) => t.status !== 'created').length : null },
+    { name: 'Wallet', icon: 'account_balance_wallet' },
     { name: 'Bookmarks', icon: 'bookmark', badge: bookmarks.length > 0 ? bookmarks.length : null },
     { name: 'Certificates', icon: 'workspace_premium' },
     { name: 'Settings', icon: 'settings' }
@@ -834,9 +835,9 @@ export default function StudentDashboard({ onNavigateHome }) {
           {/* ========================================================
               TAB: PURCHASE TRANSACTIONS & GST INVOICES
               ======================================================== */}
+          {activeMenu === 'Wallet' && <StudentWallet revision={walletRevision} />}
           {activeMenu === 'Transactions' && (
             <div className="min-w-0 max-w-full bg-white rounded-3xl p-6 sm:p-8 border border-[#fae8dc] shadow-xs flex flex-col gap-6">
-              <StudentWallet revision={walletRevision} />
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#faeae0] pb-4">
                 <div>
                   <h2 className="text-[20px] font-extrabold text-[#1f1a17]">Purchase & Transaction History</h2>

@@ -90,7 +90,7 @@ class CourseProgressControllerTest {
     void testGetProgress_NonUserPrincipalThrowsClassCastException() {
         Authentication wrong = new UsernamePasswordAuthenticationToken("someone", null);
 
-        assertThrows(ClassCastException.class, () -> courseProgressController.getProgress(3, wrong));
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> courseProgressController.getProgress(3, wrong));
         verifyNoInteractions(progressService);
     }
 }

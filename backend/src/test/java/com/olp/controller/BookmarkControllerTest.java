@@ -87,7 +87,7 @@ class BookmarkControllerTest {
     void testAddBookmark_NonUserPrincipalThrowsClassCastException() {
         Authentication wrong = new UsernamePasswordAuthenticationToken("someone", null);
 
-        assertThrows(ClassCastException.class, () -> bookmarkController.addBookmark(12, wrong));
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> bookmarkController.addBookmark(12, wrong));
         verifyNoInteractions(bookmarkService);
     }
 }

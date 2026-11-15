@@ -41,6 +41,9 @@ public class Course {
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
 
+    @Column(name = "review_comments", columnDefinition = "TEXT")
+    private String reviewComments;
+
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price = BigDecimal.ZERO;
 
@@ -62,6 +65,12 @@ public class Course {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CoursePrerequisite> prerequisites = new ArrayList<>();
@@ -244,6 +253,14 @@ public class Course {
         this.rejectionReason = rejectionReason;
     }
 
+    public String getReviewComments() {
+        return reviewComments;
+    }
+
+    public void setReviewComments(String reviewComments) {
+        this.reviewComments = reviewComments;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -326,5 +343,21 @@ public class Course {
 
     public boolean isFree() {
         return price == null || price.compareTo(BigDecimal.ZERO) == 0;
+    }
+
+    public boolean isDeleted() {
+        return isDeleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        isDeleted = deleted;
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(LocalDateTime deletedAt) {
+        this.deletedAt = deletedAt;
     }
 }

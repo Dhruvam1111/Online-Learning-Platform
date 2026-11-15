@@ -420,14 +420,14 @@ class CourseCatalogServiceExtraTest {
     }
 
     @Test
-    void testEnrollCourse_DoesNotCheckPublishedStatus() {
+    void testEnrollCourse_RejectsUnpublishedCourse() {
         Course draft = course(1, "Unreleased", "d", CourseStatus.DRAFT);
         when(courseRepository.findById(1)).thenReturn(Optional.of(draft));
 
-        EnrollmentResponse response = service.enrollCourse(student, 1);
-
-        assertTrue(response.success());
-        verify(enrollmentRepository).save(any(Enrollment.class));
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> service.enrollCourse(student, 1));
+        assertTrue(ex.getMessage().contains("Cannot enroll in a course that is not published"));
+        verify(enrollmentRepository, never()).save(any());
     }
 
     // ===== getCourseLectures =====

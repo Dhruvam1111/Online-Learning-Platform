@@ -62,9 +62,23 @@ public class WalletController {
                 "currentBalance", newBalance
         ));
     }
-    public record TopUpRequest(BigDecimal amount, String requestId, String outcome) {}
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.olp.service.SimulatedPaymentMethods methods;
+
+    public record TopUpRequest(BigDecimal amount, String requestId, String outcome, String method, String token) {}
     @PostMapping("/top-up")
     public Map<String,Object> topUp(@AuthenticationPrincipal User user, @RequestBody TopUpRequest request) {
+        String method = request.method();
+        if (request.token() != null && !request.token().isBlank()) {
+            var saved = methods.list(user).stream()
+                    .filter(entry -> request.token().equals(entry.get("token")))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Choose an active saved payment method."));
+            method = saved.get("method").toString();
+        }
+        if (method == null || !java.util.Set.of("card", "upi", "netbanking").contains(method)) {
+            throw new IllegalArgumentException("Choose card, UPI or net banking. Wallet credit cannot fund itself.");
+        }
         return walletService.topUp(user,request.amount(),request.requestId(),request.outcome());
     }
 

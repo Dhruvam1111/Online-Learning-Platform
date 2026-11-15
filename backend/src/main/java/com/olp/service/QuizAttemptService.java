@@ -202,8 +202,14 @@ public class QuizAttemptService {
         QuizEvaluationSummary summary = null;
         if (submissionRequest != null && submissionRequest.getAnswers() != null && !submissionRequest.getAnswers().isEmpty()) {
             List<QuizQuestion> linkedQuestions = quizQuestionRepository.findByQuizIdOrderByOrderIndexAsc(quiz.getId());
+            com.olp.dto.GradingPolicy policy = submissionRequest.getPolicy();
+            if (policy == null) {
+                policy = quiz.toGradingPolicy();
+            } else if (policy.getCustomTolerance() == null && quiz.getNumericTolerance() != null && quiz.getNumericTolerance().compareTo(BigDecimal.ZERO) > 0) {
+                policy.setCustomTolerance(quiz.getNumericTolerance());
+            }
             summary = autoGradingService.evaluateQuizSubmission(
-                    quiz, linkedQuestions, submissionRequest.getAnswers(), submissionRequest.getPolicy());
+                    quiz, linkedQuestions, submissionRequest.getAnswers(), policy);
 
             attempt.setObtainedMarks(summary.getTotalAwardedMarks());
 
@@ -238,6 +244,27 @@ public class QuizAttemptService {
         long usedAttempts = quizAttemptRepository.countByQuizIdAndStudentId(quiz.getId(), currentUser.getId());
         QuizAttemptResponse response = mapToAttemptResponse(saved, quiz, serverNow, usedAttempts);
         if (summary != null) {
+            boolean isStudent = "student".equalsIgnoreCase(currentUser.getRole());
+            if (isStudent) {
+                boolean answersVisible = quiz.isCorrectAnswersVisible(serverNow);
+                boolean feedbackVisible = quiz.isFeedbackVisible(serverNow);
+                summary.setCorrectAnswersVisible(answersVisible);
+                summary.setShowCorrectAnswers(quiz.getShowCorrectAnswers());
+                if (!answersVisible) {
+                    for (QuestionEvaluationResult result : summary.getResults()) {
+                        result.redactCorrectAnswer();
+                    }
+                }
+                if (!feedbackVisible) {
+                    summary.setOverallFeedback(null);
+                    for (QuestionEvaluationResult result : summary.getResults()) {
+                        result.redactFeedback();
+                    }
+                }
+            } else {
+                summary.setCorrectAnswersVisible(true);
+                summary.setShowCorrectAnswers(quiz.getShowCorrectAnswers());
+            }
             response.setEvaluationSummary(summary);
         }
         return response;
@@ -272,10 +299,42 @@ public class QuizAttemptService {
                 ? quizAttemptAnswerRepository.findByAttemptId(attemptId)
                 : List.of();
 
+        boolean feedbackEnabled = quiz.getFeedbackReleased() == null || quiz.getFeedbackReleased();
+        boolean resultsWithheld = Boolean.TRUE.equals(quiz.getResultsWithheld());
+        boolean attemptPublished = Boolean.TRUE.equals(attempt.getIsPublished()) && !resultsWithheld;
+        LocalDateTime serverNow = LocalDateTime.now(clock);
+        boolean answersVisible = !isStudent || (quiz.isCorrectAnswersVisible(serverNow) && !resultsWithheld);
+        boolean feedbackAllowedByQuiz = !isStudent || (quiz.isFeedbackVisible(serverNow) && !resultsWithheld);
+        boolean overallFeedbackVisible = !isStudent || (feedbackAllowedByQuiz && attemptPublished);
+
         QuizEvaluationSummary summary = new QuizEvaluationSummary();
         summary.setQuizId(quiz.getId());
         summary.setAttemptId(attempt.getId());
         summary.setPassingMarks(quiz.getPassingMarks());
+        summary.setFeedbackReleased(feedbackEnabled);
+        summary.setResultsPublished(attemptPublished);
+        summary.setCorrectAnswersVisible(answersVisible);
+        summary.setShowCorrectAnswers(quiz.getShowCorrectAnswers());
+
+        if (isStudent) {
+            // Student visibility: overall feedback only if allowed by quiz and attempt results published
+            if (overallFeedbackVisible) {
+                summary.setOverallFeedback(attempt.getOverallFeedback());
+                if (attempt.getGrader() != null) {
+                    summary.setGraderId(attempt.getGrader().getId());
+                    summary.setGraderName(attempt.getGrader().getName());
+                }
+                summary.setFeedbackAt(attempt.getFeedbackAt());
+            }
+        } else {
+            // Instructors and admins always see overall feedback
+            summary.setOverallFeedback(attempt.getOverallFeedback());
+            if (attempt.getGrader() != null) {
+                summary.setGraderId(attempt.getGrader().getId());
+                summary.setGraderName(attempt.getGrader().getName());
+            }
+            summary.setFeedbackAt(attempt.getFeedbackAt());
+        }
 
         BigDecimal totalAwarded = attempt.getObtainedMarks() != null ? attempt.getObtainedMarks() : BigDecimal.ZERO;
         BigDecimal totalMax = quiz.getTotalMarks() != null ? quiz.getTotalMarks() : BigDecimal.ZERO;
@@ -288,27 +347,64 @@ public class QuizAttemptService {
         List<QuestionEvaluationResult> results = new ArrayList<>();
         for (QuizAttemptAnswer ans : storedAnswers) {
             Question q = ans.getQuestion();
+            EvaluationStatus status = ans.getEvaluationStatus();
+            BigDecimal marks = ans.getAwardedMarks();
+            String feedback = ans.getFeedback();
+            boolean requiresManual = status == EvaluationStatus.MANUAL_GRADING_REQUIRED;
+
+            // Result & Feedback Visibility (FR-I30 Requirement 3, FR-I31 Requirement 3, FR-I23):
+            // Graded marks and feedback must remain unpublished and invisible to students until explicitly published.
+            if (isStudent) {
+                if (resultsWithheld) {
+                    marks = BigDecimal.ZERO;
+                    feedback = null;
+                } else if (status == EvaluationStatus.EVALUATED_UNPUBLISHED) {
+                    status = EvaluationStatus.MANUAL_GRADING_REQUIRED;
+                    marks = BigDecimal.ZERO;
+                    feedback = null;
+                    requiresManual = true;
+                } else if (!feedbackAllowedByQuiz) {
+                    feedback = null;
+                } else if (requiresManual && status != EvaluationStatus.PUBLISHED) {
+                    feedback = null;
+                }
+            }
+
+            String effectiveCorrectAnswer = answersVisible ? q.getCorrectAnswer() : null;
+
             QuestionEvaluationResult res = new QuestionEvaluationResult(
                     q.getId(),
                     q.getQuestionType(),
-                    ans.getEvaluationStatus(),
-                    ans.getAwardedMarks(),
+                    status,
+                    marks,
                     ans.getMaxMarks(),
                     ans.getSubmittedAnswer(),
-                    q.getCorrectAnswer(),
+                    effectiveCorrectAnswer,
                     q.getNumericalTolerance(),
-                    ans.getFeedback(),
-                    ans.getEvaluationStatus() == EvaluationStatus.MANUAL_GRADING_REQUIRED
+                    feedback,
+                    requiresManual
             );
             results.add(res);
 
-            switch (ans.getEvaluationStatus()) {
-                case CORRECT -> correct++;
-                case INCORRECT -> incorrect++;
-                case PARTIALLY_CORRECT -> partial++;
-                case MANUAL_GRADING_REQUIRED -> manual++;
-                case UNANSWERED -> unanswered++;
-                case INVALID_SUBMISSION -> incorrect++;
+            if (status != null) {
+                switch (status) {
+                    case CORRECT -> correct++;
+                    case INCORRECT -> incorrect++;
+                    case PARTIALLY_CORRECT -> partial++;
+                    case MANUAL_GRADING_REQUIRED -> manual++;
+                    case EVALUATED_UNPUBLISHED -> manual++;
+                    case PUBLISHED -> {
+                        if (marks != null && ans.getMaxMarks() != null && marks.compareTo(ans.getMaxMarks()) >= 0) {
+                            correct++;
+                        } else if (marks != null && marks.compareTo(BigDecimal.ZERO) > 0) {
+                            partial++;
+                        } else {
+                            incorrect++;
+                        }
+                    }
+                    case UNANSWERED -> unanswered++;
+                    case INVALID_SUBMISSION -> incorrect++;
+                }
             }
         }
 
@@ -321,7 +417,10 @@ public class QuizAttemptService {
         summary.setUnansweredCount(unanswered);
         summary.setResults(results);
 
-        if (summary.getPassingMarks() != null) {
+        if (isStudent && resultsWithheld) {
+            summary.setTotalAwardedMarks(null);
+            summary.setPassed(null);
+        } else if (summary.getPassingMarks() != null) {
             summary.setPassed(totalAwarded.compareTo(summary.getPassingMarks()) >= 0);
         }
 
@@ -449,6 +548,12 @@ public class QuizAttemptService {
                 dto.setOptionsJson(q.getOptionsJson());
                 dto.setOrderIndex(qq.getOrderIndex());
                 dto.setMarks(qq.getMarks() != null ? new BigDecimal(qq.getMarks().toString()) : BigDecimal.ONE);
+                dto.setNegativeMarks(qq.getNegativeMarks() != null ? qq.getNegativeMarks() : (q.getNegativeMarks() != null ? q.getNegativeMarks() : BigDecimal.ZERO));
+                BigDecimal effectiveTolerance = (q.getNumericalTolerance() != null && q.getNumericalTolerance().compareTo(BigDecimal.ZERO) > 0)
+                        ? q.getNumericalTolerance()
+                        : (quiz.getNumericTolerance() != null ? quiz.getNumericTolerance() : BigDecimal.ZERO);
+                dto.setNumericalTolerance(effectiveTolerance);
+                dto.setPartialMarking(quiz.getPartialMarking());
                 dto.setSavedAnswer(savedMap.get(q.getId()));
                 dtos.add(dto);
             }
@@ -587,6 +692,11 @@ public class QuizAttemptService {
         response.setRemainingSeconds(calculateRemainingSeconds(quiz, attempt, serverNow));
         response.setObtainedMarks(attempt.getObtainedMarks());
         response.setTotalMarks(quiz.getTotalMarks());
+        response.setNegativeMarking(quiz.getNegativeMarking());
+        response.setPartialMarking(quiz.getPartialMarking());
+        response.setNumericTolerance(quiz.getNumericTolerance());
+        response.setMarkingRulesSummary(QuizSettingsResponse.computeMarkingRulesSummary(
+                quiz.getNegativeMarking(), quiz.getPartialMarking(), quiz.getNumericTolerance()));
         return response;
     }
 }

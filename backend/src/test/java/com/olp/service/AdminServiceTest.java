@@ -2,13 +2,16 @@ package com.olp.service;
 
 import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
+import com.olp.dto.CourseReviewRequest;
 import com.olp.dto.PageResponse;
 import com.olp.dto.RejectCourseRequest;
 import com.olp.entity.Course;
 import com.olp.entity.CourseStatus;
+import com.olp.entity.CourseSubmission;
 import com.olp.entity.User;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.CourseRepository;
+import com.olp.repository.CourseSubmissionRepository;
 import com.olp.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +38,12 @@ class AdminServiceTest {
 
     @Mock
     private CourseRepository courseRepository;
+
+    @Mock
+    private CourseSubmissionRepository courseSubmissionRepository;
+
+    @Mock
+    private EmailService emailService;
 
     @InjectMocks
     private AdminService adminService;
@@ -219,12 +228,22 @@ class AdminServiceTest {
         when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
         when(courseRepository.save(any(Course.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
+        CourseSubmission sub = new CourseSubmission();
+        sub.setId(1);
+        when(courseSubmissionRepository.findLatestByCourseId(10)).thenReturn(Optional.of(sub));
+
         AdminCourseResponse response = adminService.approveCourse(10);
 
         assertNotNull(response);
         assertEquals("published", response.getStatus());
         assertNull(response.getRejectionReason());
+        assertEquals("APPROVED", sub.getStatus());
+        assertNotNull(sub.getReviewedAt());
+
         verify(courseRepository, times(1)).save(sampleCourse);
+        verify(courseSubmissionRepository).save(sub);
+        verify(emailService).sendCourseReviewDecisionEmail(
+                eq("chen@instructor.com"), eq("Dr. Chen"), eq("Java 101"), eq("APPROVED"), isNull());
     }
 
     @Test
@@ -232,13 +251,60 @@ class AdminServiceTest {
         when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
         when(courseRepository.save(any(Course.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
+        CourseSubmission sub = new CourseSubmission();
+        sub.setId(2);
+        when(courseSubmissionRepository.findLatestByCourseId(10)).thenReturn(Optional.of(sub));
+
         RejectCourseRequest request = new RejectCourseRequest("Content is incomplete");
         AdminCourseResponse response = adminService.rejectCourse(10, request);
 
         assertNotNull(response);
         assertEquals("rejected", response.getStatus());
         assertEquals("Content is incomplete", response.getRejectionReason());
+        assertEquals("REJECTED", sub.getStatus());
+        assertEquals("Content is incomplete", sub.getReviewComments());
+        assertNotNull(sub.getReviewedAt());
+
         verify(courseRepository, times(1)).save(sampleCourse);
+        verify(courseSubmissionRepository).save(sub);
+        verify(emailService).sendCourseReviewDecisionEmail(
+                eq("chen@instructor.com"), eq("Dr. Chen"), eq("Java 101"), eq("REJECTED"), eq("Content is incomplete"));
+    }
+
+    @Test
+    void testRequestChanges_Success() {
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+        when(courseRepository.save(any(Course.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CourseSubmission sub = new CourseSubmission();
+        sub.setId(3);
+        when(courseSubmissionRepository.findLatestByCourseId(10)).thenReturn(Optional.of(sub));
+
+        CourseReviewRequest request = new CourseReviewRequest("Please provide exercises in module 2.");
+        AdminCourseResponse response = adminService.requestChanges(10, request);
+
+        assertNotNull(response);
+        assertEquals("changes_requested", response.getStatus());
+        assertEquals("Please provide exercises in module 2.", response.getRejectionReason());
+        assertEquals(CourseStatus.CHANGES_REQUESTED, sampleCourse.getStatus());
+        assertEquals("CHANGES_REQUESTED", sub.getStatus());
+        assertEquals("Please provide exercises in module 2.", sub.getReviewComments());
+        assertNotNull(sub.getReviewedAt());
+
+        verify(courseRepository, times(1)).save(sampleCourse);
+        verify(courseSubmissionRepository).save(sub);
+        verify(emailService).sendCourseReviewDecisionEmail(
+                eq("chen@instructor.com"), eq("Dr. Chen"), eq("Java 101"), eq("CHANGES_REQUESTED"), eq("Please provide exercises in module 2."));
+    }
+
+    @Test
+    void testRequestChanges_BlankFeedback_ThrowsException() {
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        CourseReviewRequest request = new CourseReviewRequest("   ");
+        assertThrows(IllegalArgumentException.class, () -> adminService.requestChanges(10, request));
+        verify(courseRepository, never()).save(any());
+        verify(emailService, never()).sendCourseReviewDecisionEmail(any(), any(), any(), any(), any());
     }
 
     @Test

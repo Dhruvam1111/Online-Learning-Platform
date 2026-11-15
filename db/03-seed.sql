@@ -228,3 +228,10 @@ VALUES
     ('seed-upload-uuid-001', 1, 2, 'intro_to_web_dev.mp4', 'video/mp4', 52428800, 52428800, 5242880, 10, 'READY', '/uploads/videos/seed-upload-uuid-001.mp4', '/uploads/videos/seed-upload-uuid-001/master.m3u8', '/uploads/videos/seed-upload-uuid-001/manifest.mpd')
 ON CONFLICT (id) DO NOTHING;
 
+-- Step 15 / FR-I14: Supplementary Materials Seed
+INSERT INTO lecture_materials (id, lesson_id, module_id, uploader_id, title, original_filename, file_url, file_type, mime_type, file_size_bytes, is_downloadable, scan_status)
+VALUES
+    (1, 1, 1, 2, 'HTML5 Tags Cheat Sheet', 'html5_tags_cheatsheet.pdf', '/uploads/materials/html5_tags_cheatsheet.pdf', 'pdf', 'application/pdf', 1048576, FALSE, 'CLEAN')
+ON CONFLICT (id) DO NOTHING;
+
+

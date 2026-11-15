@@ -1,5 +1,6 @@
 package com.olp.service;
 
+import com.olp.dto.CourseAuditResponse;
 import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CoursePreviewResponse;
@@ -7,11 +8,15 @@ import com.olp.dto.CoursePricingRequest;
 import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.CoursePrerequisiteRequest;
 import com.olp.dto.CourseResponse;
+import com.olp.dto.CourseReviewStatusResponse;
+import com.olp.dto.CourseSubmissionRequest;
+import com.olp.dto.CourseSubmissionResponse;
 import com.olp.dto.CreateCourseRequest;
 import com.olp.dto.PageResponse;
 import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
 import com.olp.entity.Course;
+import com.olp.entity.CourseAudit;
 import com.olp.entity.CourseInstructor;
 import com.olp.entity.CourseInstructorRole;
 import com.olp.entity.CoursePrerequisite;
@@ -19,6 +24,8 @@ import com.olp.entity.CourseStatus;
 import com.olp.entity.User;
 import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.ResourceNotFoundException;
+import com.olp.repository.CertificateRepository;
+import com.olp.repository.CourseAuditRepository;
 import com.olp.repository.CourseInstructorRepository;
 import com.olp.repository.CoursePrerequisiteRepository;
 import com.olp.repository.CourseRepository;
@@ -35,11 +42,14 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 @Service
@@ -64,9 +74,13 @@ public class InstructorCourseService {
     private final EnrollmentRepository enrollmentRepository;
     private final CoursePricingService coursePricingService;
     private final CoursePreviewService coursePreviewService;
+    private final CourseSubmissionService courseSubmissionService;
+    private final CourseAuditService courseAuditService;
+    private final CourseAuditRepository courseAuditRepository;
+    private final CertificateRepository certificateRepository;
 
     public InstructorCourseService(CourseRepository courseRepository, UserRepository userRepository) {
-        this(courseRepository, userRepository, null, null, null, null, null, null);
+        this(courseRepository, userRepository, null, null, null, null, null, null, null, null, null, null);
     }
 
     public InstructorCourseService(
@@ -74,7 +88,7 @@ public class InstructorCourseService {
             UserRepository userRepository,
             CourseInstructorRepository courseInstructorRepository,
             CoursePrerequisiteRepository coursePrerequisiteRepository) {
-        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository, null, null, null, null);
+        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository, null, null, null, null, null, null, null, null);
     }
 
     public InstructorCourseService(
@@ -84,7 +98,7 @@ public class InstructorCourseService {
             CoursePrerequisiteRepository coursePrerequisiteRepository,
             InstructorProfileRepository instructorProfileRepository) {
         this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
-                instructorProfileRepository, null, null, null);
+                instructorProfileRepository, null, null, null, null, null, null, null);
     }
 
     public InstructorCourseService(
@@ -96,7 +110,52 @@ public class InstructorCourseService {
             EnrollmentRepository enrollmentRepository,
             CoursePricingService coursePricingService) {
         this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
-                instructorProfileRepository, enrollmentRepository, coursePricingService, null);
+                instructorProfileRepository, enrollmentRepository, coursePricingService, null, null, null, null, null);
+    }
+
+    public InstructorCourseService(
+            CourseRepository courseRepository,
+            UserRepository userRepository,
+            CourseInstructorRepository courseInstructorRepository,
+            CoursePrerequisiteRepository coursePrerequisiteRepository,
+            InstructorProfileRepository instructorProfileRepository,
+            EnrollmentRepository enrollmentRepository,
+            CoursePricingService coursePricingService,
+            CoursePreviewService coursePreviewService) {
+        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
+                instructorProfileRepository, enrollmentRepository, coursePricingService, coursePreviewService, null, null, null, null);
+    }
+
+    public InstructorCourseService(
+            CourseRepository courseRepository,
+            UserRepository userRepository,
+            CourseInstructorRepository courseInstructorRepository,
+            CoursePrerequisiteRepository coursePrerequisiteRepository,
+            InstructorProfileRepository instructorProfileRepository,
+            EnrollmentRepository enrollmentRepository,
+            CoursePricingService coursePricingService,
+            CoursePreviewService coursePreviewService,
+            CourseSubmissionService courseSubmissionService) {
+        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
+                instructorProfileRepository, enrollmentRepository, coursePricingService, coursePreviewService,
+                courseSubmissionService, null, null, null);
+    }
+
+    public InstructorCourseService(
+            CourseRepository courseRepository,
+            UserRepository userRepository,
+            CourseInstructorRepository courseInstructorRepository,
+            CoursePrerequisiteRepository coursePrerequisiteRepository,
+            InstructorProfileRepository instructorProfileRepository,
+            EnrollmentRepository enrollmentRepository,
+            CoursePricingService coursePricingService,
+            CoursePreviewService coursePreviewService,
+            CourseSubmissionService courseSubmissionService,
+            CourseAuditService courseAuditService,
+            CourseAuditRepository courseAuditRepository) {
+        this(courseRepository, userRepository, courseInstructorRepository, coursePrerequisiteRepository,
+                instructorProfileRepository, enrollmentRepository, coursePricingService, coursePreviewService,
+                courseSubmissionService, courseAuditService, courseAuditRepository, null);
     }
 
     @Autowired
@@ -108,7 +167,11 @@ public class InstructorCourseService {
             @Autowired(required = false) InstructorProfileRepository instructorProfileRepository,
             @Autowired(required = false) EnrollmentRepository enrollmentRepository,
             @Autowired(required = false) CoursePricingService coursePricingService,
-            @Autowired(required = false) CoursePreviewService coursePreviewService) {
+            @Autowired(required = false) CoursePreviewService coursePreviewService,
+            @Autowired(required = false) CourseSubmissionService courseSubmissionService,
+            @Autowired(required = false) CourseAuditService courseAuditService,
+            @Autowired(required = false) CourseAuditRepository courseAuditRepository,
+            @Autowired(required = false) CertificateRepository certificateRepository) {
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.courseInstructorRepository = courseInstructorRepository;
@@ -117,6 +180,10 @@ public class InstructorCourseService {
         this.enrollmentRepository = enrollmentRepository;
         this.coursePricingService = coursePricingService;
         this.coursePreviewService = coursePreviewService;
+        this.courseSubmissionService = courseSubmissionService;
+        this.courseAuditService = courseAuditService;
+        this.courseAuditRepository = courseAuditRepository;
+        this.certificateRepository = certificateRepository;
     }
 
     /**
@@ -360,8 +427,8 @@ public class InstructorCourseService {
             course.setLearningOutcomesList(cleanOutcomes);
         }
 
-        if (request.getPrice() != null || request.getDiscountValue() != null || request.getEnrollmentLimit() != null
-                || request.getDiscountType() != null) {
+        if (request != null && (request.getPrice() != null || request.getDiscountValue() != null || request.getEnrollmentLimit() != null
+                || request.getDiscountType() != null)) {
             CoursePricingRequest pricingReq = new CoursePricingRequest(
                     request.getPrice(),
                     request.getDiscountType(),
@@ -476,8 +543,8 @@ public class InstructorCourseService {
             course.setLearningOutcomesList(cleanOutcomes);
         }
 
-        if (request.getPrice() != null || request.getDiscountValue() != null || request.getEnrollmentLimit() != null
-                || request.getDiscountType() != null) {
+        if (request != null && (request.getPrice() != null || request.getDiscountValue() != null || request.getEnrollmentLimit() != null
+                || request.getDiscountType() != null)) {
             CoursePricingRequest pricingReq = new CoursePricingRequest(
                     request.getPrice(),
                     request.getDiscountType(),
@@ -603,6 +670,9 @@ public class InstructorCourseService {
 
     /**
      * FR-I09 & FR-I59 — Update course content for an associated instructor (OWNER or CO_INSTRUCTOR).
+     * Minor changes (e.g. title, description) are applied directly while preserving PUBLISHED status.
+     * Major changes (pricing, enrollment limit) on published courses trigger administrative re-review.
+     * Records immutable audit history with actor, course ID, changed fields, previous & new values.
      */
     @Transactional
     public CourseResponse updateCourse(User currentUser, Integer courseId, UpdateCourseRequest request) {
@@ -617,14 +687,48 @@ public class InstructorCourseService {
 
         Course course = findCourseAndVerifyOwnership(courseId, currentUser);
 
+        if (course.getStatus() == CourseStatus.PENDING_REVIEW) {
+            throw new IllegalStateException("Cannot edit course while it is under review (status is PENDING_REVIEW)");
+        }
+        if (course.getStatus() == CourseStatus.ARCHIVED) {
+            throw new IllegalStateException("Cannot edit an archived course");
+        }
+
         if (request.getTitle() == null || request.getTitle().trim().isEmpty()) {
             throw new IllegalArgumentException("Title cannot be blank");
         }
         validateContentPolicy("title", request.getTitle().trim());
 
-        course.setTitle(request.getTitle().trim());
+        String oldTitle = course.getTitle();
+        String oldDescription = course.getDescription();
+        java.math.BigDecimal oldPrice = course.getPrice();
+        com.olp.entity.DiscountType oldDiscountType = course.getDiscountType();
+        java.math.BigDecimal oldDiscountValue = course.getDiscountValue();
+        java.time.LocalDateTime oldDiscountStart = course.getDiscountStartDate();
+        java.time.LocalDateTime oldDiscountEnd = course.getDiscountEndDate();
+        Integer oldEnrollmentLimit = course.getEnrollmentLimit();
+        CourseStatus oldStatus = course.getStatus();
+
+        boolean isPricingChanged = false;
+        Map<String, Object> prevValues = new LinkedHashMap<>();
+        Map<String, Object> newValues = new LinkedHashMap<>();
+        List<String> changedFieldNames = new ArrayList<>();
+
+        String trimmedTitle = request.getTitle().trim();
+        if (!Objects.equals(trimmedTitle, oldTitle)) {
+            changedFieldNames.add("title");
+            prevValues.put("title", oldTitle);
+            newValues.put("title", trimmedTitle);
+        }
+        course.setTitle(trimmedTitle);
+
         if (request.getDescription() != null) {
             validateContentPolicy("description", request.getDescription());
+            if (!Objects.equals(request.getDescription(), oldDescription)) {
+                changedFieldNames.add("description");
+                prevValues.put("description", oldDescription);
+                newValues.put("description", request.getDescription());
+            }
             course.setDescription(request.getDescription());
         }
 
@@ -649,10 +753,95 @@ public class InstructorCourseService {
                 if (request.getDiscountEndDate() != null) course.setDiscountEndDate(request.getDiscountEndDate());
                 if (request.getEnrollmentLimit() != null) course.setEnrollmentLimit(request.getEnrollmentLimit());
             }
+
+            if (request.getPrice() != null && (oldPrice == null || request.getPrice().compareTo(oldPrice) != 0)) {
+                isPricingChanged = true;
+                changedFieldNames.add("price");
+                prevValues.put("price", oldPrice);
+                newValues.put("price", course.getPrice());
+            }
+            if (request.getDiscountType() != null && !Objects.equals(request.getDiscountType(), oldDiscountType)) {
+                isPricingChanged = true;
+                changedFieldNames.add("discountType");
+                prevValues.put("discountType", oldDiscountType != null ? oldDiscountType.name() : null);
+                newValues.put("discountType", course.getDiscountType() != null ? course.getDiscountType().name() : null);
+            }
+            if (request.getDiscountValue() != null && (oldDiscountValue == null || request.getDiscountValue().compareTo(oldDiscountValue) != 0)) {
+                isPricingChanged = true;
+                changedFieldNames.add("discountValue");
+                prevValues.put("discountValue", oldDiscountValue);
+                newValues.put("discountValue", course.getDiscountValue());
+            }
+            if (request.getDiscountStartDate() != null && !Objects.equals(request.getDiscountStartDate(), oldDiscountStart)) {
+                isPricingChanged = true;
+                changedFieldNames.add("discountStartDate");
+                prevValues.put("discountStartDate", oldDiscountStart != null ? oldDiscountStart.toString() : null);
+                newValues.put("discountStartDate", course.getDiscountStartDate() != null ? course.getDiscountStartDate().toString() : null);
+            }
+            if (request.getDiscountEndDate() != null && !Objects.equals(request.getDiscountEndDate(), oldDiscountEnd)) {
+                isPricingChanged = true;
+                changedFieldNames.add("discountEndDate");
+                prevValues.put("discountEndDate", oldDiscountEnd != null ? oldDiscountEnd.toString() : null);
+                newValues.put("discountEndDate", course.getDiscountEndDate() != null ? course.getDiscountEndDate().toString() : null);
+            }
+            if (request.getEnrollmentLimit() != null && !Objects.equals(request.getEnrollmentLimit(), oldEnrollmentLimit)) {
+                isPricingChanged = true;
+                changedFieldNames.add("enrollmentLimit");
+                prevValues.put("enrollmentLimit", oldEnrollmentLimit);
+                newValues.put("enrollmentLimit", course.getEnrollmentLimit());
+            }
         }
 
-        Course updated = courseRepository.save(course);
-        return enrichCourseResponse(updated);
+        Course saved;
+        if (oldStatus == CourseStatus.PUBLISHED) {
+            if (isPricingChanged) {
+                // Major changes trigger re-review
+                if (courseSubmissionService != null) {
+                    courseSubmissionService.triggerReReview(
+                            currentUser,
+                            course,
+                            "Major alterations to pricing on published course triggered re-review");
+                    saved = courseRepository.findById(courseId).orElse(course);
+                } else {
+                    course.setStatus(CourseStatus.PENDING_REVIEW);
+                    saved = courseRepository.save(course);
+                }
+                if (courseAuditService != null) {
+                    courseAuditService.recordAudit(
+                            saved,
+                            currentUser,
+                            "COURSE_EDIT_MAJOR",
+                            String.join(", ", changedFieldNames),
+                            prevValues,
+                            newValues);
+                }
+            } else {
+                // Minor changes applied directly, stays PUBLISHED
+                saved = courseRepository.save(course);
+                if (courseAuditService != null && !changedFieldNames.isEmpty()) {
+                    courseAuditService.recordAudit(
+                            saved,
+                            currentUser,
+                            "COURSE_EDIT_MINOR",
+                            String.join(", ", changedFieldNames),
+                            prevValues,
+                            newValues);
+                }
+            }
+        } else {
+            saved = courseRepository.save(course);
+            if (courseAuditService != null && !changedFieldNames.isEmpty()) {
+                courseAuditService.recordAudit(
+                        saved,
+                        currentUser,
+                        "COURSE_EDIT",
+                        String.join(", ", changedFieldNames),
+                        prevValues,
+                        newValues);
+            }
+        }
+
+        return enrichCourseResponse(saved);
     }
 
     /**
@@ -665,6 +854,9 @@ public class InstructorCourseService {
             return coursePricingService.updateCoursePricing(currentUser, courseId, request);
         }
         Course course = findCourseAndVerifyOwnership(courseId, currentUser);
+        if (course.getStatus() == CourseStatus.PENDING_REVIEW) {
+            throw new IllegalStateException("Cannot update course pricing while it is under review (status is PENDING_REVIEW)");
+        }
         if (request.getPrice() != null) {
             course.setPrice(request.getPrice());
         }
@@ -707,12 +899,17 @@ public class InstructorCourseService {
     /**
      * FR-I09 & FR-I59 — Change course status for an associated course.
      * Transitioning to or from ARCHIVED is a sensitive operation restricted to the OWNER only.
+     * Transitioning to UNPUBLISHED is routed through the unpublish workflow.
      */
     @Transactional
     public CourseResponse updateCourseStatus(User currentUser, Integer courseId, UpdateCourseStatusRequest request) {
         validateInstructor(currentUser);
 
         Course course = findCourseAndVerifyOwnership(courseId, currentUser);
+
+        if (course.getStatus() == CourseStatus.PENDING_REVIEW) {
+            throw new IllegalStateException("Cannot change status of a course while it is under review (status is PENDING_REVIEW)");
+        }
 
         if (request == null || request.getStatus() == null || request.getStatus().trim().isEmpty()) {
             throw new IllegalArgumentException("Course status cannot be blank");
@@ -723,32 +920,127 @@ public class InstructorCourseService {
             verifyOwnerOnly(course, currentUser, "archive or unarchive");
         }
 
+        if (newStatus == CourseStatus.UNPUBLISHED) {
+            return unpublishCourse(currentUser, courseId);
+        }
+
+        if (newStatus == CourseStatus.ARCHIVED) {
+            return archiveCourse(currentUser, courseId);
+        }
+
+        CourseStatus previousStatus = course.getStatus();
         course.setStatus(newStatus);
 
         Course updated = courseRepository.save(course);
+        if (courseAuditService != null) {
+            courseAuditService.recordAudit(
+                    updated,
+                    currentUser,
+                    "COURSE_STATUS_CHANGE",
+                    "status",
+                    Map.of("status", previousStatus != null ? previousStatus.name() : "null"),
+                    Map.of("status", newStatus.name()));
+        }
         return enrichCourseResponse(updated);
     }
 
     /**
-     * FR-I59 — Archive a course (restricted to OWNER only).
+     * FR-I12 / FR-I59 — Archive a course (restricted to OWNER only).
+     * Hides the course from the public catalogue while preserving all course data,
+     * student enrollments, progress, and issued certificates.
      */
     @Transactional
     public CourseResponse archiveCourse(User currentUser, Integer courseId) {
         validateInstructor(currentUser);
         Course course = findCourseAndVerifyOwnerOnly(courseId, currentUser);
+        if (course.isDeleted()) {
+            throw new ResourceNotFoundException("Course not found with id: " + courseId);
+        }
+        if (course.getStatus() == CourseStatus.PENDING_REVIEW) {
+            throw new IllegalStateException("Cannot archive course while it is under review (status is PENDING_REVIEW)");
+        }
+
+        CourseStatus previousStatus = course.getStatus();
         course.setStatus(CourseStatus.ARCHIVED);
         Course updated = courseRepository.save(course);
+
+        if (courseAuditService != null) {
+            courseAuditService.recordAudit(
+                    updated,
+                    currentUser,
+                    "COURSE_ARCHIVE",
+                    "status",
+                    Map.of("status", previousStatus != null ? previousStatus.name() : "null"),
+                    Map.of("status", CourseStatus.ARCHIVED.name()));
+        }
         return enrichCourseResponse(updated);
     }
 
     /**
-     * FR-I59 — Delete a course (restricted to OWNER only).
+     * FR-I12 / FR-I59 — Delete a course (restricted to OWNER only).
+     * Performs soft deletion per DR-ED09 if the course has no enrollments and no issued certificates.
      */
     @Transactional
     public void deleteCourse(User currentUser, Integer courseId) {
+        deleteCourse(currentUser, courseId, true, null);
+    }
+
+    @Transactional
+    public void deleteCourse(User currentUser, Integer courseId, Boolean confirmation) {
+        deleteCourse(currentUser, courseId, confirmation, null);
+    }
+
+    @Transactional
+    public void deleteCourse(User currentUser, Integer courseId, Boolean confirmation, String reason) {
         validateInstructor(currentUser);
         Course course = findCourseAndVerifyOwnerOnly(courseId, currentUser);
-        courseRepository.delete(course);
+        if (course.isDeleted()) {
+            throw new ResourceNotFoundException("Course not found with id: " + courseId);
+        }
+        if (course.getStatus() == CourseStatus.PENDING_REVIEW) {
+            throw new IllegalStateException("Cannot delete course while it is under review (status is PENDING_REVIEW)");
+        }
+        if (Boolean.FALSE.equals(confirmation)) {
+            throw new IllegalArgumentException("Course deletion must be confirmed with confirmation=true");
+        }
+
+        long enrollmentCount = enrollmentRepository != null ? enrollmentRepository.countByCourseId(courseId) : 0;
+        if (enrollmentCount > 0) {
+            throw new IllegalStateException(
+                    "Cannot delete course: Course has " + enrollmentCount + " active enrollment(s). " +
+                    "Under data retention policy (DR-ED09), courses with active student enrollments cannot be deleted. " +
+                    "Please archive the course instead to preserve student access and learning progress.");
+        }
+
+        long certificateCount = certificateRepository != null ? certificateRepository.countByCourseId(courseId) : 0;
+        if (certificateCount > 0) {
+            throw new IllegalStateException(
+                    "Cannot delete course: Course has " + certificateCount + " issued certificate(s). " +
+                    "Under data retention policy (DR-ED09), courses with issued certificates cannot be deleted. " +
+                    "Please archive the course instead to preserve student credential verification.");
+        }
+
+        // Soft deletion per DR-ED09
+        course.setDeleted(true);
+        course.setDeletedAt(LocalDateTime.now());
+        Course saved = courseRepository.save(course);
+
+        if (courseAuditService != null) {
+            Map<String, String> prevVal = Map.of("is_deleted", "false");
+            Map<String, String> newVal = new HashMap<>();
+            newVal.put("is_deleted", "true");
+            newVal.put("deleted_at", saved.getDeletedAt() != null ? saved.getDeletedAt().toString() : LocalDateTime.now().toString());
+            if (reason != null && !reason.trim().isEmpty()) {
+                newVal.put("reason", reason.trim());
+            }
+            courseAuditService.recordAudit(
+                    saved,
+                    currentUser,
+                    "COURSE_DELETE",
+                    "is_deleted",
+                    prevVal,
+                    newVal);
+        }
     }
 
     /**
@@ -771,7 +1063,7 @@ public class InstructorCourseService {
         List<Course> primaryCourses = courseRepository.findByInstructorIdOrderByIdAsc(currentUser.getId());
         if (primaryCourses != null) {
             for (Course c : primaryCourses) {
-                if (c != null && c.getId() != null) {
+                if (c != null && c.getId() != null && !c.isDeleted()) {
                     uniqueCourses.put(c.getId(), c);
                 }
             }
@@ -780,7 +1072,7 @@ public class InstructorCourseService {
             List<CourseInstructor> associations = courseInstructorRepository.findByInstructorId(currentUser.getId());
             if (associations != null) {
                 for (CourseInstructor ci : associations) {
-                    if (ci != null && ci.getCourse() != null && ci.getCourse().getId() != null) {
+                    if (ci != null && ci.getCourse() != null && ci.getCourse().getId() != null && !ci.getCourse().isDeleted()) {
                         uniqueCourses.putIfAbsent(ci.getCourse().getId(), ci.getCourse());
                     }
                 }
@@ -973,6 +1265,105 @@ public class InstructorCourseService {
         return response;
     }
 
+    /**
+     * FR-I08: Submit a course for admin review.
+     */
+    @Transactional
+    public CourseSubmissionResponse submitCourseForReview(User currentUser, Integer courseId, CourseSubmissionRequest request) {
+        validateInstructor(currentUser);
+        if (courseSubmissionService != null) {
+            return courseSubmissionService.submitCourseForReview(currentUser, courseId, request);
+        }
+        throw new IllegalStateException("CourseSubmissionService is not configured");
+    }
+
+    /**
+     * FR-I08: Retrieve submission history for an associated course.
+     */
+    @Transactional(readOnly = true)
+    public List<CourseSubmissionResponse> getCourseSubmissions(User currentUser, Integer courseId) {
+        validateInstructor(currentUser);
+        if (courseSubmissionService != null) {
+            return courseSubmissionService.getSubmissionHistory(currentUser, courseId);
+        }
+        throw new IllegalStateException("CourseSubmissionService is not configured");
+    }
+
+    /**
+     * FR-I71: Retrieve review status and comments for an associated course.
+     */
+    @Transactional(readOnly = true)
+    public CourseReviewStatusResponse getCourseReviewStatus(User currentUser, Integer courseId) {
+        validateInstructor(currentUser);
+        if (courseSubmissionService != null) {
+            return courseSubmissionService.getReviewStatus(currentUser, courseId);
+        }
+        throw new IllegalStateException("CourseSubmissionService is not configured");
+    }
+
+    /**
+     * FR-I71: Resubmit a course after changes have been requested.
+     */
+    @Transactional
+    public CourseSubmissionResponse resubmitCourse(User currentUser, Integer courseId, CourseSubmissionRequest request) {
+        validateInstructor(currentUser);
+        if (courseSubmissionService != null) {
+            return courseSubmissionService.resubmitCourse(currentUser, courseId, request);
+        }
+        throw new IllegalStateException("CourseSubmissionService is not configured");
+    }
+
+    /**
+     * FR-I09: Unpublish a published course.
+     * Transitions status to UNPUBLISHED, removes it from the public catalogue,
+     * preserves enrolled student access, prevents new enrollments, and records immutable audit history.
+     */
+    @Transactional
+    public CourseResponse unpublishCourse(User currentUser, Integer courseId) {
+        validateInstructor(currentUser);
+        Course course = findCourseAndVerifyOwnership(courseId, currentUser);
+
+        if (course.getStatus() != CourseStatus.PUBLISHED) {
+            throw new IllegalStateException(
+                    "Cannot unpublish course that is not currently published (current status: "
+                            + (course.getStatus() != null ? course.getStatus().name() : "null") + ")");
+        }
+
+        CourseStatus previousStatus = course.getStatus();
+        course.setStatus(CourseStatus.UNPUBLISHED);
+        Course saved = courseRepository.save(course);
+
+        if (courseAuditService != null) {
+            courseAuditService.recordAudit(
+                    saved,
+                    currentUser,
+                    "COURSE_UNPUBLISH",
+                    "status",
+                    Map.of("status", previousStatus != null ? previousStatus.name() : "null"),
+                    Map.of("status", CourseStatus.UNPUBLISHED.name()));
+        }
+
+        return enrichCourseResponse(saved);
+    }
+
+    /**
+     * FR-I09: Retrieve audit history for an associated course.
+     */
+    @Transactional(readOnly = true)
+    public List<CourseAuditResponse> getCourseAudits(User currentUser, Integer courseId) {
+        validateInstructor(currentUser);
+        findCourseAndVerifyOwnership(courseId, currentUser);
+        if (courseAuditService != null) {
+            return courseAuditService.getAuditsForCourse(currentUser, courseId);
+        }
+        if (courseAuditRepository != null) {
+            return courseAuditRepository.findByCourseIdOrderByCreatedAtDesc(courseId).stream()
+                    .map(CourseAuditResponse::fromEntity)
+                    .toList();
+        }
+        return Collections.emptyList();
+    }
+
     private boolean isCourseOwner(Course course, User currentUser) {
         if (course == null || currentUser == null || currentUser.getId() == null) {
             return false;
@@ -992,6 +1383,10 @@ public class InstructorCourseService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
 
+        if (course.isDeleted()) {
+            throw new ResourceNotFoundException("Course not found with id: " + courseId);
+        }
+
         verifyOwnerOnly(course, currentUser, "archive, delete, or manage owners of");
         return course;
     }
@@ -1010,6 +1405,10 @@ public class InstructorCourseService {
 
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
+
+        if (course.isDeleted()) {
+            throw new ResourceNotFoundException("Course not found with id: " + courseId);
+        }
 
         boolean isOwner = course.getInstructor() != null && currentUser.getId().equals(course.getInstructor().getId());
         if (!isOwner && (courseInstructorRepository == null

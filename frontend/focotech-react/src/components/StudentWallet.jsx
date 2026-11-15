@@ -1,36 +1,44 @@
 import React, { useEffect, useState, useRef } from 'react';
-import api from '../services/api';
+import api, { paymentSimulationAPI } from '../services/api';
 export default function StudentWallet({ revision }) {
-  const [wallet, setWallet] = useState(null);
-  const [amount, setAmount] = useState('100');
-  const [outcome, setOutcome] = useState('success');
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
-  const pending = useRef(null);
-  const refresh = () => api.get('/payments/wallet').then(r => setWallet(r.data)).catch(() => setMessage('Could not load wallet.'));
-  useEffect(() => { refresh(); }, [revision]);
-  const topUp = async e => {
-    e.preventDefault(); setBusy(true);
-    const signature = `${amount}:${outcome}`;
-    if (!pending.current || pending.current.signature !== signature) pending.current = { signature, requestId: crypto.randomUUID() };
+  const [wallet,setWallet]=useState(null), [amount,setAmount]=useState('100'), [methods,setMethods]=useState([]);
+  const [selected,setSelected]=useState('new:upi'), [dialog,setDialog]=useState(false), [busy,setBusy]=useState(false), [message,setMessage]=useState('');
+  const [result,setResult]=useState(null);
+  const pending=useRef(null);
+  const refresh=async()=>{try {setWallet((await api.get('/payments/wallet')).data);} catch {setMessage('Could not load wallet. Please retry.');}};
+  useEffect(()=>{refresh();},[revision]);
+  const open=async e=>{e.preventDefault();setMessage('');try {setMethods((await paymentSimulationAPI.methods()).data.filter(m=>m.method!=='wallet'));setSelected('new:upi');setResult(null);pending.current=null;setDialog(true);}catch {setMessage('Could not load payment methods. Please retry.');}};
+  const pay=async outcome=>{
+    setBusy(true); const signature=`${amount}:${selected}:${outcome}`;
+    if(!pending.current || pending.current.signature!==signature)pending.current={signature,requestId:crypto.randomUUID()};
+    const saved=methods.find(m=>m.token===selected);
     try {
-      const {data} = await api.post('/payments/wallet/top-up', {amount:Number(amount),outcome,requestId:pending.current.requestId});
-      setMessage(`Simulated top-up ${data.status}. No real money was transferred.`);
-      pending.current = null; await refresh();
-    } catch(err) { setMessage(err.response?.data?.message || 'Connection failed. Retry safely with the same details.'); }
-    finally { setBusy(false); }
+      const {data}=await api.post('/payments/wallet/top-up',{amount:Number(amount),outcome,requestId:pending.current.requestId,method:saved?.method || selected.replace('new:',''),token:saved?.token || null});
+      setMessage(data.status==='success'?`₹${Number(amount).toFixed(2)} added to your wallet.`:`Top-up ${data.status}. Your balance was not credited.`);
+      pending.current=null;setResult(data.status);await refresh();
+    }catch(err){setMessage(err.response?.data?.message || 'Connection failed. Retry the same action safely.');}
+    finally{setBusy(false);}
   };
-  return <section className="border rounded-2xl p-5 mb-5 bg-white">
-    <h3 className="font-bold">Student wallet · ₹{Number(wallet?.balance || 0).toFixed(2)}</h3>
-    <p className="text-xs mb-3">Demo credits for simulated course purchases.</p>
-    <form onSubmit={topUp} className="flex gap-2 flex-wrap">
-      <label>Amount (₹) <input aria-label="Wallet top-up amount" type="number" min="0.01" max="100000" step="0.01" required value={amount} onChange={e=>setAmount(e.target.value)} className="border rounded p-2" /></label>
-      <label>Demo outcome <select value={outcome} onChange={e=>setOutcome(e.target.value)} className="border rounded p-2"><option value="success">Success</option><option value="failed">Failed</option><option value="cancelled">Cancelled</option></select></label>
-      <button disabled={busy} className="border rounded p-2">{busy?'Processing…':'Simulate top-up'}</button>
-    </form>
-    <p role="status" className="text-sm py-2">{message}</p>
-    <details><summary>Wallet transaction history</summary>
-      {wallet?.transactions?.map(t=><p key={t.id} className="text-xs border-t py-2">{t.createdAt} · {t.type} ₹{Number(t.amount).toFixed(2)} · {t.description}</p>)}
-    </details>
+  return <section className="bg-white rounded-3xl border border-[#fae8dc] p-6 sm:p-8 space-y-6">
+    <div><h2 className="text-2xl font-extrabold">My wallet</h2><p className="text-sm text-[#8e8076] mt-1">Demo credit for course purchases. No real money moves.</p></div>
+    <div className="rounded-2xl bg-[#fbf7f4] p-6"><p className="text-sm text-[#685b53]">Available balance</p><p className="text-3xl font-extrabold mt-2">{wallet ? `₹${Number(wallet.balance).toFixed(2)}` : 'Loading…'}</p></div>
+    <form onSubmit={open} className="flex flex-wrap items-end gap-3"><label className="text-sm font-bold">Amount to add (₹)<input aria-label="Wallet top-up amount" type="number" min="0.01" max="100000" step="0.01" required value={amount} onChange={e=>setAmount(e.target.value)} className="block border border-[#e5dcd5] rounded-xl p-3 mt-2" /></label><button disabled={busy || !wallet} className="bg-[#ff5a36] text-white rounded-xl px-5 py-3 font-bold disabled:opacity-40">Add money</button><button type="button" onClick={refresh} className="px-4 py-3 font-bold">Refresh</button></form>
+    <p role="status" aria-live="polite" className="text-sm">{message}</p>
+    <details className="border border-[#fae8dc] rounded-2xl p-4"><summary className="font-bold cursor-pointer">Wallet transaction history ({wallet?.transactions?.length || 0})</summary>{wallet?.transactions?.length ? wallet.transactions.map(t=><div key={t.id} className="border-t py-3 mt-3 text-sm"><strong>{t.type} · ₹{Number(t.amount).toFixed(2)}</strong><p>{t.description}</p><p className="text-xs text-[#8e8076]">{new Date(t.createdAt).toLocaleString()}</p></div>):<p className="mt-3 text-sm">No wallet transactions yet.</p>}</details>
+    {dialog && <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onKeyDown={e=>{if(e.key==='Escape'&&!busy)setDialog(false);}}><div role="dialog" aria-modal="true" aria-labelledby="wallet-payment-title" className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+      <header className="px-6 py-5 border-b border-[#f0dfd3] flex justify-between items-center gap-3"><div className="flex items-center gap-3"><span className="material-symbols-outlined bg-orange-50 text-[#ff5a36] rounded-xl p-3">lock</span><div><p className="text-xs text-[#8e8076]">Simulation only · No real money moves</p><h3 id="wallet-payment-title" className="font-extrabold text-lg">Focotech Wallet Checkout</h3></div></div><button autoFocus type="button" aria-label="Close wallet checkout" disabled={busy} onClick={()=>setDialog(false)} className="rounded-full bg-[#fbf7f4] w-9 h-9 text-xl disabled:opacity-40">×</button></header>
+      {result ? <div role="status" className="p-8 sm:p-12 text-center space-y-4"><span className={`material-symbols-outlined text-5xl ${result==='success'?'text-emerald-600':'text-rose-600'}`}>{result==='success'?'check_circle':'cancel'}</span><h4 className="text-2xl font-extrabold">{result==='success'?'Money added successfully':result==='cancelled'?'Top-up cancelled':'Payment unsuccessful'}</h4><p className="text-sm text-[#685b53]">{result==='success'?`₹${Number(amount).toFixed(2)} in demo credits has been added to your wallet.`:'No wallet credit was added for this payment.'}</p><p className="font-bold">Available balance: ₹{Number(wallet?.balance || 0).toFixed(2)}</p><button type="button" onClick={()=>setDialog(false)} className="bg-[#1f1a17] text-white rounded-full px-8 py-3 font-bold">Return to wallet</button></div> : <div className="grid grid-cols-1 md:grid-cols-2">
+        <section className="p-6 sm:p-8 bg-[#fbf7f4] space-y-5"><p className="text-xs font-bold uppercase tracking-widest text-[#8e8076]">Payment summary</p><div className="flex gap-3 items-center"><span className="material-symbols-outlined text-[#ff5a36] text-3xl">account_balance_wallet</span><div><h4 className="font-extrabold">Wallet top-up</h4><p className="text-xs text-[#685b53]">Credit for future course purchases</p></div></div><dl className="space-y-4 text-sm"><div className="flex justify-between"><dt>Top-up amount</dt><dd>₹{Number(amount).toFixed(2)}</dd></div><div className="flex justify-between"><dt>Additional fees</dt><dd>₹0.00</dd></div><div className="border-t border-[#e5dcd5] pt-4 flex justify-between font-extrabold text-lg"><dt>Total payable</dt><dd>₹{Number(amount).toFixed(2)}</dd></div></dl><div className="rounded-xl border border-orange-100 bg-white p-4 text-xs leading-relaxed text-[#685b53]">Credit is added only after successful simulated payment. Never enter real card details, bank passwords or UPI PINs.</div></section>
+        <section className="p-6 sm:p-8 space-y-5"><div><p className="text-xs uppercase tracking-widest text-[#8e8076] font-bold">Payment selection</p><h4 className="font-extrabold text-lg mt-1">Choose how to pay</h4></div>
+          {methods.length>0 && <label className="block text-sm font-bold">Saved payment method<select aria-label="Saved method for wallet top-up" className="block w-full border border-[#e5dcd5] rounded-xl p-3 mt-2 text-sm" disabled={busy} value={selected.startsWith('new:')?'':selected} onChange={e=>{if(e.target.value){setSelected(e.target.value);pending.current=null;}}}><option value="">Choose a saved method</option>{methods.map(m=><option key={m.token} value={m.token}>{m.method} · {m.token.slice(-8)}</option>)}</select></label>}
+          <div className="grid grid-cols-3 gap-2" aria-label="One-time demo payment methods">{[['upi','qr_code','UPI'],['card','credit_card','Card'],['netbanking','account_balance','Net banking']].map(([value,icon,label])=><button type="button" key={value} disabled={busy} aria-pressed={selected===`new:${value}`} onClick={()=>{setSelected(`new:${value}`);pending.current=null;}} className={`rounded-xl border p-3 text-xs font-bold flex flex-col items-center gap-2 ${selected===`new:${value}`?'border-[#ff5a36] bg-orange-50 text-[#e5411d]':'border-[#e5dcd5] text-[#685b53]'}`}><span className="material-symbols-outlined">{icon}</span>{label}</button>)}</div>
+          <p className="text-xs text-[#8e8076]">{selected.startsWith('new:')?'One-time demo method · nothing will be saved.':'Using your saved demo authorization.'}</p>
+          <p role="alert" className="text-sm text-rose-700">{message}</p>
+          <button type="button" disabled={busy} onClick={()=>pay('success')} className="w-full bg-[#ff5a36] hover:bg-[#e5411d] text-white rounded-full px-5 py-3 font-bold disabled:opacity-40">{busy?'Processing…':`Simulate payment of ₹${Number(amount).toFixed(2)}`}</button>
+          <div className="flex justify-between gap-3 text-xs"><button type="button" disabled={busy} onClick={()=>pay('failed')} className="text-rose-700 underline">Simulate failure</button><button type="button" disabled={busy} onClick={()=>pay('cancelled')} className="text-[#685b53] underline">Cancel payment</button></div>
+        </section>
+      </div>}
+    </div></div>}
+
   </section>;
 }

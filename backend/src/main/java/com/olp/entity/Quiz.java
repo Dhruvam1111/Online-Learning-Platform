@@ -67,6 +67,39 @@ public class Quiz {
     @Column(name = "available_until")
     private LocalDateTime availableUntil;
 
+    @Column(name = "feedback_released", nullable = false)
+    private Boolean feedbackReleased = true;
+
+    @Column(name = "negative_marking", nullable = false)
+    private Boolean negativeMarking = false;
+
+    @Column(name = "partial_marking", nullable = false)
+    private Boolean partialMarking = false;
+
+    @Column(name = "numeric_tolerance", precision = 8, scale = 2)
+    private BigDecimal numericTolerance = BigDecimal.ZERO;
+
+    @Column(name = "show_correct_answers", nullable = false)
+    private Boolean showCorrectAnswers = true;
+
+    @Column(name = "show_feedback", nullable = false)
+    private Boolean showFeedback = true;
+
+    @Column(name = "answer_release_timing", nullable = false, length = 30)
+    private String answerReleaseTiming = "IMMEDIATELY";
+
+    @Column(name = "is_exam", nullable = false)
+    private Boolean isExam = false;
+
+    @Column(name = "results_published", nullable = false)
+    private Boolean resultsPublished = false;
+
+    @Column(name = "results_published_at")
+    private LocalDateTime resultsPublishedAt;
+
+    @Column(name = "results_withheld", nullable = false)
+    private Boolean resultsWithheld = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -109,6 +142,39 @@ public class Quiz {
         }
         if (this.maxAttempts == null) {
             this.maxAttempts = 1;
+        }
+        if (this.negativeMarking == null) {
+            this.negativeMarking = false;
+        }
+        if (this.partialMarking == null) {
+            this.partialMarking = false;
+        }
+        if (this.numericTolerance == null) {
+            this.numericTolerance = BigDecimal.ZERO;
+        }
+        if (this.isExam == null) {
+            this.isExam = false;
+        }
+        if (Boolean.TRUE.equals(this.isExam)) {
+            if (this.showCorrectAnswers == null) {
+                this.showCorrectAnswers = false;
+            }
+            if (this.showFeedback == null) {
+                this.showFeedback = false;
+            }
+            if (this.answerReleaseTiming == null) {
+                this.answerReleaseTiming = "AFTER_DEADLINE";
+            }
+        } else {
+            if (this.showCorrectAnswers == null) {
+                this.showCorrectAnswers = true;
+            }
+            if (this.showFeedback == null) {
+                this.showFeedback = true;
+            }
+            if (this.answerReleaseTiming == null) {
+                this.answerReleaseTiming = "IMMEDIATELY";
+            }
         }
     }
 
@@ -245,6 +311,54 @@ public class Quiz {
         this.availableUntil = availableUntil;
     }
 
+    public Boolean getFeedbackReleased() {
+        return feedbackReleased != null ? feedbackReleased : true;
+    }
+
+    public void setFeedbackReleased(Boolean feedbackReleased) {
+        this.feedbackReleased = feedbackReleased != null ? feedbackReleased : true;
+    }
+
+    public Boolean getNegativeMarking() {
+        return negativeMarking != null ? negativeMarking : false;
+    }
+
+    public void setNegativeMarking(Boolean negativeMarking) {
+        this.negativeMarking = negativeMarking != null ? negativeMarking : false;
+    }
+
+    public Boolean isNegativeMarking() {
+        return getNegativeMarking();
+    }
+
+    public Boolean getPartialMarking() {
+        return partialMarking != null ? partialMarking : false;
+    }
+
+    public void setPartialMarking(Boolean partialMarking) {
+        this.partialMarking = partialMarking != null ? partialMarking : false;
+    }
+
+    public Boolean isPartialMarking() {
+        return getPartialMarking();
+    }
+
+    public BigDecimal getNumericTolerance() {
+        return numericTolerance != null ? numericTolerance : BigDecimal.ZERO;
+    }
+
+    public void setNumericTolerance(BigDecimal numericTolerance) {
+        this.numericTolerance = numericTolerance != null ? numericTolerance : BigDecimal.ZERO;
+    }
+
+    public com.olp.dto.GradingPolicy toGradingPolicy() {
+        return new com.olp.dto.GradingPolicy(
+                isNegativeMarking(),
+                isPartialMarking(),
+                getNumericTolerance()
+        );
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -261,12 +375,122 @@ public class Quiz {
         this.updatedAt = updatedAt;
     }
 
+    public Boolean getShowCorrectAnswers() {
+        return showCorrectAnswers;
+    }
+
+    public void setShowCorrectAnswers(Boolean showCorrectAnswers) {
+        this.showCorrectAnswers = showCorrectAnswers;
+    }
+
+    public Boolean isShowCorrectAnswers() {
+        return Boolean.TRUE.equals(this.showCorrectAnswers);
+    }
+
+    public Boolean getShowFeedback() {
+        return showFeedback;
+    }
+
+    public void setShowFeedback(Boolean showFeedback) {
+        this.showFeedback = showFeedback;
+    }
+
+    public Boolean isShowFeedback() {
+        return Boolean.TRUE.equals(this.showFeedback);
+    }
+
+    public String getAnswerReleaseTiming() {
+        return answerReleaseTiming != null ? answerReleaseTiming : "IMMEDIATELY";
+    }
+
+    public void setAnswerReleaseTiming(String answerReleaseTiming) {
+        this.answerReleaseTiming = answerReleaseTiming;
+    }
+
+    public Boolean getIsExam() {
+        return isExam;
+    }
+
+    public void setIsExam(Boolean exam) {
+        this.isExam = exam;
+    }
+
+    public boolean isExam() {
+        return Boolean.TRUE.equals(this.isExam);
+    }
+
+    /**
+     * Determines whether students are currently permitted to review correct answers (FR-I23, Step 27).
+     * Server-side authority: checks toggle flag, release timing rule, and deadline timestamp in UTC.
+     */
+    public boolean isCorrectAnswersVisible(LocalDateTime atUtc) {
+        if (!Boolean.TRUE.equals(this.showCorrectAnswers)) {
+            return false;
+        }
+        String timing = getAnswerReleaseTiming();
+        if ("NEVER".equalsIgnoreCase(timing)) {
+            return false;
+        }
+        if ("AFTER_DEADLINE".equalsIgnoreCase(timing)) {
+            if (this.availableUntil == null) {
+                return false;
+            }
+            return atUtc != null && !atUtc.isBefore(this.availableUntil);
+        }
+        return true; // IMMEDIATELY
+    }
+
+    /**
+     * Determines whether students are currently permitted to review feedback and explanations (FR-I23, Step 27).
+     * Server-side authority: checks feedback toggle flags, release timing rule, and deadline timestamp in UTC.
+     */
+    public boolean isFeedbackVisible(LocalDateTime atUtc) {
+        if (!Boolean.TRUE.equals(this.feedbackReleased) || !Boolean.TRUE.equals(this.showFeedback)) {
+            return false;
+        }
+        String timing = getAnswerReleaseTiming();
+        if ("NEVER".equalsIgnoreCase(timing)) {
+            return false;
+        }
+        if ("AFTER_DEADLINE".equalsIgnoreCase(timing)) {
+            if (this.availableUntil == null) {
+                return false;
+            }
+            return atUtc != null && !atUtc.isBefore(this.availableUntil);
+        }
+        return true; // IMMEDIATELY
+    }
+
     public List<QuizQuestion> getQuizQuestions() {
         return quizQuestions;
     }
 
     public void setQuizQuestions(List<QuizQuestion> quizQuestions) {
         this.quizQuestions = quizQuestions;
+    }
+
+    public Boolean getResultsPublished() {
+        return resultsPublished != null ? resultsPublished : false;
+    }
+
+    public void setResultsPublished(Boolean resultsPublished) {
+        this.resultsPublished = resultsPublished != null ? resultsPublished : false;
+    }
+
+    public LocalDateTime getResultsPublishedAt() {
+        return resultsPublishedAt;
+    }
+
+    public void setResultsPublishedAt(LocalDateTime resultsPublishedAt) {
+        this.resultsPublishedAt = resultsPublishedAt;
+    }
+
+    public Boolean getResultsWithheld() {
+        return resultsWithheld != null ? resultsWithheld : false;
+    }
+
+    public void setResultsWithheld(Boolean resultsWithheld) {
+        this.resultsWithheld = resultsWithheld != null ? resultsWithheld : false;
     }
 }
 

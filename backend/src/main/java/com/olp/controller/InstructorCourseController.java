@@ -1,19 +1,32 @@
 package com.olp.controller;
 
 import com.olp.dto.ApiResponse;
+import com.olp.dto.CertificateResponse;
+import com.olp.dto.CompletionEvaluationResult;
+import com.olp.dto.CourseAuditResponse;
+import com.olp.dto.CourseCompletionCriteriaRequest;
+import com.olp.dto.CourseCompletionCriteriaResponse;
 import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CoursePreviewResponse;
 import com.olp.dto.CoursePricingRequest;
 import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.CourseResponse;
+import com.olp.dto.CourseReviewStatusResponse;
+import com.olp.dto.CourseSubmissionRequest;
+import com.olp.dto.CourseSubmissionResponse;
 import com.olp.dto.CreateCourseRequest;
+import com.olp.dto.DeleteCourseRequest;
+import com.olp.dto.DescriptiveSubmissionResponse;
 import com.olp.dto.PageResponse;
 import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
 import com.olp.entity.User;
+import com.olp.service.CourseCompletionService;
+import com.olp.service.DescriptiveGradingService;
 import com.olp.service.InstructorCourseService;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -29,9 +42,21 @@ import java.util.List;
 public class InstructorCourseController {
 
     private final InstructorCourseService instructorCourseService;
+    private final CourseCompletionService courseCompletionService;
+    private final DescriptiveGradingService descriptiveGradingService;
 
     public InstructorCourseController(InstructorCourseService instructorCourseService) {
+        this(instructorCourseService, null, null);
+    }
+
+    @Autowired
+    public InstructorCourseController(
+            InstructorCourseService instructorCourseService,
+            @Autowired(required = false) CourseCompletionService courseCompletionService,
+            @Autowired(required = false) DescriptiveGradingService descriptiveGradingService) {
         this.instructorCourseService = instructorCourseService;
+        this.courseCompletionService = courseCompletionService;
+        this.descriptiveGradingService = descriptiveGradingService;
     }
 
     /**
@@ -245,6 +270,21 @@ public class InstructorCourseController {
     }
 
     /**
+     * POST / PATCH /api/instructor/courses/{courseId}/unpublish
+     * FR-I09: Unpublish a published course, removing it from the public catalogue while
+     * preserving access for enrolled students and blocking new enrollments.
+     */
+    @RequestMapping(value = "/{courseId:\\d+}/unpublish", method = { RequestMethod.POST, RequestMethod.PATCH })
+    public ResponseEntity<CourseResponse> unpublishCourse(
+            Authentication authentication,
+            @PathVariable Integer courseId) {
+
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        CourseResponse response = instructorCourseService.unpublishCourse(currentUser, courseId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * PATCH / POST /api/instructor/courses/{courseId}/archive
      * FR-I59: Archive a course (restricted to OWNER only).
      */
@@ -259,16 +299,42 @@ public class InstructorCourseController {
     }
 
     /**
-     * DELETE /api/instructor/courses/{courseId}
-     * FR-I59: Delete a course (restricted to OWNER only).
+     * Overloaded method for direct service/controller invocations without query/body parameters.
      */
-    @DeleteMapping("/{courseId:\\d+}")
     public ResponseEntity<ApiResponse> deleteCourse(
             Authentication authentication,
-            @PathVariable Integer courseId) {
+            Integer courseId) {
+        return deleteCourse(authentication, courseId, null, null, null);
+    }
+
+    /**
+     * DELETE /api/instructor/courses/{courseId}
+     * POST /api/instructor/courses/{courseId}/delete
+     * FR-I12 / FR-I59: Soft-delete a course (restricted to OWNER only).
+     */
+    @RequestMapping(value = { "/{courseId:\\d+}", "/{courseId:\\d+}/delete" }, method = { RequestMethod.DELETE, RequestMethod.POST })
+    public ResponseEntity<ApiResponse> deleteCourse(
+            Authentication authentication,
+            @PathVariable Integer courseId,
+            @RequestParam(value = "confirm", required = false) Boolean confirm,
+            @RequestParam(value = "confirmed", required = false) Boolean confirmed,
+            @RequestBody(required = false) DeleteCourseRequest request) {
 
         User currentUser = instructorCourseService.resolveUser(authentication);
-        instructorCourseService.deleteCourse(currentUser, courseId);
+        Boolean isConfirmed = confirm != null ? confirm : confirmed;
+        String reason = null;
+        if (request != null) {
+            if (isConfirmed == null) {
+                isConfirmed = request.getConfirm();
+            }
+            reason = request.getReason();
+        }
+
+        if (isConfirmed != null || reason != null) {
+            instructorCourseService.deleteCourse(currentUser, courseId, isConfirmed, reason);
+        } else {
+            instructorCourseService.deleteCourse(currentUser, courseId);
+        }
         return ResponseEntity.ok(new ApiResponse(true, "Course deleted successfully"));
     }
 
@@ -311,5 +377,192 @@ public class InstructorCourseController {
         User currentUser = instructorCourseService.resolveUser(authentication);
         CoursePreviewResponse response = instructorCourseService.previewCourseAsStudent(currentUser, courseId);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/instructor/courses/{courseId}/submit
+     * FR-I08: Submit course for admin review.
+     */
+    @PostMapping("/{courseId:\\d+}/submit")
+    public ResponseEntity<CourseSubmissionResponse> submitCourse(
+            Authentication authentication,
+            @PathVariable Integer courseId,
+            @RequestBody(required = false) CourseSubmissionRequest request) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        CourseSubmissionResponse response = instructorCourseService.submitCourseForReview(
+                currentUser, courseId, request != null ? request : new CourseSubmissionRequest());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}/submissions
+     * FR-I08: Retrieve course submission history.
+     */
+    @GetMapping("/{courseId:\\d+}/submissions")
+    public ResponseEntity<List<CourseSubmissionResponse>> getCourseSubmissions(
+            Authentication authentication,
+            @PathVariable Integer courseId) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        List<CourseSubmissionResponse> response = instructorCourseService.getCourseSubmissions(currentUser, courseId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}/review-status
+     * FR-I71: Retrieve course review status, feedback comments, and resubmission eligibility.
+     */
+    @GetMapping("/{courseId:\\d+}/review-status")
+    public ResponseEntity<CourseReviewStatusResponse> getReviewStatus(
+            Authentication authentication,
+            @PathVariable Integer courseId) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        CourseReviewStatusResponse response = instructorCourseService.getCourseReviewStatus(currentUser, courseId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/instructor/courses/{courseId}/resubmit
+     * FR-I71: Resubmit course for admin review after changes have been requested.
+     */
+    @PostMapping("/{courseId:\\d+}/resubmit")
+    public ResponseEntity<CourseSubmissionResponse> resubmitCourse(
+            Authentication authentication,
+            @PathVariable Integer courseId,
+            @RequestBody(required = false) CourseSubmissionRequest request) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        CourseSubmissionResponse response = instructorCourseService.resubmitCourse(
+                currentUser, courseId, request != null ? request : new CourseSubmissionRequest());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}/audits
+     * FR-I09: Retrieve immutable course audit history tracking edits, status changes, and unpublish actions.
+     */
+    @GetMapping("/{courseId:\\d+}/audits")
+    public ResponseEntity<List<CourseAuditResponse>> getCourseAudits(
+            Authentication authentication,
+            @PathVariable Integer courseId) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        List<CourseAuditResponse> response = instructorCourseService.getCourseAudits(currentUser, courseId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}/completion-criteria
+     * FR-I56: Retrieve configured certificate completion criteria for a course.
+     */
+    @GetMapping("/{courseId:\\d+}/completion-criteria")
+    public ResponseEntity<CourseCompletionCriteriaResponse> getCompletionCriteria(
+            Authentication authentication,
+            @PathVariable Integer courseId) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        if (courseCompletionService == null) {
+            return ResponseEntity.notFound().build();
+        }
+        CourseCompletionCriteriaResponse response = courseCompletionService.getCompletionCriteria(courseId, currentUser);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * PUT / POST /api/instructor/courses/{courseId}/completion-criteria
+     * FR-I56: Configure or update certificate completion criteria (DR-03).
+     */
+    @RequestMapping(value = "/{courseId:\\d+}/completion-criteria", method = { RequestMethod.PUT, RequestMethod.POST })
+    public ResponseEntity<CourseCompletionCriteriaResponse> configureCompletionCriteria(
+            Authentication authentication,
+            @PathVariable Integer courseId,
+            @Valid @RequestBody CourseCompletionCriteriaRequest request) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        if (courseCompletionService == null) {
+            return ResponseEntity.notFound().build();
+        }
+        CourseCompletionCriteriaResponse response = courseCompletionService.configureCompletionCriteria(currentUser, courseId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}/completion-evaluation/{studentId}
+     * FR-I56 / FR-S77: Evaluate a student's completion eligibility for the course.
+     */
+    @GetMapping("/{courseId:\\d+}/completion-evaluation/{studentId:\\d+}")
+    public ResponseEntity<CompletionEvaluationResult> evaluateStudentCompletion(
+            Authentication authentication,
+            @PathVariable Integer courseId,
+            @PathVariable Integer studentId) {
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        if (courseCompletionService == null) {
+            return ResponseEntity.notFound().build();
+        }
+        CompletionEvaluationResult result = courseCompletionService.evaluate(studentId, courseId);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}/certificates
+     * FR-I57: Retrieve issued certificates for a specific course associated with the authenticated instructor (DR-05).
+     * Supports optional issue date range filtering and pagination.
+     */
+    @GetMapping("/{courseId:\\d+}/certificates")
+    public ResponseEntity<?> getCourseCertificates(
+            Authentication authentication,
+            @PathVariable Integer courseId,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String fromDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String toDate,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        if (courseCompletionService == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        String start = startDate != null ? startDate : fromDate;
+        String end = endDate != null ? endDate : toDate;
+
+        if (page != null || size != null) {
+            int p = page != null ? page : 0;
+            int s = size != null ? size : 10;
+            PageResponse<CertificateResponse> response = courseCompletionService.getIssuedCertificates(
+                    currentUser, courseId, start, end, p, s);
+            return ResponseEntity.ok(response);
+        } else {
+            List<CertificateResponse> response = courseCompletionService.getIssuedCertificatesList(
+                    currentUser, courseId, start, end);
+            return ResponseEntity.ok(response);
+        }
+    }
+
+    /**
+     * GET /api/instructor/courses/{courseId}/grading
+     * Lists descriptive submissions in the grading queue for a specific course (FR-I30).
+     */
+    @GetMapping({ "/{courseId:\\d+}/grading", "/{courseId:\\d+}/grading-queue" })
+    public ResponseEntity<?> getCourseGradingQueue(
+            Authentication authentication,
+            @PathVariable Integer courseId,
+            @RequestParam(required = false) Integer quizId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+
+        User currentUser = instructorCourseService.resolveUser(authentication);
+        if (descriptiveGradingService == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        if (page != null || size != null) {
+            int p = page != null ? page : 0;
+            int s = size != null ? size : 20;
+            PageResponse<DescriptiveSubmissionResponse> response = descriptiveGradingService
+                    .getGradingQueuePaged(currentUser, courseId, quizId, status, p, s);
+            return ResponseEntity.ok(response);
+        } else {
+            List<DescriptiveSubmissionResponse> response = descriptiveGradingService
+                    .getGradingQueue(currentUser, courseId, quizId, status);
+            return ResponseEntity.ok(response);
+        }
     }
 }

@@ -431,15 +431,6 @@ public class OtpAuthService {
         log.info("  [{}] OTP   : {}", title, otpCode);
         log.info("  [{}] Expiry: {} minutes", title, OTP_EXPIRY_MINUTES);
         log.info("=============================================================");
-
-        System.out.println("\n");
-        System.out.println("╔══════════════════════════════════════════════╗");
-        System.out.printf ("║  %-44s║%n", title);
-        System.out.printf ("║  To      : %-34s║%n", email);
-        System.out.printf ("║  OTP     : %-34s║%n", otpCode);
-        System.out.printf ("║  Expires : %-34s║%n", "in " + OTP_EXPIRY_MINUTES + " minutes");
-        System.out.println("╚══════════════════════════════════════════════╝");
-        System.out.println();
     }
 
     private String maskEmail(String email) {
