@@ -44,6 +44,7 @@ public class ExamService {
 
     private Clock clock = Clock.systemUTC();
 
+    @org.springframework.beans.factory.annotation.Autowired
     public ExamService(ExamRepository examRepository,
                        ExamQuestionRepository examQuestionRepository,
                        ExamAttemptRepository examAttemptRepository,

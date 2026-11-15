@@ -25,6 +25,7 @@ public class PaymentSubscriptionService {
     public PaymentSubscriptionService(PaymentAuditService audit,WalletRepository locks,SimulatedPaymentMethods methods,PaymentService payments,CourseRepository courses,PaymentPolicyService policies){
         this.audit=audit;this.locks=locks;this.methods=methods;this.payments=payments;this.courses=courses;this.policies=policies;
     }
+    @org.springframework.beans.factory.annotation.Autowired
     public PaymentSubscriptionService(PaymentAuditService audit,WalletRepository locks,SimulatedPaymentMethods methods,PaymentService payments,CourseRepository courses,PaymentPolicyService policies,EmailService emailService){
         this.audit=audit;this.locks=locks;this.methods=methods;this.payments=payments;this.courses=courses;this.policies=policies;this.emailService=emailService;
     }
