@@ -1,9 +1,11 @@
 package com.olp.service;
 
 import com.olp.dto.InitiateVideoUploadRequest;
+import com.olp.dto.TranscoderWebhookRequest;
 import com.olp.dto.VideoChunkResponse;
 import com.olp.dto.VideoUploadResponse;
 import com.olp.entity.*;
+import com.olp.event.VideoProcessingStatusEvent;
 import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.CourseInstructorRepository;
 import com.olp.repository.CourseRepository;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -28,7 +31,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -52,6 +54,10 @@ class VideoUploadServiceTest {
     private VideoTranscodeService videoTranscodeService;
     @Mock
     private ContentDeclarationService contentDeclarationService;
+    @Mock
+    private EmailService emailService;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private VideoUploadService videoUploadService;
@@ -117,7 +123,7 @@ class VideoUploadServiceTest {
         request.setFilename("lecture1.mp4");
         request.setFileType("video/mp4");
         request.setTotalBytes(15728640L); // 15 MB
-        request.setChunkSize(5242880L);  // 5 MB -> 3 chunks
+        request.setChunkSize(5242880L); // 5 MB -> 3 chunks
 
         when(lessonRepository.findById(401)).thenReturn(Optional.of(videoLesson));
         doNothing().when(contentDeclarationService).assertDeclared(401);
@@ -230,13 +236,15 @@ class VideoUploadServiceTest {
 
     @Test
     void testUploadChunk_IntermediateChunk() throws IOException {
-        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L, 3);
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L,
+                3);
         when(videoUploadRepository.findById("sess-1")).thenReturn(Optional.of(upload));
         when(videoStorageService.saveChunk(eq("sess-1"), eq(0), any(InputStream.class))).thenReturn(500L);
         when(videoStorageService.getUploadedChunkIndices("sess-1")).thenReturn(List.of(0));
         when(videoUploadRepository.save(any(VideoUpload.class))).thenAnswer(i -> i.getArgument(0));
 
-        MockMultipartFile chunkFile = new MockMultipartFile("file", "chunk0.part", "application/octet-stream", new byte[500]);
+        MockMultipartFile chunkFile = new MockMultipartFile("file", "chunk0.part", "application/octet-stream",
+                new byte[500]);
         VideoChunkResponse response = videoUploadService.uploadChunk(instructor, "sess-1", 0, chunkFile);
 
         assertNotNull(response);
@@ -249,14 +257,17 @@ class VideoUploadServiceTest {
 
     @Test
     void testUploadChunk_FinalChunkAssemblesAndTranscodes() throws IOException {
-        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1000L, 500L, 2);
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1000L, 500L,
+                2);
         when(videoUploadRepository.findById("sess-1")).thenReturn(Optional.of(upload));
         when(videoStorageService.saveChunk(eq("sess-1"), eq(1), any(InputStream.class))).thenReturn(500L);
         when(videoStorageService.getUploadedChunkIndices("sess-1")).thenReturn(List.of(0, 1));
-        when(videoStorageService.assembleChunks("sess-1", "video.mp4", 2)).thenReturn("/uploads/videos/sess-1_video.mp4");
+        when(videoStorageService.assembleChunks("sess-1", "video.mp4", 2))
+                .thenReturn("/uploads/videos/sess-1_video.mp4");
         when(videoUploadRepository.save(any(VideoUpload.class))).thenAnswer(i -> i.getArgument(0));
 
-        MockMultipartFile chunkFile = new MockMultipartFile("file", "chunk1.part", "application/octet-stream", new byte[500]);
+        MockMultipartFile chunkFile = new MockMultipartFile("file", "chunk1.part", "application/octet-stream",
+                new byte[500]);
         VideoChunkResponse response = videoUploadService.uploadChunk(instructor, "sess-1", 1, chunkFile);
 
         assertNotNull(response);
@@ -272,35 +283,45 @@ class VideoUploadServiceTest {
 
     @Test
     void testUploadChunk_Fails_AlreadyCompleted() {
-        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1000L, 500L, 2);
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1000L, 500L,
+                2);
         upload.setStatus(VideoUploadStatus.COMPLETED);
         when(videoUploadRepository.findById("sess-1")).thenReturn(Optional.of(upload));
 
-        MockMultipartFile chunkFile = new MockMultipartFile("file", "chunk0.part", "application/octet-stream", new byte[500]);
-        assertThrows(IllegalStateException.class, () -> videoUploadService.uploadChunk(instructor, "sess-1", 0, chunkFile));
+        MockMultipartFile chunkFile = new MockMultipartFile("file", "chunk0.part", "application/octet-stream",
+                new byte[500]);
+        assertThrows(IllegalStateException.class,
+                () -> videoUploadService.uploadChunk(instructor, "sess-1", 0, chunkFile));
     }
 
     @Test
     void testUploadChunk_Fails_InvalidChunkIndex() {
-        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1000L, 500L, 2);
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1000L, 500L,
+                2);
         when(videoUploadRepository.findById("sess-1")).thenReturn(Optional.of(upload));
 
-        MockMultipartFile chunkFile = new MockMultipartFile("file", "chunk0.part", "application/octet-stream", new byte[500]);
-        assertThrows(IllegalArgumentException.class, () -> videoUploadService.uploadChunk(instructor, "sess-1", 5, chunkFile));
+        MockMultipartFile chunkFile = new MockMultipartFile("file", "chunk0.part", "application/octet-stream",
+                new byte[500]);
+        assertThrows(IllegalArgumentException.class,
+                () -> videoUploadService.uploadChunk(instructor, "sess-1", 5, chunkFile));
     }
 
     @Test
     void testUploadChunk_Fails_EmptyFile() {
-        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1000L, 500L, 2);
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1000L, 500L,
+                2);
         when(videoUploadRepository.findById("sess-1")).thenReturn(Optional.of(upload));
 
-        MockMultipartFile emptyFile = new MockMultipartFile("file", "chunk0.part", "application/octet-stream", new byte[0]);
-        assertThrows(IllegalArgumentException.class, () -> videoUploadService.uploadChunk(instructor, "sess-1", 0, emptyFile));
+        MockMultipartFile emptyFile = new MockMultipartFile("file", "chunk0.part", "application/octet-stream",
+                new byte[0]);
+        assertThrows(IllegalArgumentException.class,
+                () -> videoUploadService.uploadChunk(instructor, "sess-1", 0, emptyFile));
     }
 
     @Test
     void testResumeUpload_Success() {
-        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L, 3);
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L,
+                3);
         upload.setReceivedBytes(500L);
         upload.setStatus(VideoUploadStatus.UPLOADING);
 
@@ -315,7 +336,8 @@ class VideoUploadServiceTest {
 
     @Test
     void testGetUploadStatus_Success() {
-        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L, 3);
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L,
+                3);
         upload.setReceivedBytes(1000L);
         upload.setStatus(VideoUploadStatus.UPLOADING);
 
@@ -330,7 +352,8 @@ class VideoUploadServiceTest {
 
     @Test
     void testGetVideoByLesson_Success() {
-        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L, 3);
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L,
+                3);
         when(lessonRepository.findById(401)).thenReturn(Optional.of(videoLesson));
         when(videoUploadRepository.findFirstByLessonIdOrderByCreatedAtDesc(401)).thenReturn(Optional.of(upload));
 
@@ -362,5 +385,174 @@ class VideoUploadServiceTest {
         User resolved = videoUploadService.resolveUser(auth);
         assertEquals(instructor, resolved);
     }
-}
 
+    @Test
+    void testProcessTranscoderWebhook_Success_TransitionsToReady_NotifiesInstructor() {
+        videoUploadService.setWebhookSecret("test-secret-123");
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L, 3);
+        upload.setStatus(VideoUploadStatus.TRANSCODING);
+
+        when(videoUploadRepository.findById("sess-1")).thenReturn(Optional.of(upload));
+        when(videoUploadRepository.save(any(VideoUpload.class))).thenAnswer(i -> i.getArgument(0));
+
+        TranscoderWebhookRequest request = new TranscoderWebhookRequest(
+                "sess-1",
+                VideoUploadStatus.READY,
+                "/media/hls/sess-1/master.m3u8",
+                "/media/dash/sess-1/manifest.mpd",
+                null
+        );
+
+        VideoUploadResponse response = videoUploadService.processTranscoderWebhook("test-secret-123", request);
+
+        assertNotNull(response);
+        assertEquals(VideoUploadStatus.READY, response.getStatus());
+        assertEquals("READY", response.getStatusBadge());
+        assertEquals("/media/hls/sess-1/master.m3u8", response.getHlsUrl());
+        assertEquals("/media/dash/sess-1/manifest.mpd", response.getDashUrl());
+        assertEquals("/media/hls/sess-1/master.m3u8", videoLesson.getContentUrl());
+
+        verify(emailService, times(1)).sendVideoProcessingStatusEmail(
+                eq(instructor.getEmail()), eq(instructor.getName()), eq("video.mp4"), eq(videoLesson.getTitle()), eq("READY"), isNull());
+        verify(eventPublisher, times(1)).publishEvent(any(VideoProcessingStatusEvent.class));
+    }
+
+    @Test
+    void testProcessTranscoderWebhook_Success_TransitionsToFailed_NotifiesInstructor() {
+        videoUploadService.setWebhookSecret("test-secret-123");
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L, 3);
+        upload.setStatus(VideoUploadStatus.TRANSCODING);
+
+        when(videoUploadRepository.findById("sess-1")).thenReturn(Optional.of(upload));
+        when(videoUploadRepository.save(any(VideoUpload.class))).thenAnswer(i -> i.getArgument(0));
+
+        TranscoderWebhookRequest request = new TranscoderWebhookRequest(
+                "sess-1",
+                VideoUploadStatus.FAILED,
+                null,
+                null,
+                "Codec unsupported: av1"
+        );
+
+        VideoUploadResponse response = videoUploadService.processTranscoderWebhook("test-secret-123", request);
+
+        assertNotNull(response);
+        assertEquals(VideoUploadStatus.FAILED, response.getStatus());
+        assertEquals("FAILED", response.getStatusBadge());
+        assertEquals("Codec unsupported: av1", response.getFailureReason());
+
+        verify(emailService, times(1)).sendVideoProcessingStatusEmail(
+                eq(instructor.getEmail()), eq(instructor.getName()), eq("video.mp4"), eq(videoLesson.getTitle()), eq("FAILED"), eq("Codec unsupported: av1"));
+        verify(eventPublisher, times(1)).publishEvent(any(VideoProcessingStatusEvent.class));
+    }
+
+    @Test
+    void testProcessTranscoderWebhook_Idempotent_ReturnsExistingWithoutReNotifying() {
+        videoUploadService.setWebhookSecret("test-secret-123");
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L, 3);
+        upload.setStatus(VideoUploadStatus.READY);
+        upload.setHlsUrl("/media/hls/sess-1/master.m3u8");
+
+        when(videoUploadRepository.findById("sess-1")).thenReturn(Optional.of(upload));
+
+        TranscoderWebhookRequest request = new TranscoderWebhookRequest(
+                "sess-1",
+                VideoUploadStatus.READY,
+                "/media/hls/sess-1/master.m3u8",
+                null,
+                null
+        );
+
+        VideoUploadResponse response = videoUploadService.processTranscoderWebhook("test-secret-123", request);
+
+        assertNotNull(response);
+        assertEquals(VideoUploadStatus.READY, response.getStatus());
+        assertEquals("READY", response.getStatusBadge());
+        verify(emailService, never()).sendVideoProcessingStatusEmail(anyString(), anyString(), anyString(), anyString(), anyString(), anyString());
+        verify(videoUploadRepository, never()).save(any());
+    }
+
+    @Test
+    void testProcessTranscoderWebhook_RejectsJumpFromFailedToReadyWithoutReupload() {
+        videoUploadService.setWebhookSecret("test-secret-123");
+        VideoUpload upload = new VideoUpload("sess-1", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L, 3);
+        upload.setStatus(VideoUploadStatus.FAILED);
+        upload.setFailureReason("Initial transcode crashed");
+
+        when(videoUploadRepository.findById("sess-1")).thenReturn(Optional.of(upload));
+
+        TranscoderWebhookRequest request = new TranscoderWebhookRequest(
+                "sess-1",
+                VideoUploadStatus.READY,
+                "/media/hls/sess-1/master.m3u8",
+                null,
+                null
+        );
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+                videoUploadService.processTranscoderWebhook("test-secret-123", request));
+
+        assertTrue(ex.getMessage().contains("cannot transition upload from FAILED to READY"));
+        verify(videoUploadRepository, never()).save(any());
+    }
+
+    @Test
+    void testProcessTranscoderWebhook_Fails_InvalidSecret() {
+        videoUploadService.setWebhookSecret("test-secret-123");
+        TranscoderWebhookRequest request = new TranscoderWebhookRequest(
+                "sess-1", VideoUploadStatus.READY, null, null, null);
+
+        assertThrows(AccessDeniedException.class, () ->
+                videoUploadService.processTranscoderWebhook("wrong-secret", request));
+        assertThrows(AccessDeniedException.class, () ->
+                videoUploadService.processTranscoderWebhook(null, request));
+    }
+
+    @Test
+    void testProcessTranscoderWebhook_Fails_NotFound() {
+        videoUploadService.setWebhookSecret("test-secret-123");
+        when(videoUploadRepository.findById("unknown-id")).thenReturn(Optional.empty());
+
+        TranscoderWebhookRequest request = new TranscoderWebhookRequest(
+                "unknown-id", VideoUploadStatus.READY, null, null, null);
+
+        assertThrows(ResourceNotFoundException.class, () ->
+                videoUploadService.processTranscoderWebhook("test-secret-123", request));
+    }
+
+    @Test
+    void testRetryUploadAfterFailure_Success_CreatesFreshJob() throws IOException {
+        VideoUpload failedUpload = new VideoUpload("sess-old", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L, 3);
+        failedUpload.setStatus(VideoUploadStatus.FAILED);
+        failedUpload.setFailureReason("Encoding error");
+
+        when(videoUploadRepository.findById("sess-old")).thenReturn(Optional.of(failedUpload));
+        when(lessonRepository.findById(401)).thenReturn(Optional.of(videoLesson));
+        doNothing().when(contentDeclarationService).assertDeclared(401);
+        doNothing().when(videoStorageService).initSession(anyString());
+        when(videoUploadRepository.save(any(VideoUpload.class))).thenAnswer(i -> i.getArgument(0));
+
+        VideoUploadResponse freshResponse = videoUploadService.retryUploadAfterFailure(instructor, "sess-old", null);
+
+        assertNotNull(freshResponse);
+        assertNotEquals("sess-old", freshResponse.getUploadId(), "Re-upload MUST create a fresh upload ID");
+        assertEquals(VideoUploadStatus.INITIATED, freshResponse.getStatus());
+        assertEquals("UPLOADING", freshResponse.getStatusBadge());
+        assertEquals(401, freshResponse.getLessonId());
+        verify(videoStorageService, times(1)).initSession(anyString());
+    }
+
+    @Test
+    void testRetryUploadAfterFailure_Fails_WhenUploadNotFailedOrCancelled() {
+        VideoUpload activeUpload = new VideoUpload("sess-active", videoLesson, instructor, "video.mp4", "video/mp4", 1500L, 500L, 3);
+        activeUpload.setStatus(VideoUploadStatus.TRANSCODING);
+
+        when(videoUploadRepository.findById("sess-active")).thenReturn(Optional.of(activeUpload));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+                videoUploadService.retryUploadAfterFailure(instructor, "sess-active", null));
+
+        assertTrue(ex.getMessage().contains("Only failed or cancelled uploads can be re-uploaded"));
+        verify(videoUploadRepository, never()).save(any());
+    }
+}

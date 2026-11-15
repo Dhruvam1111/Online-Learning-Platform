@@ -1,15 +1,20 @@
 package com.olp.controller;
 
 import com.olp.dto.ApiResponse;
+import com.olp.dto.CourseAuditResponse;
+import com.olp.dto.CourseCompletionCriteriaRequest;
+import com.olp.dto.CourseCompletionCriteriaResponse;
 import com.olp.dto.CourseDraftRequest;
 import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.CoursePreviewResponse;
 import com.olp.dto.CoursePricingRequest;
 import com.olp.dto.CoursePricingResponse;
 import com.olp.dto.CourseResponse;
+import com.olp.dto.CourseReviewStatusResponse;
 import com.olp.dto.CourseSubmissionRequest;
 import com.olp.dto.CourseSubmissionResponse;
 import com.olp.dto.CreateCourseRequest;
+import com.olp.dto.DeleteCourseRequest;
 import com.olp.dto.PageResponse;
 import com.olp.dto.UpdateCourseRequest;
 import com.olp.dto.UpdateCourseStatusRequest;
@@ -18,6 +23,7 @@ import com.olp.entity.CourseStatus;
 import com.olp.entity.User;
 import com.olp.exception.GlobalExceptionHandler;
 import com.olp.exception.ResourceNotFoundException;
+import com.olp.service.CourseCompletionService;
 import com.olp.service.InstructorCourseService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +42,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -49,6 +56,8 @@ class InstructorCourseControllerTest {
 
     @Mock
     private InstructorCourseService instructorCourseService;
+    @Mock
+    private CourseCompletionService courseCompletionService;
 
     @InjectMocks
     private InstructorCourseController controller;
@@ -110,8 +119,8 @@ class InstructorCourseControllerTest {
         ResponseEntity<CourseResponse> response = controller.createCourse(authentication, request);
 
         assertEquals(201, response.getStatusCode().value());
-        assertEquals("Web Development", response.getBody().getCategory());
-        assertEquals(CourseStatus.DRAFT, response.getBody().getStatus());
+        assertEquals("Web Development", Objects.requireNonNull(response.getBody()).getCategory());
+        assertEquals(CourseStatus.DRAFT, Objects.requireNonNull(response.getBody()).getStatus());
         verify(instructorCourseService, times(1)).createCourse(currentUser, request);
     }
 
@@ -134,7 +143,7 @@ class InstructorCourseControllerTest {
         ResponseEntity<List<CourseResponse>> response = controller.getCourses(authentication, null, null);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(2, response.getBody().size());
+        assertEquals(2, Objects.requireNonNull(response.getBody()).size());
         assertSame(courses, response.getBody());
     }
 
@@ -146,7 +155,7 @@ class InstructorCourseControllerTest {
         ResponseEntity<List<CourseResponse>> response = controller.getCourses(authentication, 1, 1);
 
         assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().isEmpty());
+        assertTrue(Objects.requireNonNull(response.getBody()).isEmpty());
     }
 
     @Test
@@ -210,7 +219,7 @@ class InstructorCourseControllerTest {
         ResponseEntity<CourseResponse> response = controller.updateCourseStatus(authentication, 10, request);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(CourseStatus.PUBLISHED, response.getBody().getStatus());
+        assertEquals(CourseStatus.PUBLISHED, Objects.requireNonNull(response.getBody()).getStatus());
         verify(instructorCourseService, times(1)).updateCourseStatus(currentUser, 10, request);
     }
 
@@ -224,7 +233,7 @@ class InstructorCourseControllerTest {
         ResponseEntity<CourseResponse> response = controller.saveDraft(authentication, request);
 
         assertEquals(201, response.getStatusCode().value());
-        assertEquals(CourseStatus.DRAFT, response.getBody().getStatus());
+        assertEquals(CourseStatus.DRAFT, Objects.requireNonNull(response.getBody()).getStatus());
         verify(instructorCourseService).saveDraft(currentUser, request);
     }
 
@@ -239,7 +248,7 @@ class InstructorCourseControllerTest {
         ResponseEntity<CourseResponse> response = controller.saveDraft(authentication, request);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("Updated Draft Title", response.getBody().getTitle());
+        assertEquals("Updated Draft Title", Objects.requireNonNull(response.getBody()).getTitle());
     }
 
     @Test
@@ -265,7 +274,7 @@ class InstructorCourseControllerTest {
         ResponseEntity<List<CourseResponse>> response = controller.getDrafts(authentication);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(1, response.getBody().size());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).size());
         verify(instructorCourseService).getInstructorDrafts(currentUser);
     }
 
@@ -293,8 +302,8 @@ class InstructorCourseControllerTest {
         ResponseEntity<List<CourseInstructorResponse>> response = controller.getCourseInstructors(authentication, 10);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(1, response.getBody().size());
-        assertEquals(CourseInstructorRole.OWNER, response.getBody().get(0).getRole());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).size());
+        assertEquals(CourseInstructorRole.OWNER, Objects.requireNonNull(response.getBody()).get(0).getRole());
 
         var method = InstructorCourseController.class.getMethod("getCourseInstructors", Authentication.class, Integer.class);
         PreAuthorize methodAuth = method.getAnnotation(PreAuthorize.class);
@@ -309,7 +318,7 @@ class InstructorCourseControllerTest {
         ResponseEntity<ApiResponse> response = controller.removeCourseInstructor(authentication, 10, 2);
 
         assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().isSuccess());
+        assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
         verify(instructorCourseService).removeCourseInstructor(currentUser, 10, 2);
     }
 
@@ -322,7 +331,7 @@ class InstructorCourseControllerTest {
         ResponseEntity<CourseResponse> response = controller.archiveCourse(authentication, 10);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(CourseStatus.ARCHIVED, response.getBody().getStatus());
+        assertEquals(CourseStatus.ARCHIVED, Objects.requireNonNull(response.getBody()).getStatus());
         verify(instructorCourseService).archiveCourse(currentUser, 10);
     }
 
@@ -333,8 +342,31 @@ class InstructorCourseControllerTest {
         ResponseEntity<ApiResponse> response = controller.deleteCourse(authentication, 10);
 
         assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().isSuccess());
+        assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
         verify(instructorCourseService).deleteCourse(currentUser, 10);
+    }
+
+    @Test
+    void testDeleteCourse_WithConfirmParam_PassesConfirmationToService() {
+        givenResolvedUser();
+
+        ResponseEntity<ApiResponse> response = controller.deleteCourse(authentication, 10, true, null, null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
+        verify(instructorCourseService).deleteCourse(currentUser, 10, true, null);
+    }
+
+    @Test
+    void testDeleteCourse_WithRequestBody_PassesConfirmationAndReasonToService() {
+        givenResolvedUser();
+        DeleteCourseRequest req = new DeleteCourseRequest(true, "Retiring course");
+
+        ResponseEntity<ApiResponse> response = controller.deleteCourse(authentication, 10, null, null, req);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
+        verify(instructorCourseService).deleteCourse(currentUser, 10, true, "Retiring course");
     }
 
     @Test
@@ -350,8 +382,8 @@ class InstructorCourseControllerTest {
                 controller.getMyCourses(authentication, "PUBLISHED", "Pub", 0, 5, null, null);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(1, response.getBody().getContent().size());
-        assertEquals(12L, response.getBody().getContent().get(0).getEnrollmentCount());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).getContent().size());
+        assertEquals(12L, Objects.requireNonNull(response.getBody()).getContent().get(0).getEnrollmentCount());
         verify(instructorCourseService).getMyCourses(currentUser, "PUBLISHED", "Pub", 0, 5);
     }
 
@@ -462,9 +494,9 @@ class InstructorCourseControllerTest {
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
         assertSame(preview, response.getBody());
-        assertTrue(response.getBody().isPreview());
-        assertTrue(response.getBody().isReadOnly());
-        assertFalse(response.getBody().isCanEnroll());
+        assertTrue(Objects.requireNonNull(response.getBody()).isPreview());
+        assertTrue(Objects.requireNonNull(response.getBody()).isReadOnly());
+        assertFalse(Objects.requireNonNull(response.getBody()).isCanEnroll());
         verify(instructorCourseService).previewCourseAsStudent(currentUser, 10);
     }
 
@@ -486,7 +518,7 @@ class InstructorCourseControllerTest {
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
         assertSame(submission, response.getBody());
-        assertEquals("PENDING_REVIEW", response.getBody().getStatus());
+        assertEquals("PENDING_REVIEW", Objects.requireNonNull(response.getBody()).getStatus());
         verify(instructorCourseService).submitCourseForReview(eq(currentUser), eq(10), any(CourseSubmissionRequest.class));
     }
 
@@ -504,8 +536,120 @@ class InstructorCourseControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(1, response.getBody().size());
-        assertSame(submission, response.getBody().get(0));
+        assertEquals(1, Objects.requireNonNull(response.getBody()).size());
+        assertSame(submission, Objects.requireNonNull(response.getBody()).get(0));
         verify(instructorCourseService).getCourseSubmissions(currentUser, 10);
+    }
+
+    @Test
+    void testGetReviewStatus_Returns200WithReviewStatusResponse() {
+        givenResolvedUser();
+        CourseReviewStatusResponse statusResp = new CourseReviewStatusResponse();
+        statusResp.setCourseId(10);
+        statusResp.setStatus("CHANGES_REQUESTED");
+        statusResp.setReviewStatus("CHANGES_REQUESTED");
+        statusResp.setCanResubmit(true);
+        statusResp.setAdminComments("Please adjust exercise order.");
+
+        when(instructorCourseService.getCourseReviewStatus(currentUser, 10))
+                .thenReturn(statusResp);
+
+        ResponseEntity<CourseReviewStatusResponse> response = controller.getReviewStatus(authentication, 10);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("CHANGES_REQUESTED", Objects.requireNonNull(response.getBody()).getReviewStatus());
+        assertTrue(Objects.requireNonNull(response.getBody()).isCanResubmit());
+        assertEquals("Please adjust exercise order.", Objects.requireNonNull(response.getBody()).getAdminComments());
+        verify(instructorCourseService).getCourseReviewStatus(currentUser, 10);
+    }
+
+    @Test
+    void testResubmitCourse_Returns200WithSubmissionResponse() {
+        givenResolvedUser();
+        CourseSubmissionRequest request = new CourseSubmissionRequest("Fixed requested changes.");
+        CourseSubmissionResponse submission = new CourseSubmissionResponse();
+        submission.setId(2);
+        submission.setCourseId(10);
+        submission.setStatus("PENDING_REVIEW");
+        submission.setComments("Fixed requested changes.");
+
+        when(instructorCourseService.resubmitCourse(eq(currentUser), eq(10), any(CourseSubmissionRequest.class)))
+                .thenReturn(submission);
+
+        ResponseEntity<CourseSubmissionResponse> response = controller.resubmitCourse(authentication, 10, request);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertSame(submission, response.getBody());
+        assertEquals("PENDING_REVIEW", Objects.requireNonNull(response.getBody()).getStatus());
+        verify(instructorCourseService).resubmitCourse(eq(currentUser), eq(10), any(CourseSubmissionRequest.class));
+    }
+
+    @Test
+    void testUnpublishCourse_Returns200WithUnpublishedStatus() {
+        givenResolvedUser();
+        CourseResponse unpublished = new CourseResponse();
+        unpublished.setId(10);
+        unpublished.setStatus(CourseStatus.UNPUBLISHED);
+
+        when(instructorCourseService.unpublishCourse(currentUser, 10)).thenReturn(unpublished);
+
+        ResponseEntity<CourseResponse> response = controller.unpublishCourse(authentication, 10);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(CourseStatus.UNPUBLISHED, Objects.requireNonNull(response.getBody()).getStatus());
+        verify(instructorCourseService).unpublishCourse(currentUser, 10);
+    }
+
+    @Test
+    void testGetCourseAudits_Returns200WithAuditList() {
+        givenResolvedUser();
+        CourseAuditResponse audit = new CourseAuditResponse();
+        audit.setId(1);
+        audit.setCourseId(10);
+        audit.setActionType("COURSE_UNPUBLISH");
+
+        when(instructorCourseService.getCourseAudits(currentUser, 10)).thenReturn(List.of(audit));
+
+        ResponseEntity<List<CourseAuditResponse>> response = controller.getCourseAudits(authentication, 10);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).size());
+        assertEquals("COURSE_UNPUBLISH", Objects.requireNonNull(response.getBody()).get(0).getActionType());
+        verify(instructorCourseService).getCourseAudits(currentUser, 10);
+    }
+
+    @Test
+    void testGetCompletionCriteria_Returns200() {
+        givenResolvedUser();
+        CourseCompletionCriteriaResponse mockResp = new CourseCompletionCriteriaResponse();
+        mockResp.setCourseId(10);
+        when(courseCompletionService.getCompletionCriteria(10, currentUser)).thenReturn(mockResp);
+
+        ResponseEntity<CourseCompletionCriteriaResponse> response = controller.getCompletionCriteria(authentication, 10);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(10, Objects.requireNonNull(response.getBody()).getCourseId());
+        verify(courseCompletionService).getCompletionCriteria(10, currentUser);
+    }
+
+    @Test
+    void testConfigureCompletionCriteria_Returns200() {
+        givenResolvedUser();
+        CourseCompletionCriteriaRequest req = new CourseCompletionCriteriaRequest();
+        req.setMinLessonCompletionPercentage(BigDecimal.valueOf(80.0));
+        CourseCompletionCriteriaResponse mockResp = new CourseCompletionCriteriaResponse();
+        mockResp.setCourseId(10);
+        mockResp.setMinLessonCompletionPercentage(BigDecimal.valueOf(80.0));
+        when(courseCompletionService.configureCompletionCriteria(currentUser, 10, req)).thenReturn(mockResp);
+
+        ResponseEntity<CourseCompletionCriteriaResponse> response = controller.configureCompletionCriteria(authentication, 10, req);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(BigDecimal.valueOf(80.0), Objects.requireNonNull(response.getBody()).getMinLessonCompletionPercentage());
+        verify(courseCompletionService).configureCompletionCriteria(currentUser, 10, req);
     }
 }

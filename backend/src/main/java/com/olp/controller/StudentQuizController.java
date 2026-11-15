@@ -16,7 +16,7 @@ import java.util.List;
 
 /**
  * Student-facing REST endpoints for reading quiz settings, availability, attempt limits,
- * and server-enforced timed quiz attempts (FR-I20, DR-ED06, S19, S22, S24).
+ * marking rules display (DR-ED03, FR-I65, Step 25), and server-enforced timed quiz attempts (FR-I20, S19, S22, S24).
  */
 @RestController
 @RequestMapping({"/api/student/quizzes", "/api/students/quizzes"})

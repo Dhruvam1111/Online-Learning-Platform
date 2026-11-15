@@ -32,6 +32,12 @@ public class CourseSubmission {
     @Column(name = "snapshot_data", columnDefinition = "TEXT")
     private String snapshotData;
 
+    @Column(name = "review_comments", columnDefinition = "TEXT")
+    private String reviewComments;
+
+    @Column(name = "reviewed_at")
+    private LocalDateTime reviewedAt;
+
     @Column(name = "submitted_at", nullable = false)
     private LocalDateTime submittedAt;
 
@@ -121,6 +127,22 @@ public class CourseSubmission {
 
     public void setSnapshotData(String snapshotData) {
         this.snapshotData = snapshotData;
+    }
+
+    public String getReviewComments() {
+        return reviewComments;
+    }
+
+    public void setReviewComments(String reviewComments) {
+        this.reviewComments = reviewComments;
+    }
+
+    public LocalDateTime getReviewedAt() {
+        return reviewedAt;
+    }
+
+    public void setReviewedAt(LocalDateTime reviewedAt) {
+        this.reviewedAt = reviewedAt;
     }
 
     public LocalDateTime getSubmittedAt() {

@@ -13,6 +13,8 @@ public class CourseSubmissionResponse {
     private String status;
     private LocalDateTime submittedAt;
     private String comments;
+    private String reviewComments;
+    private LocalDateTime reviewedAt;
     private String snapshotData;
     private long submissionNumber;
     private String message;
@@ -30,6 +32,8 @@ public class CourseSubmissionResponse {
         resp.setStatus(sub.getStatus());
         resp.setSubmittedAt(sub.getSubmittedAt());
         resp.setComments(sub.getComments());
+        resp.setReviewComments(sub.getReviewComments());
+        resp.setReviewedAt(sub.getReviewedAt());
         resp.setSnapshotData(sub.getSnapshotData());
         resp.setSubmissionNumber(submissionNumber);
         resp.setMessage("Course submitted for admin review successfully");
@@ -98,6 +102,22 @@ public class CourseSubmissionResponse {
 
     public void setComments(String comments) {
         this.comments = comments;
+    }
+
+    public String getReviewComments() {
+        return reviewComments;
+    }
+
+    public void setReviewComments(String reviewComments) {
+        this.reviewComments = reviewComments;
+    }
+
+    public LocalDateTime getReviewedAt() {
+        return reviewedAt;
+    }
+
+    public void setReviewedAt(LocalDateTime reviewedAt) {
+        this.reviewedAt = reviewedAt;
     }
 
     public String getSnapshotData() {

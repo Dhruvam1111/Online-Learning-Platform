@@ -24,6 +24,14 @@ public class ReviewController {
         this.reviewService = reviewService;
     }
 
+    private User resolveStudent(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof User user)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "User is not authenticated");
+        }
+        return user;
+    }
+
     /**
      * POST /api/courses/{courseId}/reviews
      * Only logged-in students can submit reviews.
@@ -35,7 +43,7 @@ public class ReviewController {
             @Valid @RequestBody CreateReviewRequest request,
             Authentication authentication) {
 
-        User currentUser = (User) authentication.getPrincipal();
+        User currentUser = resolveStudent(authentication);
         ReviewResponse response = reviewService.addReview(courseId, currentUser.getId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

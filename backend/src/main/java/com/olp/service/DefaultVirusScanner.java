@@ -4,14 +4,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
  * Default implementation of the VirusScanner interface (FR-I14).
- * Inspects payload signatures including the EICAR test pattern and disguised executable magic bytes.
+ * Inspects payload signatures including the EICAR test pattern and disguised
+ * executable magic bytes.
  */
 @Service
 public class DefaultVirusScanner implements VirusScanner {
@@ -35,12 +35,14 @@ public class DefaultVirusScanner implements VirusScanner {
             }
 
             String contentPreview = new String(buffer, 0, read, StandardCharsets.ISO_8859_1);
-            if (contentPreview.contains(EICAR_PREFIX) || contentPreview.contains("EICAR-STANDARD-ANTIVIRUS-TEST-FILE")) {
+            if (contentPreview.contains(EICAR_PREFIX)
+                    || contentPreview.contains("EICAR-STANDARD-ANTIVIRUS-TEST-FILE")) {
                 logger.warn("Virus scanner detected EICAR test pattern in file: {}", filename);
                 return ScanResult.infected("EICAR-Test-Signature");
             }
 
-            // Check for DOS/PE Executable magic bytes 'MZ' (0x4D, 0x5A) in non-executable files
+            // Check for DOS/PE Executable magic bytes 'MZ' (0x4D, 0x5A) in non-executable
+            // files
             if (read >= 2 && buffer[0] == 0x4D && buffer[1] == 0x5A) {
                 logger.warn("Disguised executable binary detected (MZ header) in file: {}", filename);
                 return ScanResult.infected("Win32.Executable.Payload.Blocked");
@@ -59,4 +61,3 @@ public class DefaultVirusScanner implements VirusScanner {
         }
     }
 }
-

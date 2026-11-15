@@ -15,6 +15,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 
+import java.util.Objects;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -65,8 +67,8 @@ class UserControllerTest {
         ResponseEntity<UserResponse> response = userController.updateProfile(authentication, request);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("Samuel", response.getBody().getName());
-        assertEquals("samuel@example.com", response.getBody().getEmail());
+        assertEquals("Samuel", Objects.requireNonNull(response.getBody()).getName());
+        assertEquals("samuel@example.com", Objects.requireNonNull(response.getBody()).getEmail());
         verify(userService, times(1)).updateProfile(user, request);
     }
 

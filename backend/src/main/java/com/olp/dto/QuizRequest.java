@@ -48,6 +48,18 @@ public class QuizRequest {
     private LocalDateTime availableFrom;
     private LocalDateTime availableUntil;
 
+    @JsonAlias({ "showFeedback", "feedbackVisible", "reviewEnabled" })
+    private Boolean feedbackReleased;
+
+    private Boolean showCorrectAnswers;
+    private Boolean showFeedback;
+    private String answerReleaseTiming;
+    private Boolean isExam;
+
+    private Boolean negativeMarking;
+    private Boolean partialMarking;
+    private BigDecimal numericTolerance;
+
     @Valid
     private List<QuizQuestionRequest> questions;
 
@@ -163,6 +175,70 @@ public class QuizRequest {
 
     public void setAvailableUntil(LocalDateTime availableUntil) {
         this.availableUntil = availableUntil;
+    }
+
+    public Boolean getFeedbackReleased() {
+        return feedbackReleased;
+    }
+
+    public void setFeedbackReleased(Boolean feedbackReleased) {
+        this.feedbackReleased = feedbackReleased;
+    }
+
+    public Boolean getNegativeMarking() {
+        return negativeMarking;
+    }
+
+    public void setNegativeMarking(Boolean negativeMarking) {
+        this.negativeMarking = negativeMarking;
+    }
+
+    public Boolean getPartialMarking() {
+        return partialMarking;
+    }
+
+    public void setPartialMarking(Boolean partialMarking) {
+        this.partialMarking = partialMarking;
+    }
+
+    public BigDecimal getNumericTolerance() {
+        return numericTolerance;
+    }
+
+    public void setNumericTolerance(BigDecimal numericTolerance) {
+        this.numericTolerance = numericTolerance;
+    }
+
+    public Boolean getShowCorrectAnswers() {
+        return showCorrectAnswers;
+    }
+
+    public void setShowCorrectAnswers(Boolean showCorrectAnswers) {
+        this.showCorrectAnswers = showCorrectAnswers;
+    }
+
+    public Boolean getShowFeedback() {
+        return showFeedback;
+    }
+
+    public void setShowFeedback(Boolean showFeedback) {
+        this.showFeedback = showFeedback;
+    }
+
+    public String getAnswerReleaseTiming() {
+        return answerReleaseTiming;
+    }
+
+    public void setAnswerReleaseTiming(String answerReleaseTiming) {
+        this.answerReleaseTiming = answerReleaseTiming;
+    }
+
+    public Boolean getIsExam() {
+        return isExam;
+    }
+
+    public void setIsExam(Boolean exam) {
+        this.isExam = exam;
     }
 
     public List<QuizQuestionRequest> getQuestions() {

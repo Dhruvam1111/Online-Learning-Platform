@@ -23,6 +23,10 @@ public class QuizAttemptResponse {
     private Long remainingSeconds;
     private BigDecimal obtainedMarks;
     private BigDecimal totalMarks;
+    private Boolean negativeMarking;
+    private Boolean partialMarking;
+    private BigDecimal numericTolerance;
+    private String markingRulesSummary;
     private QuizEvaluationSummary evaluationSummary;
 
     public QuizAttemptResponse() {}
@@ -153,6 +157,38 @@ public class QuizAttemptResponse {
 
     public void setEvaluationSummary(QuizEvaluationSummary evaluationSummary) {
         this.evaluationSummary = evaluationSummary;
+    }
+
+    public Boolean getNegativeMarking() {
+        return negativeMarking;
+    }
+
+    public void setNegativeMarking(Boolean negativeMarking) {
+        this.negativeMarking = negativeMarking;
+    }
+
+    public Boolean getPartialMarking() {
+        return partialMarking;
+    }
+
+    public void setPartialMarking(Boolean partialMarking) {
+        this.partialMarking = partialMarking;
+    }
+
+    public BigDecimal getNumericTolerance() {
+        return numericTolerance;
+    }
+
+    public void setNumericTolerance(BigDecimal numericTolerance) {
+        this.numericTolerance = numericTolerance;
+    }
+
+    public String getMarkingRulesSummary() {
+        return markingRulesSummary;
+    }
+
+    public void setMarkingRulesSummary(String markingRulesSummary) {
+        this.markingRulesSummary = markingRulesSummary;
     }
 }
 

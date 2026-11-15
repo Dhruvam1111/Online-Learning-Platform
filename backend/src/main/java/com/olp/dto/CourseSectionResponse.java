@@ -18,6 +18,10 @@ public class CourseSectionResponse {
 
     public CourseSectionResponse() {}
 
+    public CourseSectionResponse(Integer id, Integer moduleId, String title) {
+        this(id, moduleId, title, null, null, new ArrayList<>(), null, null);
+    }
+
     public CourseSectionResponse(Integer id, Integer moduleId, String title, String description,
                                  Integer orderIndex, List<LessonResponse> lessons,
                                  LocalDateTime createdAt, LocalDateTime updatedAt) {
