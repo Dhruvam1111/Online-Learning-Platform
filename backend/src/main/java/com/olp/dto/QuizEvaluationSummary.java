@@ -180,6 +180,8 @@ public class QuizEvaluationSummary {
 
     public void setIsOverridden(Boolean isOverridden) {
         this.isOverridden = isOverridden != null ? isOverridden : false;
+    }
+
     public Boolean getCorrectAnswersVisible() {
         return correctAnswersVisible;
     }

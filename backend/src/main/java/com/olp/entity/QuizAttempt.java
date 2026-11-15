@@ -241,6 +241,8 @@ public class QuizAttempt {
 
     public void setIsOverridden(Boolean isOverridden) {
         this.isOverridden = isOverridden != null ? isOverridden : false;
+    }
+
     public LocalDateTime getPublishedAt() {
         return publishedAt;
     }
