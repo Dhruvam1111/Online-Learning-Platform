@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 
 import java.util.Map;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -53,7 +54,7 @@ class OtpAuthControllerTest {
         ResponseEntity<AuthResponse> response = otpAuthController.verifyRegistrationOtp(request);
 
         assertEquals(201, response.getStatusCode().value());
-        assertEquals("jwt", response.getBody().getToken());
+        assertEquals("jwt", Objects.requireNonNull(response.getBody()).getToken());
     }
 
     @Test
@@ -86,7 +87,7 @@ class OtpAuthControllerTest {
         ResponseEntity<SendOtpResponse> response = otpAuthController.sendPasswordResetOtp(request);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("sa***@example.com", response.getBody().getMaskedEmail());
+        assertEquals("sa***@example.com", Objects.requireNonNull(response.getBody()).getMaskedEmail());
     }
 
     @Test
@@ -98,7 +99,7 @@ class OtpAuthControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals("Password has been successfully reset. You may now log in with your new password.",
-                response.getBody().get("message"));
+                Objects.requireNonNull(response.getBody()).get("message"));
         verify(otpAuthService, times(1)).resetPasswordWithOtp(request);
     }
 

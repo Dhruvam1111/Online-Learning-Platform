@@ -16,6 +16,7 @@ import org.springframework.security.core.Authentication;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -89,7 +90,7 @@ class CourseStructureControllerTest {
         ResponseEntity<List<CourseModuleResponse>> response = controller.getModules(10, authentication);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(1, response.getBody().size());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).size());
     }
 
     @Test
@@ -114,7 +115,7 @@ class CourseStructureControllerTest {
         ResponseEntity<ApiResponse> response = controller.deleteModule(10, 101, authentication);
 
         assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().isSuccess());
+        assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
     }
 
     @Test
@@ -168,7 +169,7 @@ class CourseStructureControllerTest {
         ResponseEntity<ApiResponse> response = controller.deleteSection(10, 101, 201, authentication);
 
         assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().isSuccess());
+        assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
     }
 
     @Test
@@ -222,7 +223,7 @@ class CourseStructureControllerTest {
         ResponseEntity<ApiResponse> response = controller.deleteLesson(10, 101, 201, 301, authentication);
 
         assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().isSuccess());
+        assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
     }
 
     @Test

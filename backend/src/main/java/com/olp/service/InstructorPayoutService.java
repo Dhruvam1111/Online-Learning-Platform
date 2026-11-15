@@ -220,6 +220,7 @@ public class InstructorPayoutService {
         BigDecimal gross=unpaidEarnings.stream().map(InstructorEarning::getNetInstructorEarning).reduce(BigDecimal.ZERO,BigDecimal::add);
         if(gross.signum()<=0)throw new IllegalStateException("No eligible unpaid earnings to withdraw.");
         java.util.Map<String,Object> profile=accounts==null?null:accounts.requireVerified(instructor);
+        if(profile==null && bank==null)throw new IllegalArgumentException("Bank payout destination or saved verified account is required.");
         if(profile!=null && bank!=null && (!profile.get("account").equals("•••• "+bank.accountNumber().substring(bank.accountNumber().length()-4)) || !profile.get("ifscCode").equals(bank.ifscCode())))throw new IllegalArgumentException("Withdraw to your saved verified account; update it before changing destinations.");
         String masked=profile==null?"•••• "+bank.accountNumber().substring(bank.accountNumber().length()-4):profile.get("account").toString();
         String bankName=profile==null?bank.bankName():profile.get("bankName").toString();

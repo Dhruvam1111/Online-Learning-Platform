@@ -22,6 +22,7 @@ import org.springframework.security.core.Authentication;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -90,12 +91,12 @@ class QuestionControllerTest {
                 "TRUE", "TRUE", null, "Correct", false);
         when(questionService.evaluateQuestion(eq(instructor), eq(12), any())).thenReturn(evalRes);
 
-        assertEquals(1, controller.getQuestions(null, null, null, authentication).getBody().size());
-        assertEquals(1, controller.getQuestionsByCourse(10, "DESCRIPTIVE", true, authentication).getBody().size());
+        assertEquals(1, Objects.requireNonNull(controller.getQuestions(null, null, null, authentication).getBody()).size());
+        assertEquals(1, Objects.requireNonNull(controller.getQuestionsByCourse(10, "DESCRIPTIVE", true, authentication).getBody()).size());
         assertSame(qRes, controller.getQuestionById(12, authentication).getBody());
         assertSame(qRes, controller.updateQuestion(12, req, authentication).getBody());
-        assertTrue(controller.deleteQuestion(12, authentication).getBody().isSuccess());
-        assertEquals(1, controller.getManualGradingQuestions(null, authentication).getBody().size());
+        assertTrue(Objects.requireNonNull(controller.deleteQuestion(12, authentication).getBody()).isSuccess());
+        assertEquals(1, Objects.requireNonNull(controller.getManualGradingQuestions(null, authentication).getBody()).size());
         assertSame(qRes, controller.sendForManualGrading(12, Map.of("gradingRubric", "Rubric"), authentication).getBody());
         assertSame(evalRes, controller.evaluateQuestion(12, new QuestionEvaluationRequest("TRUE"), authentication).getBody());
     }

@@ -14,6 +14,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 
+import java.util.Objects;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -46,8 +48,8 @@ class VideoTranscoderWebhookControllerTest {
 
         assertEquals(HttpStatus.OK, entity.getStatusCode());
         assertNotNull(entity.getBody());
-        assertEquals("upload-99", entity.getBody().getUploadId());
-        assertEquals("READY", entity.getBody().getStatusBadge());
+        assertEquals("upload-99", Objects.requireNonNull(entity.getBody()).getUploadId());
+        assertEquals("READY", Objects.requireNonNull(entity.getBody()).getStatusBadge());
         verify(videoUploadService, times(1)).processTranscoderWebhook("my-secret", request);
     }
 

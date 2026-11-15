@@ -18,6 +18,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.io.Writer;
+import java.util.Objects;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -195,7 +196,7 @@ class JwtAuthenticationFilterBranchTest {
         filter.doFilter(request, response, filterChain);
 
         assertEquals(403, response.getStatus());
-        assertTrue(response.getContentType().startsWith("application/json"));
+        assertTrue(Objects.requireNonNull(response.getContentType()).startsWith("application/json"));
         assertNull(SecurityContextHolder.getContext().getAuthentication());
         verify(filterChain, never()).doFilter(any(), any());
 
