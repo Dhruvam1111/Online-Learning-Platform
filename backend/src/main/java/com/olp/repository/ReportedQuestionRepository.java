@@ -59,4 +59,30 @@ public interface ReportedQuestionRepository extends JpaRepository<ReportedQuesti
             @Param("assessmentType") AssessmentType assessmentType,
             @Param("assessmentId") Integer assessmentId,
             @Param("status") ReportedQuestionStatus status);
+
+    @Query("SELECT rq FROM ReportedQuestion rq " +
+           "WHERE (:courseId IS NULL OR rq.course.id = :courseId) " +
+           "AND (:assessmentType IS NULL OR rq.assessmentType = :assessmentType) " +
+           "AND (:assessmentId IS NULL OR rq.assessmentId = :assessmentId) " +
+           "AND (:status IS NULL OR rq.status = :status) " +
+           "AND rq.course.id IN :accessibleCourseIds " +
+           "ORDER BY rq.lastReportedAt DESC")
+    List<ReportedQuestion> findWithFilters(
+            @Param("accessibleCourseIds") Collection<Integer> accessibleCourseIds,
+            @Param("courseId") Integer courseId,
+            @Param("assessmentType") AssessmentType assessmentType,
+            @Param("assessmentId") Integer assessmentId,
+            @Param("status") ReportedQuestionStatus status);
+
+    @Query("SELECT rq FROM ReportedQuestion rq " +
+           "WHERE (:courseId IS NULL OR rq.course.id = :courseId) " +
+           "AND (:assessmentType IS NULL OR rq.assessmentType = :assessmentType) " +
+           "AND (:assessmentId IS NULL OR rq.assessmentId = :assessmentId) " +
+           "AND (:status IS NULL OR rq.status = :status) " +
+           "ORDER BY rq.lastReportedAt DESC")
+    List<ReportedQuestion> findWithFiltersAdmin(
+            @Param("courseId") Integer courseId,
+            @Param("assessmentType") AssessmentType assessmentType,
+            @Param("assessmentId") Integer assessmentId,
+            @Param("status") ReportedQuestionStatus status);
 }
