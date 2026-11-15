@@ -23,6 +23,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -83,8 +84,8 @@ class CourseAssociationControllerTest {
                 instructorController.searchAvailableCourses(instructorAuth, "Data", null);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(1, response.getBody().size());
-        assertEquals("AVAILABLE", response.getBody().get(0).getAssociationStatus());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).size());
+        assertEquals("AVAILABLE", Objects.requireNonNull(response.getBody()).get(0).getAssociationStatus());
     }
 
     @Test
@@ -102,7 +103,7 @@ class CourseAssociationControllerTest {
                 instructorController.submitAssociationRequest(instructorAuth, dto);
 
         assertEquals(201, response.getStatusCode().value());
-        assertEquals(AssociationRequestStatus.PENDING, response.getBody().getStatus());
+        assertEquals(AssociationRequestStatus.PENDING, Objects.requireNonNull(response.getBody()).getStatus());
     }
 
     @Test
@@ -120,7 +121,7 @@ class CourseAssociationControllerTest {
                 instructorController.submitCourseAssociationRequest(instructorAuth, 10, dto);
 
         assertEquals(201, response.getStatusCode().value());
-        assertEquals(51, response.getBody().getId());
+        assertEquals(51, Objects.requireNonNull(response.getBody()).getId());
     }
 
     @Test
@@ -133,12 +134,12 @@ class CourseAssociationControllerTest {
         when(courseAssociationService.getMyRequests(instructorUser, "PENDING")).thenReturn(List.of(req));
         when(courseAssociationService.getMyRequestById(instructorUser, 50)).thenReturn(req);
 
-        assertEquals(1, instructorController.getMyRequests(instructorAuth, "PENDING").getBody().size());
-        assertEquals(50, instructorController.getMyRequestById(instructorAuth, 50).getBody().getId());
+        assertEquals(1, Objects.requireNonNull(instructorController.getMyRequests(instructorAuth, "PENDING").getBody()).size());
+        assertEquals(50, Objects.requireNonNull(instructorController.getMyRequestById(instructorAuth, 50).getBody()).getId());
 
         ResponseEntity<ApiResponse> cancelled = instructorController.cancelMyRequest(instructorAuth, 50);
         assertEquals(200, cancelled.getStatusCode().value());
-        assertTrue(cancelled.getBody().isSuccess());
+        assertTrue(Objects.requireNonNull(cancelled.getBody()).isSuccess());
         verify(courseAssociationService).cancelMyRequest(instructorUser, 50);
     }
 
@@ -154,7 +155,7 @@ class CourseAssociationControllerTest {
         ResponseEntity<List<CourseAssociationRequestResponse>> listResp =
                 adminController.getAssociationRequests("PENDING", adminAuth);
         assertEquals(200, listResp.getStatusCode().value());
-        assertEquals(1, listResp.getBody().size());
+        assertEquals(1, Objects.requireNonNull(listResp.getBody()).size());
 
         CourseAssociationReviewRequest approveBody = new CourseAssociationReviewRequest("Welcome!");
         CourseAssociationRequestResponse approved = new CourseAssociationRequestResponse();
@@ -165,7 +166,7 @@ class CourseAssociationControllerTest {
         ResponseEntity<CourseAssociationRequestResponse> approveResp =
                 adminController.approveAssociationRequest(50, approveBody, adminAuth);
         assertEquals(200, approveResp.getStatusCode().value());
-        assertEquals(AssociationRequestStatus.APPROVED, approveResp.getBody().getStatus());
+        assertEquals(AssociationRequestStatus.APPROVED, Objects.requireNonNull(approveResp.getBody()).getStatus());
 
         CourseAssociationReviewRequest rejectBody = new CourseAssociationReviewRequest("Full team");
         CourseAssociationRequestResponse rejected = new CourseAssociationRequestResponse();
@@ -176,7 +177,7 @@ class CourseAssociationControllerTest {
         ResponseEntity<CourseAssociationRequestResponse> rejectResp =
                 adminController.rejectAssociationRequest(51, rejectBody, adminAuth);
         assertEquals(200, rejectResp.getStatusCode().value());
-        assertEquals(AssociationRequestStatus.REJECTED, rejectResp.getBody().getStatus());
+        assertEquals(AssociationRequestStatus.REJECTED, Objects.requireNonNull(rejectResp.getBody()).getStatus());
     }
 
     @Test
@@ -194,9 +195,9 @@ class CourseAssociationControllerTest {
                 adminController.getCourseInstructors(10, adminAuth);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(2, response.getBody().size());
-        assertEquals(CourseInstructorRole.OWNER, response.getBody().get(0).getRole());
-        assertEquals(CourseInstructorRole.CO_INSTRUCTOR, response.getBody().get(1).getRole());
+        assertEquals(2, Objects.requireNonNull(response.getBody()).size());
+        assertEquals(CourseInstructorRole.OWNER, Objects.requireNonNull(response.getBody()).get(0).getRole());
+        assertEquals(CourseInstructorRole.CO_INSTRUCTOR, Objects.requireNonNull(response.getBody()).get(1).getRole());
     }
 }
 

@@ -20,6 +20,7 @@ import org.springframework.security.core.Authentication;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -152,7 +153,7 @@ class InstructorProfileControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertSame(dummy, response.getBody());
         assertNotNull(response.getHeaders().getContentType());
-        assertEquals("image/png", response.getHeaders().getContentType().toString());
+        assertEquals("image/png", Objects.requireNonNull(response.getHeaders().getContentType()).toString());
     }
 
     @Test
@@ -167,7 +168,7 @@ class InstructorProfileControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertSame(dummy, response.getBody());
         assertNotNull(response.getHeaders().getContentType());
-        assertEquals("image/jpeg", response.getHeaders().getContentType().toString());
+        assertEquals("image/jpeg", Objects.requireNonNull(response.getHeaders().getContentType()).toString());
     }
 
     @Test
@@ -217,7 +218,7 @@ class InstructorProfileControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().size());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).size());
     }
 
     @Test
@@ -251,7 +252,7 @@ class InstructorProfileControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertSame(dummy, response.getBody());
         assertNotNull(response.getHeaders().getContentType());
-        assertEquals("application/pdf", response.getHeaders().getContentType().toString());
+        assertEquals("application/pdf", Objects.requireNonNull(response.getHeaders().getContentType()).toString());
 
         String disposition = response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
         assertNotNull(disposition);
@@ -300,6 +301,6 @@ class InstructorProfileControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().size());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).size());
     }
 }

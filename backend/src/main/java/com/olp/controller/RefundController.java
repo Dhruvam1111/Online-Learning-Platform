@@ -21,7 +21,10 @@ public class RefundController {
 
     private final RefundService refundService;
 
-    public RefundController(RefundService refundService) {
+    private final com.olp.service.ExceptionalRefundService exceptions;
+
+    public RefundController(RefundService refundService, com.olp.service.ExceptionalRefundService exceptions) {
+        this.exceptions = exceptions;
         this.refundService = refundService;
     }
 
@@ -32,7 +35,7 @@ public class RefundController {
     public ResponseEntity<RefundResponse> initiateRefund(
             @AuthenticationPrincipal User currentUser,
             @Valid @RequestBody RefundRequest request) {
-        RefundResponse response = refundService.processRefund(currentUser, request);
+        RefundResponse response = exceptions.submit(currentUser, request);
         return ResponseEntity.ok(response);
     }
 

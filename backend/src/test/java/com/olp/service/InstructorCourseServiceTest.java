@@ -17,6 +17,7 @@ import com.olp.entity.InstructorProfile;
 import com.olp.entity.User;
 import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.ResourceNotFoundException;
+import com.olp.repository.CertificateRepository;
 import com.olp.repository.CourseInstructorRepository;
 import com.olp.repository.CoursePrerequisiteRepository;
 import com.olp.repository.CourseRepository;
@@ -65,6 +66,8 @@ class InstructorCourseServiceTest {
     private CoursePreviewService coursePreviewService;
     @Mock
     private CourseSubmissionService courseSubmissionService;
+    @Mock
+    private CertificateRepository certificateRepository;
 
     @InjectMocks
     private InstructorCourseService service;
@@ -938,10 +941,12 @@ class InstructorCourseServiceTest {
         AccessDeniedException ex = assertThrows(AccessDeniedException.class,
                 () -> service.deleteCourse(coInstructor, 10));
         assertTrue(ex.getMessage().contains("OWNER"));
-        verify(courseRepository, never()).delete(any());
+        verify(courseRepository, never()).save(any());
 
         service.deleteCourse(owner, 10);
-        verify(courseRepository, times(1)).delete(c);
+        verify(courseRepository, times(1)).save(c);
+        assertTrue(c.isDeleted());
+        assertNotNull(c.getDeletedAt());
     }
 
     @Test

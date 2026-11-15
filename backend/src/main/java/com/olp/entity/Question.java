@@ -64,6 +64,22 @@ public class Question {
     @Column(name = "is_bank_question", nullable = false)
     private Boolean isBankQuestion = Boolean.FALSE;
 
+    @Column(name = "origin", nullable = false, length = 30)
+    private String origin = "MANUAL";
+
+    @Column(name = "tags", columnDefinition = "TEXT")
+    private String tags;
+
+    @Column(name = "version", nullable = false)
+    private Integer version = 1;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_question_id")
+    private Question parentQuestion;
+
+    @Column(name = "is_latest", nullable = false)
+    private Boolean isLatest = Boolean.TRUE;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -118,6 +134,15 @@ public class Question {
         }
         if (this.isBankQuestion == null) {
             this.isBankQuestion = Boolean.FALSE;
+        }
+        if (this.origin == null || this.origin.trim().isEmpty()) {
+            this.origin = "MANUAL";
+        }
+        if (this.version == null) {
+            this.version = 1;
+        }
+        if (this.isLatest == null) {
+            this.isLatest = Boolean.TRUE;
         }
         if (this.requiresManualGrading == null) {
             this.requiresManualGrading = (this.questionType == QuestionType.DESCRIPTIVE);
@@ -268,6 +293,107 @@ public class Question {
 
     public void setIsBankQuestion(Boolean isBankQuestion) {
         this.isBankQuestion = isBankQuestion;
+    }
+
+    public String getOrigin() {
+        return origin;
+    }
+
+    public void setOrigin(String origin) {
+        this.origin = origin != null && !origin.trim().isEmpty() ? origin.trim().toUpperCase() : "MANUAL";
+    }
+
+    public String getTags() {
+        return tags;
+    }
+
+    public void setTags(String tags) {
+        this.tags = tags;
+    }
+
+    public Integer getVersion() {
+        return version;
+    }
+
+    public void setVersion(Integer version) {
+        this.version = version;
+    }
+
+    public Question getParentQuestion() {
+        return parentQuestion;
+    }
+
+    public void setParentQuestion(Question parentQuestion) {
+        this.parentQuestion = parentQuestion;
+    }
+
+    public Integer getParentQuestionId() {
+        return parentQuestion != null ? parentQuestion.getId() : null;
+    }
+
+    public Boolean getIsLatest() {
+        return isLatest;
+    }
+
+    public void setIsLatest(Boolean isLatest) {
+        this.isLatest = isLatest;
+    }
+
+    public boolean isLatestVersion() {
+        return Boolean.TRUE.equals(isLatest);
+    }
+
+    public Question cloneForReuse(Course targetCourse, User actor) {
+        Question copy = new Question(
+                targetCourse != null ? targetCourse : this.course,
+                actor != null ? actor : this.createdBy,
+                this.questionText,
+                this.questionType,
+                this.optionsJson,
+                this.correctAnswer,
+                this.defaultMarks,
+                this.negativeMarks,
+                this.numericalTolerance,
+                this.gradingRubric,
+                this.requiresManualGrading
+        );
+        copy.setTopic(this.topic);
+        copy.setDifficulty(this.difficulty);
+        copy.setExplanation(this.explanation);
+        copy.setIsBankQuestion(this.isBankQuestion);
+        copy.setOrigin(this.origin);
+        copy.setTags(this.tags);
+        copy.setVersion(1);
+        copy.setParentQuestion(null);
+        copy.setIsLatest(Boolean.TRUE);
+        return copy;
+    }
+
+    public Question createNextVersion(User actor) {
+        Question root = this.parentQuestion != null ? this.parentQuestion : this;
+        Question next = new Question(
+                this.course,
+                actor != null ? actor : this.createdBy,
+                this.questionText,
+                this.questionType,
+                this.optionsJson,
+                this.correctAnswer,
+                this.defaultMarks,
+                this.negativeMarks,
+                this.numericalTolerance,
+                this.gradingRubric,
+                this.requiresManualGrading
+        );
+        next.setTopic(this.topic);
+        next.setDifficulty(this.difficulty);
+        next.setExplanation(this.explanation);
+        next.setIsBankQuestion(this.isBankQuestion);
+        next.setOrigin(this.origin);
+        next.setTags(this.tags);
+        next.setVersion((this.version != null ? this.version : 1) + 1);
+        next.setParentQuestion(root);
+        next.setIsLatest(Boolean.TRUE);
+        return next;
     }
 
     public LocalDateTime getCreatedAt() {

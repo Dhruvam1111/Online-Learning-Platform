@@ -2,6 +2,7 @@ package com.olp.controller;
 
 import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
+import com.olp.dto.CourseReviewRequest;
 import com.olp.dto.PageResponse;
 import com.olp.dto.RejectCourseRequest;
 import com.olp.service.AdminService;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -56,7 +58,7 @@ class AdminControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(1, response.getBody().getContent().size());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).getContent().size());
     }
 
     @Test
@@ -70,7 +72,7 @@ class AdminControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(1, response.getBody().getContent().size());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).getContent().size());
     }
 
     @Test
@@ -82,7 +84,7 @@ class AdminControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("active", response.getBody().getAccountStatus());
+        assertEquals("active", Objects.requireNonNull(response.getBody()).getAccountStatus());
     }
 
     @Test
@@ -94,7 +96,7 @@ class AdminControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("rejected", response.getBody().getAccountStatus());
+        assertEquals("rejected", Objects.requireNonNull(response.getBody()).getAccountStatus());
     }
 
     @Test
@@ -106,7 +108,7 @@ class AdminControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("suspended", response.getBody().getAccountStatus());
+        assertEquals("suspended", Objects.requireNonNull(response.getBody()).getAccountStatus());
     }
 
     @Test
@@ -118,7 +120,7 @@ class AdminControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("active", response.getBody().getAccountStatus());
+        assertEquals("active", Objects.requireNonNull(response.getBody()).getAccountStatus());
     }
 
     @Test
@@ -129,7 +131,7 @@ class AdminControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().isSuccess());
+        assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
         verify(adminService, times(1)).deleteUser(1);
     }
 
@@ -147,7 +149,7 @@ class AdminControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(1, response.getBody().getContent().size());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).getContent().size());
     }
 
     @Test
@@ -161,7 +163,7 @@ class AdminControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(1, response.getBody().getContent().size());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).getContent().size());
     }
 
     @Test
@@ -173,7 +175,7 @@ class AdminControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("published", response.getBody().getStatus());
+        assertEquals("published", Objects.requireNonNull(response.getBody()).getStatus());
     }
 
     @Test
@@ -187,8 +189,24 @@ class AdminControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("rejected", response.getBody().getStatus());
-        assertEquals("Audio quality needs improvement", response.getBody().getRejectionReason());
+        assertEquals("rejected", Objects.requireNonNull(response.getBody()).getStatus());
+        assertEquals("Audio quality needs improvement", Objects.requireNonNull(response.getBody()).getRejectionReason());
+    }
+
+    @Test
+    void testRequestChanges() {
+        sampleCourseResponse.setStatus("changes_requested");
+        sampleCourseResponse.setRejectionReason("Add exercise links");
+        CourseReviewRequest request = new CourseReviewRequest("Add exercise links");
+        when(adminService.requestChanges(eq(10), any(CourseReviewRequest.class))).thenReturn(sampleCourseResponse);
+
+        ResponseEntity<AdminCourseResponse> response = adminController.requestChanges(10, request);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("changes_requested", Objects.requireNonNull(response.getBody()).getStatus());
+        assertEquals("Add exercise links", Objects.requireNonNull(response.getBody()).getRejectionReason());
+        verify(adminService).requestChanges(eq(10), any(CourseReviewRequest.class));
     }
 
     @Test
@@ -200,7 +218,7 @@ class AdminControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("draft", response.getBody().getStatus());
+        assertEquals("draft", Objects.requireNonNull(response.getBody()).getStatus());
     }
 
     @Test
@@ -211,7 +229,7 @@ class AdminControllerTest {
 
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().isSuccess());
+        assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
         verify(adminService, times(1)).deleteCourse(10);
     }
 }

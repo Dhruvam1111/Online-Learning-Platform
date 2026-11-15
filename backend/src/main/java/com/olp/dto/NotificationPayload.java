@@ -1,5 +1,6 @@
 package com.olp.dto;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -15,11 +16,23 @@ public class NotificationPayload {
 
     public NotificationPayload() {}
 
+    public NotificationPayload(String title, String message, String link) {
+        this(title, message, link, true);
+    }
+
     public NotificationPayload(String title, String message, String link, boolean sendEmail) {
         this.title = title;
         this.message = message;
         this.link = link;
         this.sendEmail = sendEmail;
+    }
+
+    public NotificationPayload withMetadata(String key, Object value) {
+        if (this.metadata == null) {
+            this.metadata = new HashMap<>();
+        }
+        this.metadata.put(key, value);
+        return this;
     }
 
     public static NotificationPayload of(String message) {
@@ -78,4 +91,3 @@ public class NotificationPayload {
         this.metadata = metadata;
     }
 }
-

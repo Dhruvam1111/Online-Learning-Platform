@@ -13,7 +13,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * REST Controller for Quiz creation, management, and ordered Quiz-Question mapping (FR-I19).
+ * REST Controller for Quiz creation, management, ordered Quiz-Question mapping (FR-I19),
+ * and Quiz Marking Rules configuration (FR-I65, Step 25).
  */
 @RestController
 @RequestMapping({"/api/instructor", "/api/instructors"})
@@ -126,6 +127,15 @@ public class QuizController {
     public ResponseEntity<QuizSettingsResponse> updateQuizSettings(
             @PathVariable Integer quizId,
             @Valid @RequestBody QuizSettingsRequest request,
+            Authentication authentication) {
+        User currentUser = quizService.resolveUser(authentication);
+        return ResponseEntity.ok(quizService.configureQuizSettings(currentUser, quizId, request));
+    }
+
+    @PutMapping("/quizzes/{quizId}/review-toggle")
+    public ResponseEntity<QuizSettingsResponse> updateReviewToggle(
+            @PathVariable Integer quizId,
+            @RequestBody QuizSettingsRequest request,
             Authentication authentication) {
         User currentUser = quizService.resolveUser(authentication);
         return ResponseEntity.ok(quizService.configureQuizSettings(currentUser, quizId, request));

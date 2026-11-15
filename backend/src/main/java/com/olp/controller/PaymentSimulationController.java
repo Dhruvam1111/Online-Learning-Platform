@@ -20,11 +20,27 @@ public class PaymentSimulationController {
             PaymentWebhookService webhooks,PaymentWebhookAuthenticator signatures) {
         this.methods=methods;this.actions=actions;this.webhooks=webhooks;this.signatures=signatures;
     }
-    public record SavedMethodRequest(String method,boolean consent) {}
+    public record SavedMethodRequest(
+        String method,
+        boolean consent,
+        String cardBrand,
+        String last4,
+        String expiryMonth,
+        String expiryYear,
+        String cardholderName,
+        String upiId,
+        String bankName,
+        String walletProvider,
+        String displayName
+    ) {
+        public SavedMethodRequest(String method, boolean consent) {
+            this(method, consent, null, null, null, null, null, null, null, null, null);
+        }
+    }
     public record TokenPaymentRequest(String orderId) {}
     @GetMapping("/methods") public List<Map<String,Object>> list(@AuthenticationPrincipal User user) { return methods.list(user); }
     @PostMapping("/methods") public Map<String,Object> create(@AuthenticationPrincipal User user,@RequestBody SavedMethodRequest request) {
-        return methods.create(user,request.method(),request.consent());
+        return methods.create(user,request);
     }
     @DeleteMapping("/methods/{token}") public Map<String,String> revoke(@AuthenticationPrincipal User user,@PathVariable String token) {
         methods.revoke(user,token);return Map.of("status","revoked");

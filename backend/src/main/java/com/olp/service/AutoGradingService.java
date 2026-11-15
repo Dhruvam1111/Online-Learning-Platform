@@ -433,7 +433,7 @@ public class AutoGradingService {
     // =========================================================================
 
     private BigDecimal resolveTolerance(BigDecimal questionTolerance, GradingPolicy policy) {
-        if (policy != null && policy.getCustomTolerance() != null && policy.getCustomTolerance().compareTo(BigDecimal.ZERO) >= 0) {
+        if (policy != null && policy.getCustomTolerance() != null && policy.getCustomTolerance().compareTo(BigDecimal.ZERO) > 0) {
             return policy.getCustomTolerance();
         }
         return questionTolerance != null && questionTolerance.compareTo(BigDecimal.ZERO) >= 0

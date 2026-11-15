@@ -18,9 +18,9 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 
+import java.util.Objects;
+
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,30 +63,34 @@ class VideoUploadControllerTest {
 
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals("upload-123", response.getBody().getUploadId());
+        assertEquals("upload-123", Objects.requireNonNull(response.getBody()).getUploadId());
         verify(videoUploadService, times(1)).initiateUpload(instructor, request);
     }
 
     @Test
     void testUploadChunk() {
-        MockMultipartFile file = new MockMultipartFile("file", "chunk0.part", "application/octet-stream", new byte[500]);
-        VideoChunkResponse expected = new VideoChunkResponse("upload-123", 0, 500L, 1000L, 50.0, VideoUploadStatus.UPLOADING, false, 1);
+        MockMultipartFile file = new MockMultipartFile("file", "chunk0.part", "application/octet-stream",
+                new byte[500]);
+        VideoChunkResponse expected = new VideoChunkResponse("upload-123", 0, 500L, 1000L, 50.0,
+                VideoUploadStatus.UPLOADING, false, 1);
 
         when(videoUploadService.resolveUser(authentication)).thenReturn(instructor);
         when(videoUploadService.uploadChunk(instructor, "upload-123", 0, file)).thenReturn(expected);
 
-        ResponseEntity<VideoChunkResponse> response = videoUploadController.uploadChunk("upload-123", 0, file, authentication);
+        ResponseEntity<VideoChunkResponse> response = videoUploadController.uploadChunk("upload-123", 0, file,
+                authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(0, response.getBody().getChunkIndex());
-        assertFalse(response.getBody().isCompleted());
-        assertEquals(1, response.getBody().getNextExpectedChunkIndex());
+        assertEquals(0, Objects.requireNonNull(response.getBody()).getChunkIndex());
+        assertFalse(Objects.requireNonNull(response.getBody()).isCompleted());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).getNextExpectedChunkIndex());
     }
 
     @Test
     void testResumeUpload() {
-        VideoChunkResponse expected = new VideoChunkResponse("upload-123", 0, 500L, 1000L, 50.0, VideoUploadStatus.UPLOADING, false, 1);
+        VideoChunkResponse expected = new VideoChunkResponse("upload-123", 0, 500L, 1000L, 50.0,
+                VideoUploadStatus.UPLOADING, false, 1);
 
         when(videoUploadService.resolveUser(authentication)).thenReturn(instructor);
         when(videoUploadService.resumeUpload(instructor, "upload-123")).thenReturn(expected);
@@ -95,7 +99,7 @@ class VideoUploadControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getNextExpectedChunkIndex());
+        assertEquals(1, Objects.requireNonNull(response.getBody()).getNextExpectedChunkIndex());
     }
 
     @Test
@@ -108,11 +112,12 @@ class VideoUploadControllerTest {
         when(videoUploadService.resolveUser(authentication)).thenReturn(instructor);
         when(videoUploadService.getUploadStatus(instructor, "upload-123")).thenReturn(expected);
 
-        ResponseEntity<VideoUploadResponse> response = videoUploadController.getUploadStatus("upload-123", authentication);
+        ResponseEntity<VideoUploadResponse> response = videoUploadController.getUploadStatus("upload-123",
+                authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(75.0, response.getBody().getProgressPercent());
+        assertEquals(75.0, Objects.requireNonNull(response.getBody()).getProgressPercent());
     }
 
     @Test
@@ -129,7 +134,26 @@ class VideoUploadControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals("upload-123", response.getBody().getUploadId());
+        assertEquals("upload-123", Objects.requireNonNull(response.getBody()).getUploadId());
+    }
+
+    @Test
+    void testRetryUploadAfterFailure() {
+        VideoUploadResponse fresh = new VideoUploadResponse();
+        fresh.setUploadId("upload-fresh-456");
+        fresh.setLessonId(401);
+        fresh.setStatus(VideoUploadStatus.INITIATED);
+        fresh.setStatusBadge("UPLOADING");
+
+        when(videoUploadService.resolveUser(authentication)).thenReturn(instructor);
+        when(videoUploadService.retryUploadAfterFailure(eq(instructor), eq("upload-123"), any())).thenReturn(fresh);
+
+        ResponseEntity<VideoUploadResponse> response = videoUploadController.retryUploadAfterFailure("upload-123", null, authentication);
+
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("upload-fresh-456", Objects.requireNonNull(response.getBody()).getUploadId());
+        assertEquals("UPLOADING", Objects.requireNonNull(response.getBody()).getStatusBadge());
+        verify(videoUploadService, times(1)).retryUploadAfterFailure(eq(instructor), eq("upload-123"), any());
     }
 }
-

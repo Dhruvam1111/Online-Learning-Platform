@@ -21,6 +21,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 
 import java.util.Map;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -82,8 +83,8 @@ class AuthControllerTest {
         ResponseEntity<AuthResponse> response = authController.login(request);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("jwt", response.getBody().getToken());
-        assertEquals(7, response.getBody().getUser().getId());
+        assertEquals("jwt", Objects.requireNonNull(response.getBody()).getToken());
+        assertEquals(7, Objects.requireNonNull(response.getBody()).getUser().getId());
     }
 
     @Test
@@ -103,7 +104,7 @@ class AuthControllerTest {
         ResponseEntity<AuthResponse> response = authController.loginWithGoogle(request);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("Authenticated successfully via Google", response.getBody().getMessage());
+        assertEquals("Authenticated successfully via Google", Objects.requireNonNull(response.getBody()).getMessage());
         verify(authService, times(1)).loginOrRegisterWithGoogle(request);
     }
 
@@ -113,7 +114,7 @@ class AuthControllerTest {
         ResponseEntity<Map<String, String>> response = authController.logout(httpRequest);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("Logged out successfully", response.getBody().get("message"));
+        assertEquals("Logged out successfully", Objects.requireNonNull(response.getBody()).get("message"));
         verify(authService, times(1)).logout(httpRequest);
     }
 

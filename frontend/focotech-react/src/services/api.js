@@ -198,7 +198,8 @@ export const adminAPI = {
   processExceptionalRefund: (paymentId, reason) =>
     api.post('/payments/refunds/exceptions', { paymentId, reason }),
   getRefundExceptions: () => api.get('/payments/refunds/exceptions'),
-  decideRefundException: (id, decision, reason) => api.post(`/payments/refunds/exceptions/${id}/decision`, {decision, reason}),
+  getRefundQueue: (params, signal) => api.get('/payments/refunds/exceptions/queue', { params, signal }),
+  decideRefundException: (id, decision, reason, approvedAmount = null) => api.post(`/payments/refunds/exceptions/${id}/decision`, {decision, reason, approvedAmount}),
   getReconciliation: () => api.get('/payments/reconciliation/report'),
 };
 
@@ -231,9 +232,17 @@ export const paymentAPI = {
 
 export const paymentSimulationAPI = {
   methods: () => api.get('/payments/methods'),
-  saveMethod: (method, consent) => api.post('/payments/methods', {method, consent}),
+  saveMethod: (method, consent, details = {}) => api.post('/payments/methods', { method, consent, ...details }),
   revokeMethod: token => api.delete(`/payments/methods/${token}`),
   pay: (token, orderId) => api.post(`/payments/methods/${token}/pay`, {orderId}),
   requestRefund: (paymentId, amount, reason) => api.post('/payments/refunds/request', {paymentId, amount, reason}),
   event: body => api.post('/payments/simulator/events', body),
+};
+
+export const subscriptionAPI = {
+  getSubscriptions: () => api.get('/payments/subscriptions'),
+  createSubscription: (data) => api.post('/payments/subscriptions', data),
+  cancelSubscription: (id) => api.delete(`/payments/subscriptions/${id}`),
+  getQuote: (id) => api.get(`/payments/subscriptions/${id}/quote`),
+  approveRenewal: (id, data) => api.post(`/payments/subscriptions/${id}/approve`, data),
 };

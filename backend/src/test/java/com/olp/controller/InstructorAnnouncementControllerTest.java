@@ -2,8 +2,9 @@ package com.olp.controller;
 
 import com.olp.dto.AnnouncementRequest;
 import com.olp.dto.AnnouncementResponse;
-import com.olp.security.CustomUserDetails;
+import com.olp.entity.User;
 import com.olp.service.InstructorAnnouncementService;
+import com.olp.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,17 +28,24 @@ class InstructorAnnouncementControllerTest {
     @Mock
     private InstructorAnnouncementService announcementService;
 
+    @Mock
+    private NotificationService notificationService;
+
     @InjectMocks
     private InstructorAnnouncementController controller;
 
     private Authentication authentication;
+    private User instructor;
 
     @BeforeEach
     void setUp() {
-        CustomUserDetails principal = mock(CustomUserDetails.class);
-        when(principal.getId()).thenReturn(10);
+        instructor = new User();
+        instructor.setId(10);
+        instructor.setName("Prof. Ada");
+        instructor.setRole("instructor");
+
         authentication = mock(Authentication.class);
-        when(authentication.getPrincipal()).thenReturn(principal);
+        when(notificationService.resolveUser(authentication)).thenReturn(instructor);
     }
 
     @Test
@@ -72,4 +80,3 @@ class InstructorAnnouncementControllerTest {
         assertEquals(1, response.getBody().size());
     }
 }
-

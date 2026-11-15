@@ -50,6 +50,21 @@ public class LectureMaterial {
     @Column(name = "scan_status", length = 30)
     private String scanStatus = "CLEAN";
 
+    @Column(name = "order_index", nullable = false)
+    private Integer orderIndex = 1;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Column(name = "release_at")
+    private LocalDateTime releaseAt;
+
+    @Column(name = "is_released", nullable = false)
+    private Boolean isReleased = true;
+
+    @Column(name = "time_zone", length = 50)
+    private String timeZone = "Asia/Kolkata";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -100,6 +115,15 @@ public class LectureMaterial {
         }
         if (this.scanStatus == null) {
             this.scanStatus = "CLEAN";
+        }
+        if (this.orderIndex == null) {
+            this.orderIndex = 1;
+        }
+        if (this.isReleased == null) {
+            this.isReleased = true;
+        }
+        if (this.timeZone == null || this.timeZone.isBlank()) {
+            this.timeZone = "Asia/Kolkata";
         }
     }
 
@@ -152,4 +176,34 @@ public class LectureMaterial {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Integer getOrderIndex() { return orderIndex; }
+    public void setOrderIndex(Integer orderIndex) { this.orderIndex = orderIndex != null ? orderIndex : 1; }
+
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+
+    public LocalDateTime getReleaseAt() { return releaseAt; }
+    public void setReleaseAt(LocalDateTime releaseAt) { this.releaseAt = releaseAt; }
+
+    public Boolean getIsReleased() { return isReleased; }
+    public void setIsReleased(Boolean isReleased) { this.isReleased = isReleased; }
+
+    public String getTimeZone() { return timeZone; }
+    public void setTimeZone(String timeZone) { this.timeZone = timeZone; }
+
+    public boolean isDeleted() { return deletedAt != null; }
+
+    public boolean isAvailableToStudent() {
+        if (this.deletedAt != null) {
+            return false;
+        }
+        if (Boolean.TRUE.equals(this.isReleased)) {
+            return true;
+        }
+        if (this.releaseAt == null) {
+            return true;
+        }
+        return !this.releaseAt.isAfter(LocalDateTime.now(java.time.ZoneOffset.UTC));
+    }
 }

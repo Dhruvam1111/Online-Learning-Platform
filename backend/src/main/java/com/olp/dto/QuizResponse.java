@@ -30,6 +30,15 @@ public class QuizResponse {
     private Integer maxAttempts;
     private LocalDateTime availableFrom;
     private LocalDateTime availableUntil;
+    private Boolean feedbackReleased;
+    private Boolean negativeMarking;
+    private Boolean partialMarking;
+    private BigDecimal numericTolerance;
+    private String markingRulesSummary;
+    private Boolean showCorrectAnswers;
+    private Boolean showFeedback;
+    private String answerReleaseTiming;
+    private Boolean isExam;
     private Integer questionCount;
     private List<QuizQuestionResponse> questions = new ArrayList<>();
     private LocalDateTime createdAt;
@@ -197,6 +206,14 @@ public class QuizResponse {
         this.availableUntil = availableUntil;
     }
 
+    public Boolean getFeedbackReleased() {
+        return feedbackReleased;
+    }
+
+    public void setFeedbackReleased(Boolean feedbackReleased) {
+        this.feedbackReleased = feedbackReleased;
+    }
+
     public Integer getQuestionCount() {
         return questionCount;
     }
@@ -227,6 +244,70 @@ public class QuizResponse {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Boolean getNegativeMarking() {
+        return negativeMarking;
+    }
+
+    public void setNegativeMarking(Boolean negativeMarking) {
+        this.negativeMarking = negativeMarking;
+    }
+
+    public Boolean getPartialMarking() {
+        return partialMarking;
+    }
+
+    public void setPartialMarking(Boolean partialMarking) {
+        this.partialMarking = partialMarking;
+    }
+
+    public BigDecimal getNumericTolerance() {
+        return numericTolerance;
+    }
+
+    public void setNumericTolerance(BigDecimal numericTolerance) {
+        this.numericTolerance = numericTolerance;
+    }
+
+    public String getMarkingRulesSummary() {
+        return markingRulesSummary;
+    }
+
+    public void setMarkingRulesSummary(String markingRulesSummary) {
+        this.markingRulesSummary = markingRulesSummary;
+    }
+
+    public Boolean getShowCorrectAnswers() {
+        return showCorrectAnswers;
+    }
+
+    public void setShowCorrectAnswers(Boolean showCorrectAnswers) {
+        this.showCorrectAnswers = showCorrectAnswers;
+    }
+
+    public Boolean getShowFeedback() {
+        return showFeedback;
+    }
+
+    public void setShowFeedback(Boolean showFeedback) {
+        this.showFeedback = showFeedback;
+    }
+
+    public String getAnswerReleaseTiming() {
+        return answerReleaseTiming;
+    }
+
+    public void setAnswerReleaseTiming(String answerReleaseTiming) {
+        this.answerReleaseTiming = answerReleaseTiming;
+    }
+
+    public Boolean getIsExam() {
+        return isExam;
+    }
+
+    public void setIsExam(Boolean exam) {
+        this.isExam = exam;
     }
 }
 

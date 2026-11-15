@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import StudentWallet from './StudentWallet';
+import StudentSubscriptions from './StudentSubscriptions';
 import DailyStreakCalendar from './DailyStreakCalendar';
 import CourseSyllabusTree from './CourseSyllabusTree';
 import RazorpayPaymentModal from './RazorpayPaymentModal';
@@ -27,12 +28,16 @@ export default function StudentDashboard({ onNavigateHome }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isApiLoading, setIsApiLoading] = useState(false);
   const [transactions, setTransactions] = useState([]);
+  const [refundReviews, setRefundReviews] = useState([]);
+  const [refundReviewError, setRefundReviewError] = useState('');
   const [walletRevision, setWalletRevision] = useState(0);
+  const [activeSubscriptionsCount, setActiveSubscriptionsCount] = useState(0);
 
   // Refund Modal State
   const [refundModalTx, setRefundModalTx] = useState(null);
   const [refundReason, setRefundReason] = useState('Purchased by mistake');
   const [customRefundReason, setCustomRefundReason] = useState('');
+  const [refundComment, setRefundComment] = useState('');
   const [isRefunding, setIsRefunding] = useState(false);
 
   // Profile Form state for Settings tab
@@ -48,6 +53,10 @@ export default function StudentDashboard({ onNavigateHome }) {
   // Load dashboard data from backend API
   const loadDashboardData = () => {
     setIsApiLoading(true);
+    api.get('/payments/refunds/exceptions').then(({ data }) => {
+      setRefundReviews(Array.isArray(data) ? data : []);
+      setRefundReviewError('');
+    }).catch(() => setRefundReviewError('Administrator review statuses could not be loaded. Please refresh purchases.'));
 
     studentAPI
       .getProfile()
@@ -140,6 +149,15 @@ export default function StudentDashboard({ onNavigateHome }) {
   }, [activeMenu]);
 
   useEffect(() => { api.get('/payments/policy/catalog').then(res => setCatalogPrices(Object.fromEntries(res.data.map(row => [row.courseId, Number(row.amount)])))).catch(() => setCatalogPrices({})); }, [activeMenu]);
+  useEffect(() => {
+    api.get('/payments/subscriptions')
+      .then(res => {
+        if (Array.isArray(res.data)) {
+          setActiveSubscriptionsCount(res.data.filter(s => s.status !== 'cancelled').length);
+        }
+      })
+      .catch(() => {});
+  }, [activeMenu]);
   const pricingFor = course => { const amount = catalogPrices[course.courseId || course.id]; return amount == null ? { ...getCoursePricing(course), formatted: 'Loading current price…' } : getCoursePricing({ ...course, price: amount }); };
   const displayName = profile?.name || user?.name || 'Student Learner';
   const displayRole = profile?.bio || profile?.interests || 'Active Student Workspace';
@@ -195,28 +213,34 @@ export default function StudentDashboard({ onNavigateHome }) {
 
   const handleOpenRefundModal = (tx) => {
     setRefundModalTx(tx);
-    setExceptionalRefund(false);
     setRefundReason('Purchased by mistake');
     setCustomRefundReason('');
+    setRefundComment('');
   };
 
-  const [exceptionalRefund, setExceptionalRefund] = useState(false);
   const handleConfirmRefund = async () => {
     if (!refundModalTx) return;
-    const finalReason = refundReason === 'Other' && customRefundReason.trim()
-      ? customRefundReason.trim()
-      : refundReason;
+    if (refundReason === 'Other' && !customRefundReason.trim()) {
+      showToast('Please specify your refund reason.');
+      return;
+    }
+    const reason = refundReason === 'Other' ? customRefundReason.trim() : refundReason;
+    const finalReason = refundComment.trim() ? `${reason}\nStudent comment: ${refundComment.trim()}` : reason;
+    if (finalReason.length > 1000) {
+      showToast('Please shorten your reason and comment to 1,000 characters combined.');
+      return;
+    }
 
     setIsRefunding(true);
     try {
-      if (exceptionalRefund) {
-        await paymentAPI.requestException(refundModalTx.orderId, finalReason);
-        showToast('Exceptional refund submitted for administrator review.');
-        setRefundModalTx(null);
-        return;
-      }
       const refId = refundModalTx.paymentId || refundModalTx.orderId;
       const { data: refund } = await paymentAPI.requestRefund(refId, finalReason);
+      if (refund.status === 'pending_review') {
+        showToast('Your purchase is older than 30 days. Your refund request has been sent to the administrator for review.');
+        setRefundModalTx(null);
+        loadDashboardData();
+        return;
+      }
       showToast(`🎉 Refund of ₹${Number(refund.amount).toFixed(2)} processed successfully! Course enrollment revoked.`);
       setRefundModalTx(null);
 
@@ -286,8 +310,10 @@ export default function StudentDashboard({ onNavigateHome }) {
   const menuItems = [
     { name: 'Overview', icon: 'grid_view' },
     { name: 'Courses', icon: 'video_library', badge: enrolledCourses.length > 0 ? enrolledCourses.length : null },
+    { name: 'Subscriptions', icon: 'autorenew', badge: activeSubscriptionsCount > 0 ? activeSubscriptionsCount : null },
     { name: 'Transactions', icon: 'receipt_long', badge: transactions.filter((t) => t.status !== 'created').length > 0 ? transactions.filter((t) => t.status !== 'created').length : null },
     { name: 'Wallet', icon: 'account_balance_wallet' },
+    { name: 'Refunds', icon: 'assignment_return' },
     { name: 'Bookmarks', icon: 'bookmark', badge: bookmarks.length > 0 ? bookmarks.length : null },
     { name: 'Certificates', icon: 'workspace_premium' },
     { name: 'Settings', icon: 'settings' }
@@ -421,14 +447,25 @@ export default function StudentDashboard({ onNavigateHome }) {
           </div>
 
           <div className="pt-4 mt-6 border-t border-[#fae8dc]">
-            <a href="#payments" className="block px-4 py-3 underline">Subscriptions &amp; saved methods</a>
+            <button
+              type="button"
+              onClick={() => setActiveMenu('Subscriptions')}
+              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-[13.5px] font-semibold w-full transition-all cursor-pointer ${
+                activeMenu === 'Subscriptions'
+                  ? 'bg-[#fff0eb] text-[#ff5a36] font-bold'
+                  : 'text-[#6d635c] hover:bg-[#fff7f4] hover:text-[#ff5a36]'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[20px]">autorenew</span>
+              <span>Subscriptions</span>
+            </button>
             <button
               type="button"
               onClick={() => {
                 logout();
                 if (onNavigateHome) onNavigateHome();
               }}
-              className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-rose-600 hover:bg-rose-50 text-[13.5px] font-semibold w-full transition-colors cursor-pointer"
+              className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-rose-600 hover:bg-rose-50 text-[13.5px] font-semibold w-full transition-colors cursor-pointer mt-1"
             >
               <span className="material-symbols-outlined text-[20px]">logout</span>
               <span>Sign Out</span>
@@ -706,25 +743,7 @@ export default function StudentDashboard({ onNavigateHome }) {
                       <div className="mt-4 pt-3 border-t border-[#f7ede6] flex items-center justify-between">
                         <div className="flex flex-col">
                           <span className="text-xs font-bold text-[#ff5a36]">Progress: 42%</span>
-                          {(() => {
-                            const matchingTx = transactions.find(
-                              (t) => (t.courseId === (c.courseId || c.id) || t.courseTitle === c.title) &&
-                                     t.status === 'success' && t.refundStatus !== 'refunded'
-                            );
-                            if (matchingTx) {
-                              return (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenRefundModal(matchingTx)}
-                                  className="text-[11px] text-rose-600 hover:text-rose-800 font-semibold underline text-left mt-0.5 cursor-pointer inline-flex items-center gap-0.5"
-                                  title="Request 100% money-back refund"
-                                >
-                                  <span>💸</span> Request Refund
-                                </button>
-                              );
-                            }
-                            return null;
-                          })()}
+
                         </div>
                         <button
                           onClick={() => handleWatchCourse(c)}
@@ -833,6 +852,16 @@ export default function StudentDashboard({ onNavigateHome }) {
           )}
 
           {/* ========================================================
+              TAB: COURSE SUBSCRIPTIONS & SAVED METHODS
+              ======================================================== */}
+          {activeMenu === 'Subscriptions' && (
+            <StudentSubscriptions
+              user={user}
+              catalogCourses={catalogCourses.length > 0 ? catalogCourses : enrolledCourses}
+            />
+          )}
+
+          {/* ========================================================
               TAB: PURCHASE TRANSACTIONS & GST INVOICES
               ======================================================== */}
           {activeMenu === 'Wallet' && <StudentWallet revision={walletRevision} />}
@@ -912,20 +941,7 @@ export default function StudentDashboard({ onNavigateHome }) {
                           </td>
                           <td className="py-3.5 px-3 text-right">
                             <div className="flex items-center justify-end gap-2 flex-wrap">
-                              {tx.refundStatus === 'refunded' ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-semibold">
-                                  ↩️ ₹{tx.refundAmount ?? purchaseTotal(tx)} Returned
-                                </span>
-                              ) : tx.status === 'success' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenRefundModal(tx)}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
-                                  title="Request full refund & revoke course enrollment"
-                                >
-                                  <span>💸</span> Refund
-                                </button>
-                              ) : null}
+
 
                               <button
                                 onClick={() => handleReceipt(tx, true)}
@@ -954,6 +970,59 @@ export default function StudentDashboard({ onNavigateHome }) {
                 </div>
               )}
             </div>
+          )}
+
+          {activeMenu === 'Refunds' && (
+            <section className="min-w-0 bg-white rounded-3xl p-6 sm:p-8 border border-[#fae8dc] space-y-5" aria-labelledby="refund-center-title">
+              <h2 id="refund-center-title" className="text-xl font-extrabold text-[#1f1a17]">Refunds</h2>
+              <p className="text-sm text-[#685b53]">Manage refund requests for all your purchases here. Select a purchase below to provide a reason and confirm your request.</p>
+              <button type="button" onClick={loadDashboardData} disabled={isApiLoading} className="px-4 py-2 rounded-xl border border-[#fae8dc] font-semibold">{isApiLoading ? 'Refreshing…' : 'Refresh purchases'}</button>
+              {refundReviewError && <p role="alert" className="text-sm text-rose-700">{refundReviewError}</p>}
+              {[
+                { title: 'Available to request', description: 'Completed purchases without a refund. Eligibility is checked when you submit.', rows: transactions.filter(tx => tx.status === 'success' && (!tx.refundStatus || tx.refundStatus === 'none') && !refundReviews.some(review => review.orderId === tx.orderId)) },
+                { title: 'Pending refunds', description: 'Requests awaiting processing.', rows: [...transactions.filter(tx => ['pending', 'processing'].includes(tx.refundStatus) && !refundReviews.some(r => r.orderId === tx.orderId)), ...refundReviews.filter(r => r.status === 'pending').map(review => ({...transactions.find(tx => tx.orderId === review.orderId), orderId: review.orderId, refundStatus: 'pending_review', review}))] },
+                { title: 'Refund history', description: 'Completed refunds and other recorded outcomes.', rows: [...transactions.filter(tx => tx.refundStatus && !['none', 'pending', 'processing'].includes(tx.refundStatus) && !refundReviews.some(r => r.orderId === tx.orderId && r.status !== 'pending')), ...refundReviews.filter(r => r.status !== 'pending').map(review => ({...transactions.find(tx => tx.orderId === review.orderId), orderId: review.orderId, refundStatus: review.status, review}))] },
+              ].map(group => (
+                <details key={group.title} className="border border-[#fae8dc] rounded-2xl p-4 space-y-3" aria-label={group.title}>
+                  <summary className="font-bold text-lg text-[#1f1a17] cursor-pointer">{group.title} <span className="text-sm text-[#685b53]">({group.rows.length})</span></summary>
+                  <p className="text-xs text-[#685b53]">{group.description}</p>
+                  {group.rows.length ? (
+<div className="min-w-0 w-full">
+                  <table className="w-full table-fixed text-left text-xs sm:text-sm [overflow-wrap:anywhere]">
+                    <colgroup>{(group.title === 'Available to request' ? [35, 17, 25, 23] : [20, 11, 16, 20, 20, 13]).map((width, index) => <col key={index} style={{width: `${width}%`}} />)}</colgroup>
+                    <thead><tr className="border-b border-[#fae8dc]">{(group.title === 'Available to request' ? ['Course / Order', 'Paid', 'Refund status', 'Action'] : ['Course / Order', 'Paid', 'Refund status', 'Your comment', 'Admin reply', 'Refunded amount']).map(label => <th key={label} scope="col" className="px-1 py-3 sm:px-2 align-top font-semibold">{label}</th>)}</tr></thead>
+                    <tbody>
+                    {group.rows.map(tx => {
+                      const refunded = ['approved', 'refunded'].includes(tx.refundStatus) && tx.refundAmount != null ? Number(tx.refundAmount) : null;
+                      const refundType = refunded == null ? null : Math.round(refunded * 100) === Math.round(Number(purchaseTotal(tx)) * 100) ? 'Full refund' : 'Partial refund';
+                      return <tr key={tx.id || tx.orderId} className="border-b border-[#f7f0eb]">
+                        <td className="px-1 py-3 sm:px-2 whitespace-pre-wrap align-top"><strong>{tx.courseTitle}</strong><span className="block text-xs break-all">{tx.orderId}</span></td>
+                        <td className="px-1 py-3 sm:px-2 whitespace-pre-wrap align-top">₹{purchaseTotal(tx)}</td>
+                        <td className="px-1 py-3 sm:px-2 whitespace-pre-wrap align-top"><span className={`inline-flex rounded-lg px-1 py-1 text-xs font-bold ${tx.refundStatus === 'rejected' ? 'bg-rose-50 text-rose-800' : ['approved','refunded'].includes(tx.refundStatus) ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>{tx.refundStatus === 'rejected' ? 'Request rejected' : ['approved', 'refunded'].includes(tx.refundStatus) ? 'Request approved' : tx.refundStatus === 'pending_review' ? 'Awaiting admin review' : !tx.refundStatus || tx.refundStatus === 'none' ? 'No refund requested' : tx.refundStatus}</span>
+                        </td>
+                        {group.title !== 'Available to request' && <>
+                          <td className="px-1 py-3 sm:px-2 whitespace-pre-wrap align-top">{tx.review?.reason || tx.refundReason || 'No comment provided.'}</td>
+                          <td className="px-1 py-3 sm:px-2 whitespace-pre-wrap align-top">{tx.review?.decisionRecord?.reason || (tx.refundStatus === 'pending_review' ? 'Awaiting admin review.' : tx.refundStatus === 'refunded' ? 'Automatically processed under the refund policy.' : 'No administrator reply.')}</td>
+                          <td className="px-1 py-3 sm:px-2 whitespace-pre-wrap align-top">{refunded != null ? <><strong className="block">₹{refunded.toFixed(2)}</strong><span className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800">{refundType}</span></> : <span>{tx.refundStatus === 'rejected' ? '₹0.00 — Not refunded' : 'Not processed'}</span>}</td>
+                        </>}
+                        {group.title === 'Available to request' && <td className="px-1 py-3 sm:px-2 whitespace-pre-wrap align-top"><button type="button" onClick={() => handleOpenRefundModal(tx)} className="w-full px-1 py-2 bg-rose-50 text-rose-700 rounded-xl font-bold">Request refund</button></td>}
+                      </tr>;
+                    })}</tbody>
+                  </table>
+
+                </div>
+              ) : <p className="py-8 text-center text-[#685b53]">No entries in this section.</p>}
+                </details>
+              ))}
+              <details className="rounded-xl bg-[#fbf7f4] p-4">
+                <summary className="font-bold cursor-pointer">Refund policy and common questions</summary>
+                <div className="text-sm text-[#685b53] mt-3 space-y-2">
+                  <p>Standard refunds must be requested within 30 days. The server checks eligibility when you submit.</p>
+                  <p>Processed refunds restore the original simulated payment sources, including wallet credit, and revoke course access. No real money moves.</p>
+                  <p>Purchases older than 30 days are automatically sent to an administrator for review when you request a refund. Funds and course access remain unchanged until approval.</p>
+                </div>
+              </details>
+            </section>
           )}
 
           {/* ========================================================
@@ -1199,7 +1268,7 @@ export default function StudentDashboard({ onNavigateHome }) {
               <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 flex items-start gap-2.5">
                 <span className="text-lg shrink-0">⚠️</span>
                 <p className="text-[11px] leading-relaxed">
-                  <strong>Access Revocation Notice:</strong> {exceptionalRefund ? "Submitting an exception does not change access or funds. An administrator must review the request." : "Processing this refund will immediately revoke your course access."}
+                  <strong>Access Revocation Notice:</strong> Refunds within 30 days are processed if eligible. Older purchases automatically go to administrator review. Course access is revoked only when a refund is processed.
                 </p>
               </div>
 
@@ -1232,6 +1301,14 @@ export default function StudentDashboard({ onNavigateHome }) {
                   />
                 </div>
               )}
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="refund-comment" className="font-bold text-[#1e1916]">Additional comments (optional)</label>
+                <textarea id="refund-comment" rows={3} maxLength={700} value={refundComment}
+                  onChange={e => setRefundComment(e.target.value)} disabled={isRefunding}
+                  placeholder="Share any details that will help us review your refund request."
+                  className="w-full p-2.5 rounded-xl border border-[#e5dcd5] text-xs focus:outline-none focus:ring-2 focus:ring-rose-500" />
+                <p className="text-xs text-[#685b53]">Your comment is included with your refund reason and is visible to the administrator. {refundComment.length}/700</p>
+              </div>
             </div>
 
             {/* Modal Actions */}
@@ -1244,7 +1321,6 @@ export default function StudentDashboard({ onNavigateHome }) {
               >
                 Cancel
               </button>
-              <label className="text-xs flex items-center gap-2"><input type="checkbox" checked={exceptionalRefund} onChange={e => setExceptionalRefund(e.target.checked)} />Request an exception for admin review (including purchases older than 30 days)</label>
                   <button
                 type="button"
                 onClick={handleConfirmRefund}
@@ -1259,7 +1335,7 @@ export default function StudentDashboard({ onNavigateHome }) {
                 ) : (
                   <>
                     <span>💸</span>
-                    <span>{exceptionalRefund ? 'Submit for Admin Review' : `Confirm Refund (₹${purchaseTotal(refundModalTx)})`}</span>
+                    <span>{`Submit refund request (₹${purchaseTotal(refundModalTx)})`}</span>
                   </>
                 )}
               </button>

@@ -9,9 +9,11 @@ import com.olp.repository.ReviewRepository;
 import com.olp.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,7 +37,15 @@ public class ReviewService {
      * 1. Student must be enrolled in the course.
      * 2. Student can only submit one review per course.
      */
+    @Transactional
     public ReviewResponse addReview(Integer courseId, Integer studentId, CreateReviewRequest request) {
+        if (courseId == null || studentId == null) {
+            throw new IllegalArgumentException("Course ID and Student ID cannot be null");
+        }
+        if (request == null) {
+            throw new IllegalArgumentException("Review request cannot be null");
+        }
+
         // 1. Verify student is enrolled
         if (!enrollmentCheckRepository.isStudentEnrolled(studentId, courseId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You must be enrolled in this course to leave a review.");
@@ -56,7 +66,7 @@ public class ReviewService {
         review = reviewRepository.save(review);
 
         // 4. Retrieve student name
-        String studentName = userRepository.findById(studentId)
+        String studentName = userRepository.findById(Objects.requireNonNull(studentId))
                 .map(User::getName)
                 .orElse("Student");
 
@@ -75,13 +85,20 @@ public class ReviewService {
      * Get all reviews for a course (newest first) with student names.
      */
     public List<ReviewResponse> getReviewsForCourse(Integer courseId) {
+        if (courseId == null) {
+            throw new IllegalArgumentException("Course ID cannot be null");
+        }
+
         List<Review> reviews = reviewRepository.findByCourseIdOrderByCreatedAtDesc(courseId);
 
         // Fetch student names to attach to responses
         return reviews.stream().map(r -> {
-            String studentName = userRepository.findById(r.getStudentId())
-                    .map(User::getName)
-                    .orElse("Student");
+            String studentName = "Student";
+            if (r.getStudentId() != null) {
+                studentName = userRepository.findById(Objects.requireNonNull(r.getStudentId()))
+                        .map(User::getName)
+                        .orElse("Student");
+            }
             return new ReviewResponse(
                     r.getId(),
                     r.getCourseId(),
@@ -98,6 +115,10 @@ public class ReviewService {
      * Get average rating for a course.
      */
     public Double getAverageRating(Integer courseId) {
+        if (courseId == null) {
+            throw new IllegalArgumentException("Course ID cannot be null");
+        }
+
         Double avg = reviewRepository.findAverageRatingByCourseId(courseId);
         return avg != null ? Math.round(avg * 10.0) / 10.0 : 0.0;
     }

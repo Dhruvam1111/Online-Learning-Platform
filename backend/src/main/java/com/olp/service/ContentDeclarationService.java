@@ -12,6 +12,7 @@ import com.olp.repository.CourseRepository;
 import com.olp.repository.LessonRepository;
 import com.olp.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.NonNull;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -78,20 +79,25 @@ public class ContentDeclarationService {
             throw new AccessDeniedException("Only instructors or administrators can declare content ownership");
         }
 
-        Course course = courseRepository.findById(request.getCourseId())
-                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + request.getCourseId()));
+        if (request == null || request.getCourseId() == null) {
+            throw new IllegalArgumentException("Course ID cannot be null");
+        }
+        Integer courseId = request.getCourseId();
+        Course course = courseRepository.findById(Objects.requireNonNull(courseId))
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
 
         assertInstructorAccess(course, instructor);
 
         Lesson lesson = null;
         if (request.getLessonId() != null) {
-            lesson = lessonRepository.findById(request.getLessonId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Lesson not found with id: " + request.getLessonId()));
+            Integer lessonId = request.getLessonId();
+            lesson = lessonRepository.findById(Objects.requireNonNull(lessonId))
+                    .orElseThrow(() -> new ResourceNotFoundException("Lesson not found with id: " + lessonId));
 
             // Verify lesson belongs to course
             Integer lessonCourseId = extractCourseIdFromLesson(lesson);
             if (!Objects.equals(lessonCourseId, course.getId())) {
-                throw new IllegalArgumentException("Lesson with ID " + request.getLessonId() + " does not belong to course with ID " + course.getId());
+                throw new IllegalArgumentException("Lesson with ID " + lessonId + " does not belong to course with ID " + course.getId());
             }
         }
 
@@ -113,7 +119,10 @@ public class ContentDeclarationService {
      */
     @Transactional(readOnly = true)
     public List<ContentDeclarationResponse> getDeclarationsByCourse(Integer courseId, User instructor) {
-        Course course = courseRepository.findById(courseId)
+        if (courseId == null) {
+            throw new IllegalArgumentException("Course ID cannot be null");
+        }
+        Course course = courseRepository.findById(Objects.requireNonNull(courseId))
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
 
         assertInstructorAccess(course, instructor);
@@ -128,12 +137,18 @@ public class ContentDeclarationService {
      * Retrieve active declaration for a specific lesson (or fallback to course-level).
      */
     @Transactional(readOnly = true)
-    public ContentDeclarationResponse getDeclarationByLesson(Integer lessonId, User instructor) {
-        Lesson lesson = lessonRepository.findById(lessonId)
+    public ContentDeclarationResponse getDeclarationByLesson(@NonNull Integer lessonId, User instructor) {
+        if (lessonId == null) {
+            throw new IllegalArgumentException("Lesson ID cannot be null");
+        }
+        Lesson lesson = lessonRepository.findById(Objects.requireNonNull(lessonId))
                 .orElseThrow(() -> new ResourceNotFoundException("Lesson not found with id: " + lessonId));
 
         Integer courseId = extractCourseIdFromLesson(lesson);
-        Course course = courseRepository.findById(courseId)
+        if (courseId == null) {
+            throw new ResourceNotFoundException("Course associated with lesson ID " + lessonId + " could not be resolved");
+        }
+        Course course = courseRepository.findById(Objects.requireNonNull(courseId))
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
 
         assertInstructorAccess(course, instructor);
@@ -150,7 +165,10 @@ public class ContentDeclarationService {
      */
     @Transactional(readOnly = true)
     public ContentDeclarationResponse getDeclarationById(Integer id, User instructor) {
-        ContentDeclaration declaration = declarationRepository.findById(id)
+        if (id == null) {
+            throw new IllegalArgumentException("Content declaration ID cannot be null");
+        }
+        ContentDeclaration declaration = declarationRepository.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Content declaration not found with id: " + id));
 
         assertInstructorAccess(declaration.getCourse(), instructor);
@@ -161,7 +179,10 @@ public class ContentDeclarationService {
      * Instructor responds to a takedown notice for flagged content.
      */
     public ContentDeclarationResponse respondToTakedown(Integer id, User instructor, TakedownResponseRequest request) {
-        ContentDeclaration declaration = declarationRepository.findById(id)
+        if (id == null) {
+            throw new IllegalArgumentException("Content declaration ID cannot be null");
+        }
+        ContentDeclaration declaration = declarationRepository.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Content declaration not found with id: " + id));
 
         assertInstructorAccess(declaration.getCourse(), instructor);
@@ -182,7 +203,10 @@ public class ContentDeclarationService {
      * Voluntarily remove flagged content in response to takedown notice.
      */
     public ContentDeclarationResponse removeContent(Integer id, User instructor) {
-        ContentDeclaration declaration = declarationRepository.findById(id)
+        if (id == null) {
+            throw new IllegalArgumentException("Content declaration ID cannot be null");
+        }
+        ContentDeclaration declaration = declarationRepository.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Content declaration not found with id: " + id));
 
         assertInstructorAccess(declaration.getCourse(), instructor);
@@ -202,7 +226,10 @@ public class ContentDeclarationService {
      * Replace flagged content with licensed or corrected version.
      */
     public ContentDeclarationResponse replaceContent(Integer id, User instructor, TakedownReplaceRequest request) {
-        ContentDeclaration declaration = declarationRepository.findById(id)
+        if (id == null) {
+            throw new IllegalArgumentException("Content declaration ID cannot be null");
+        }
+        ContentDeclaration declaration = declarationRepository.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Content declaration not found with id: " + id));
 
         assertInstructorAccess(declaration.getCourse(), instructor);
@@ -226,7 +253,10 @@ public class ContentDeclarationService {
      */
     @Transactional(readOnly = true)
     public Map<String, Object> checkDeclarationStatus(Integer courseId, Integer lessonId, User instructor) {
-        Course course = courseRepository.findById(courseId)
+        if (courseId == null) {
+            throw new IllegalArgumentException("Course ID cannot be null");
+        }
+        Course course = courseRepository.findById(Objects.requireNonNull(courseId))
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
 
         assertInstructorAccess(course, instructor);
@@ -265,7 +295,7 @@ public class ContentDeclarationService {
         if (lessonId == null) {
             throw new IllegalArgumentException("Lesson ID cannot be null when verifying content declaration");
         }
-        Lesson lesson = lessonRepository.findById(lessonId)
+        Lesson lesson = lessonRepository.findById(Objects.requireNonNull(lessonId))
                 .orElseThrow(() -> new ResourceNotFoundException("Lesson not found with id: " + lessonId));
 
         Integer courseId = extractCourseIdFromLesson(lesson);

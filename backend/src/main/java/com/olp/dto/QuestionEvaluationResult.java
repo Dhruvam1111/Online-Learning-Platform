@@ -125,5 +125,13 @@ public class QuestionEvaluationResult {
     public void setRequiresManualGrading(boolean requiresManualGrading) {
         this.requiresManualGrading = requiresManualGrading;
     }
+
+    public void redactCorrectAnswer() {
+        this.correctAnswer = null;
+    }
+
+    public void redactFeedback() {
+        this.feedback = null;
+    }
 }
 

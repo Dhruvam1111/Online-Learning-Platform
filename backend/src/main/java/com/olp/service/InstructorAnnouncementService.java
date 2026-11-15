@@ -6,13 +6,12 @@ import com.olp.dto.NotificationPayload;
 import com.olp.entity.Course;
 import com.olp.entity.CourseAnnouncement;
 import com.olp.entity.User;
-import com.olp.exception.NotFoundException;
+import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.CourseAnnouncementRepository;
 import com.olp.repository.CourseInstructorRepository;
 import com.olp.repository.CourseRepository;
 import com.olp.repository.EnrollmentRepository;
 import com.olp.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,7 +36,6 @@ public class InstructorAnnouncementService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
 
-    @Autowired
     public InstructorAnnouncementService(
             CourseAnnouncementRepository announcementRepository,
             CourseRepository courseRepository,
@@ -57,7 +55,7 @@ public class InstructorAnnouncementService {
     public AnnouncementResponse createAnnouncement(Integer instructorId, Integer courseId, AnnouncementRequest request) {
         Course course = verifyCourseAccess(instructorId, courseId);
         User instructor = userRepository.findById(instructorId)
-                .orElseThrow(() -> new NotFoundException("Instructor not found with ID: " + instructorId));
+                .orElseThrow(() -> new ResourceNotFoundException("Instructor not found with ID: " + instructorId));
 
         if (request == null || request.getTitle() == null || request.getTitle().isBlank()) {
             throw new IllegalArgumentException("Announcement title is required");
@@ -102,7 +100,7 @@ public class InstructorAnnouncementService {
     @Transactional(readOnly = true)
     public List<AnnouncementResponse> getCourseAnnouncementsPublic(Integer courseId) {
         if (!courseRepository.existsById(courseId)) {
-            throw new NotFoundException("Course not found with ID: " + courseId);
+            throw new ResourceNotFoundException("Course not found with ID: " + courseId);
         }
         return announcementRepository.findByCourseIdOrderByCreatedAtDesc(courseId)
                 .stream()
@@ -118,7 +116,7 @@ public class InstructorAnnouncementService {
             AnnouncementRequest request) {
         verifyCourseAccess(instructorId, courseId);
         CourseAnnouncement announcement = announcementRepository.findByIdAndCourseId(announcementId, courseId)
-                .orElseThrow(() -> new NotFoundException("Announcement not found with ID: " + announcementId));
+                .orElseThrow(() -> new ResourceNotFoundException("Announcement not found with ID: " + announcementId));
 
         if (request == null || request.getTitle() == null || request.getTitle().isBlank()) {
             throw new IllegalArgumentException("Announcement title is required");
@@ -137,13 +135,13 @@ public class InstructorAnnouncementService {
     public void deleteAnnouncement(Integer instructorId, Integer courseId, Integer announcementId) {
         verifyCourseAccess(instructorId, courseId);
         CourseAnnouncement announcement = announcementRepository.findByIdAndCourseId(announcementId, courseId)
-                .orElseThrow(() -> new NotFoundException("Announcement not found with ID: " + announcementId));
+                .orElseThrow(() -> new ResourceNotFoundException("Announcement not found with ID: " + announcementId));
         announcementRepository.delete(announcement);
     }
 
     private Course verifyCourseAccess(Integer userId, Integer courseId) {
         Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new NotFoundException("Course not found with ID: " + courseId));
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found with ID: " + courseId));
 
         boolean isOwner = course.getInstructor() != null && course.getInstructor().getId().equals(userId);
         boolean isCoInstructor = courseInstructorRepository.existsByCourseIdAndInstructorId(courseId, userId);
@@ -154,4 +152,3 @@ public class InstructorAnnouncementService {
         return course;
     }
 }
-

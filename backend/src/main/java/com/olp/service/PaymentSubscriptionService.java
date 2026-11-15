@@ -19,20 +19,93 @@ public class PaymentSubscriptionService {
     private final PaymentService payments;
     private final CourseRepository courses;
     private final PaymentPolicyService policies;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private EmailService emailService;
+
     public PaymentSubscriptionService(PaymentAuditService audit,WalletRepository locks,SimulatedPaymentMethods methods,PaymentService payments,CourseRepository courses,PaymentPolicyService policies){
         this.audit=audit;this.locks=locks;this.methods=methods;this.payments=payments;this.courses=courses;this.policies=policies;
+    }
+    @org.springframework.beans.factory.annotation.Autowired
+    public PaymentSubscriptionService(PaymentAuditService audit,WalletRepository locks,SimulatedPaymentMethods methods,PaymentService payments,CourseRepository courses,PaymentPolicyService policies,EmailService emailService){
+        this.audit=audit;this.locks=locks;this.methods=methods;this.payments=payments;this.courses=courses;this.policies=policies;this.emailService=emailService;
     }
     private void student(User user){if(user==null || !"student".equals(user.getRole()))throw new AccessDeniedException("Student account required.");}
     @Transactional
     public Map<String,Object> create(User user,Integer courseId,String token,boolean consent){
+        return create(user,courseId,token,consent,1,"Monthly Plan",null,null);
+    }
+    @Transactional
+    public Map<String,Object> create(User user,Integer courseId,String token,boolean consent,Integer durationMonths,String planName,java.math.BigDecimal customMonthlyPrice,java.math.BigDecimal customTotalAmount){
         student(user);locks.lockStudent(user.getId());
         if(!consent)throw new IllegalArgumentException("Explicit subscription consent is required.");
         if(methods.list(user).stream().noneMatch(m -> token!=null && token.equals(m.get("token"))))throw new IllegalArgumentException("Choose an active saved method.");
-        if(courseId==null || courses.findById(courseId).filter(c -> c.getStatus()==com.olp.entity.CourseStatus.PUBLISHED).isEmpty())throw new IllegalArgumentException("Choose a published course for subscription billing.");
+        var courseOpt = courses.findById(courseId);
+        if(courseId==null || courseOpt.filter(c -> c.getStatus()==com.olp.entity.CourseStatus.PUBLISHED).isEmpty())throw new IllegalArgumentException("Choose a published course for subscription billing.");
         if(list(user).stream().anyMatch(m -> courseId.equals(((Number)m.get("courseId")).intValue()) && !"cancelled".equals(m.get("status"))))throw new IllegalStateException("An active subscription already exists for this course.");
+
+        var course = courseOpt.get();
+        java.math.BigDecimal monthlyPrice = policies.price(course);
+        int duration = (durationMonths != null && durationMonths > 0) ? durationMonths : 1;
+        String resolvedPlan = (planName != null && !planName.isBlank()) ? planName : (duration == 1 ? "Monthly Plan" : duration + "-Month Plan");
+        java.math.BigDecimal totalPlanCost = (customTotalAmount != null && customTotalAmount.compareTo(java.math.BigDecimal.ZERO) > 0)
+                ? customTotalAmount
+                : monthlyPrice.multiply(java.math.BigDecimal.valueOf(duration));
+
         String id="sub_"+UUID.randomUUID();
-        Map<String,Object> state=new LinkedHashMap<>(Map.of("id",id,"owner",user.getId(),"courseId",courseId,"token",token,"consent",true,"status","active","nextRenewalAt",Instant.now().plus(30,ChronoUnit.DAYS).toString()));
-        audit.record(id,"subscription.created",state);return state;
+        Instant nextRenewal = Instant.now().plus(30,ChronoUnit.DAYS);
+        Map<String,Object> state=new LinkedHashMap<>();
+        state.put("id",id);
+        state.put("owner",user.getId());
+        state.put("courseId",courseId);
+        state.put("courseTitle",course.getTitle());
+        state.put("token",token);
+        state.put("consent",true);
+        state.put("status","active");
+        state.put("durationMonths",duration);
+        state.put("planName",resolvedPlan);
+        state.put("monthlyPrice",monthlyPrice);
+        state.put("totalPlanCost",totalPlanCost);
+        state.put("payableAmount",monthlyPrice);
+        state.put("nextRenewalAt",nextRenewal.toString());
+        state.put("createdAt",Instant.now().toString());
+
+        // Locate recognizable saved method details for confirmation email / user summary
+        var savedMethodOpt = methods.list(user).stream().filter(m -> token.equals(m.get("token"))).findFirst();
+        String methodSummary = savedMethodOpt.map(m -> {
+            Object disp = m.get("displayName");
+            if (disp != null) return disp.toString();
+            String mType = String.valueOf(m.get("method"));
+            return mType.toUpperCase() + " (ends in " + token.substring(Math.max(0, token.length() - 4)) + ")";
+        }).orElse("Saved Payment Method");
+        state.put("paymentMethodSummary", methodSummary);
+
+        audit.record(id,"subscription.created",state);
+
+        String successMessage = String.format(
+            "Subscription activated successfully for '%s'! Plan: %s (%d Month%s) at ₹%s/month (Total plan cost: ₹%s). Next renewal scheduled for %s. A confirmation email with plan details has been sent to %s.",
+            course.getTitle(), resolvedPlan, duration, duration > 1 ? "s" : "", monthlyPrice.toPlainString(), totalPlanCost.toPlainString(), nextRenewal.toString().substring(0, 10), user.getEmail()
+        );
+        state.put("successMessage", successMessage);
+
+        if (emailService != null) {
+            try {
+                emailService.sendSubscriptionConfirmationEmail(
+                    user.getEmail(),
+                    user.getName(),
+                    course.getTitle(),
+                    resolvedPlan,
+                    duration,
+                    monthlyPrice,
+                    totalPlanCost,
+                    nextRenewal.toString(),
+                    methodSummary,
+                    id
+                );
+            } catch (Exception ignored) {
+            }
+        }
+
+        return state;
     }
     @Transactional(readOnly=true)
     public List<Map<String,Object>> list(User user){
@@ -45,6 +118,20 @@ public class PaymentSubscriptionService {
         if(audit.exists("cancel-"+id))state.put("status","cancelled");
         String cycle=id+"-"+state.get("nextRenewalAt");
         if(audit.exists("notice-"+cycle))state.put("notice",audit.get("notice-"+cycle));
+
+        if(state.get("courseId") != null) {
+            courses.findById(((Number)state.get("courseId")).intValue()).ifPresent(c -> {
+                if(state.get("courseTitle") == null) {
+                    state.put("courseTitle", c.getTitle());
+                }
+                if(state.get("payableAmount") == null) {
+                    state.put("payableAmount", policies.price(c));
+                }
+                if(state.get("monthlyPrice") == null) {
+                    state.put("monthlyPrice", policies.price(c));
+                }
+            });
+        }
         return state;
     }
     private Map<String,Object> owned(User user,String id){

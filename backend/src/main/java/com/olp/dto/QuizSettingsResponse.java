@@ -28,6 +28,17 @@ public class QuizSettingsResponse {
     private LocalDateTime serverTime;
     private Long attemptsUsed;
     private Integer remainingAttempts;
+    private Boolean feedbackReleased;
+    private Boolean negativeMarking;
+    private Boolean partialMarking;
+    private BigDecimal numericTolerance;
+    private String markingRulesSummary;
+    private Boolean showCorrectAnswers;
+    private Boolean showFeedback;
+    private String answerReleaseTiming;
+    private Boolean isExam;
+    private Boolean correctAnswersVisible;
+    private Boolean feedbackVisible;
 
     public QuizSettingsResponse() {}
 
@@ -181,6 +192,112 @@ public class QuizSettingsResponse {
 
     public void setRemainingAttempts(Integer remainingAttempts) {
         this.remainingAttempts = remainingAttempts;
+    }
+
+    public Boolean getFeedbackReleased() {
+        return feedbackReleased;
+    }
+
+    public void setFeedbackReleased(Boolean feedbackReleased) {
+        this.feedbackReleased = feedbackReleased;
+    }
+
+    public Boolean getNegativeMarking() {
+        return negativeMarking;
+    }
+
+    public void setNegativeMarking(Boolean negativeMarking) {
+        this.negativeMarking = negativeMarking;
+    }
+
+    public Boolean getPartialMarking() {
+        return partialMarking;
+    }
+
+    public void setPartialMarking(Boolean partialMarking) {
+        this.partialMarking = partialMarking;
+    }
+
+    public BigDecimal getNumericTolerance() {
+        return numericTolerance;
+    }
+
+    public void setNumericTolerance(BigDecimal numericTolerance) {
+        this.numericTolerance = numericTolerance;
+    }
+
+    public String getMarkingRulesSummary() {
+        return markingRulesSummary;
+    }
+
+    public void setMarkingRulesSummary(String markingRulesSummary) {
+        this.markingRulesSummary = markingRulesSummary;
+    }
+
+    public Boolean getShowCorrectAnswers() {
+        return showCorrectAnswers;
+    }
+
+    public void setShowCorrectAnswers(Boolean showCorrectAnswers) {
+        this.showCorrectAnswers = showCorrectAnswers;
+    }
+
+    public Boolean getShowFeedback() {
+        return showFeedback;
+    }
+
+    public void setShowFeedback(Boolean showFeedback) {
+        this.showFeedback = showFeedback;
+    }
+
+    public String getAnswerReleaseTiming() {
+        return answerReleaseTiming;
+    }
+
+    public void setAnswerReleaseTiming(String answerReleaseTiming) {
+        this.answerReleaseTiming = answerReleaseTiming;
+    }
+
+    public Boolean getIsExam() {
+        return isExam;
+    }
+
+    public void setIsExam(Boolean exam) {
+        this.isExam = exam;
+    }
+
+    public Boolean getCorrectAnswersVisible() {
+        return correctAnswersVisible;
+    }
+
+    public void setCorrectAnswersVisible(Boolean correctAnswersVisible) {
+        this.correctAnswersVisible = correctAnswersVisible;
+    }
+
+    public Boolean getFeedbackVisible() {
+        return feedbackVisible;
+    }
+
+    public void setFeedbackVisible(Boolean feedbackVisible) {
+        this.feedbackVisible = feedbackVisible;
+    }
+
+    public static String computeMarkingRulesSummary(Boolean negativeMarking, Boolean partialMarking, BigDecimal numericTolerance) {
+        java.util.List<String> rules = new java.util.ArrayList<>();
+        if (Boolean.TRUE.equals(negativeMarking)) {
+            rules.add("Negative marking is ENABLED (deductions apply for incorrect answers)");
+        } else {
+            rules.add("Negative marking is DISABLED (no marks deducted for incorrect answers)");
+        }
+        if (Boolean.TRUE.equals(partialMarking)) {
+            rules.add("Partial marking is ENABLED for multiple-select questions");
+        } else {
+            rules.add("Partial marking is DISABLED (all-or-nothing for multiple-select questions)");
+        }
+        if (numericTolerance != null && numericTolerance.compareTo(BigDecimal.ZERO) > 0) {
+            rules.add("Numerical tolerance: \u00b1" + numericTolerance.stripTrailingZeros().toPlainString());
+        }
+        return String.join(". ", rules) + ".";
     }
 }
 

@@ -1,5 +1,6 @@
 package com.olp.service;
 
+import com.olp.dto.ContentRemovalResponse;
 import com.olp.dto.SupplementaryMaterialResponse;
 import com.olp.entity.*;
 import com.olp.exception.ResourceNotFoundException;
@@ -47,6 +48,12 @@ class SupplementaryMaterialServiceTest {
     private VirusScanner virusScanner;
     @Mock
     private ContentDeclarationService contentDeclarationService;
+    @Mock
+    private LectureProgressRepository lectureProgressRepository;
+    @Mock
+    private LessonProgressRepository lessonProgressRepository;
+    @Mock
+    private CourseCompletionCriteriaRepository courseCompletionCriteriaRepository;
 
     @InjectMocks
     private SupplementaryMaterialService materialService;
@@ -430,6 +437,207 @@ class SupplementaryMaterialServiceTest {
         assertThrows(ResourceNotFoundException.class, () ->
                 materialService.updateDownloadableStatus(instructor, 999, true));
         verify(materialRepository, never()).save(any());
+    }
+
+    // =========================================================================
+    // FR-I16 (Step 19) TESTS: REORDER, REPLACE, REMOVE
+    // =========================================================================
+
+    @Test
+    void testReorderMaterialsInLesson_Success_ContiguousIndexing() {
+        LectureMaterial m1 = new LectureMaterial(400, null, null, 10, "Item 1", "1.pdf", "/p/1.pdf", "pdf", "application/pdf", 100L, false);
+        m1.setId(21);
+        m1.setOrderIndex(1);
+
+        LectureMaterial m2 = new LectureMaterial(400, null, null, 10, "Item 2", "2.pdf", "/p/2.pdf", "pdf", "application/pdf", 100L, false);
+        m2.setId(22);
+        m2.setOrderIndex(2);
+
+        LectureMaterial m3 = new LectureMaterial(400, null, null, 10, "Item 3", "3.pdf", "/p/3.pdf", "pdf", "application/pdf", 100L, false);
+        m3.setId(23);
+        m3.setOrderIndex(3);
+
+        when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
+        when(materialRepository.findByLessonId(400)).thenReturn(List.of(m1, m2, m3));
+
+        List<SupplementaryMaterialResponse> reordered = materialService.reorderMaterialsInLesson(
+                instructor, 400, List.of(23, 21, 22));
+
+        assertEquals(3, reordered.size());
+        assertEquals(23, reordered.get(0).getId());
+        assertEquals(1, reordered.get(0).getOrderIndex());
+        assertEquals(21, reordered.get(1).getId());
+        assertEquals(2, reordered.get(1).getOrderIndex());
+        assertEquals(22, reordered.get(2).getId());
+        assertEquals(3, reordered.get(2).getOrderIndex());
+
+        verify(materialRepository, times(3)).save(any(LectureMaterial.class));
+    }
+
+    @Test
+    void testReorderMaterialsInLesson_RejectsIdFromAnotherLesson() {
+        LectureMaterial m1 = new LectureMaterial(400, null, null, 10, "Item 1", "1.pdf", "/p/1.pdf", "pdf", "application/pdf", 100L, false);
+        m1.setId(21);
+
+        when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
+        when(materialRepository.findByLessonId(400)).thenReturn(List.of(m1));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                materialService.reorderMaterialsInLesson(instructor, 400, List.of(21, 999)));
+        assertTrue(ex.getMessage().contains("does not belong to lesson ID 400"));
+        verify(materialRepository, never()).save(any());
+    }
+
+    @Test
+    void testReorderMaterialsInLesson_RejectsDuplicates() {
+        when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                materialService.reorderMaterialsInLesson(instructor, 400, List.of(21, 21)));
+        assertTrue(ex.getMessage().contains("Duplicate material ID"));
+    }
+
+    @Test
+    void testReorderMaterialsInLesson_RejectsEmptyList() {
+        when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                materialService.reorderMaterialsInLesson(instructor, 400, List.of()));
+        assertTrue(ex.getMessage().contains("cannot be empty"));
+    }
+
+    @Test
+    void testReplaceMaterialFile_Success_PreservesLessonAndProgressReferences() throws Exception {
+        LectureMaterial mat = new LectureMaterial(400, null, null, 10, "Original Slides", "old.pdf", "/p/old.pdf", "pdf", "application/pdf", 500L, true);
+        mat.setId(30);
+        mat.setOrderIndex(5);
+
+        MockMultipartFile newFile = new MockMultipartFile("file", "updated.pdf", "application/pdf", new byte[2048]);
+
+        when(materialRepository.findById(30)).thenReturn(Optional.of(mat));
+        when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
+        when(virusScanner.scan(any(), eq("updated.pdf"))).thenReturn(VirusScanner.ScanResult.clean());
+        doNothing().when(materialStorageService).deleteMaterialFile("/p/old.pdf");
+        when(materialStorageService.storeMaterial(newFile)).thenReturn("/p/updated.pdf");
+        when(materialRepository.save(any(LectureMaterial.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SupplementaryMaterialResponse resp = materialService.replaceMaterialFile(instructor, 30, newFile);
+
+        assertNotNull(resp);
+        assertEquals(30, resp.getId());
+        assertEquals(400, resp.getLessonId());
+        assertEquals(5, resp.getOrderIndex());
+        assertTrue(resp.getIsDownloadable());
+        assertEquals("updated.pdf", resp.getOriginalFilename());
+        assertEquals("/p/updated.pdf", resp.getFileUrl());
+        assertEquals(2048L, resp.getFileSizeBytes());
+
+        verify(materialStorageService, times(1)).deleteMaterialFile("/p/old.pdf");
+        verify(materialStorageService, times(1)).storeMaterial(newFile);
+        verify(materialRepository, times(1)).save(mat);
+    }
+
+    @Test
+    void testReplaceMaterialFile_Fails_VirusInfected() throws Exception {
+        LectureMaterial mat = new LectureMaterial(400, null, null, 10, "Original Slides", "old.pdf", "/p/old.pdf", "pdf", "application/pdf", 500L, true);
+        mat.setId(31);
+
+        MockMultipartFile infectedFile = new MockMultipartFile("file", "virus.pdf", "application/pdf", new byte[1024]);
+
+        when(materialRepository.findById(31)).thenReturn(Optional.of(mat));
+        when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
+        when(virusScanner.scan(any(), eq("virus.pdf"))).thenReturn(VirusScanner.ScanResult.infected("Trojan.Test"));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                materialService.replaceMaterialFile(instructor, 31, infectedFile));
+        assertTrue(ex.getMessage().contains("Malicious content detected"));
+
+        verify(materialStorageService, never()).storeMaterial(any());
+        verify(materialRepository, never()).save(any());
+    }
+
+    @Test
+    void testRemoveMaterial_NoProgress_HardDeletesAndRemovesFile() {
+        LectureMaterial mat = new LectureMaterial(400, null, null, 10, "Slides", "s.pdf", "/p/s.pdf", "pdf", "application/pdf", 100L, false);
+        mat.setId(40);
+
+        when(materialRepository.findById(40)).thenReturn(Optional.of(mat));
+        when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
+        when(lessonProgressRepository.existsByLessonId(400)).thenReturn(false);
+        when(lectureProgressRepository.existsByLectureId(400)).thenReturn(false);
+
+        ContentRemovalResponse response = materialService.removeMaterial(instructor, 40);
+
+        assertNotNull(response);
+        assertEquals(40, response.getId());
+        assertTrue(response.isDeleted());
+        assertFalse(response.isSoftDeleted());
+        assertFalse(response.isCriteriaWarning());
+        assertNull(response.getWarning());
+
+        verify(materialStorageService, times(1)).deleteMaterialFile("/p/s.pdf");
+        verify(materialRepository, times(1)).delete(mat);
+    }
+
+    @Test
+    void testRemoveMaterial_WithProgress_SoftDeletesAndPreservesFile() {
+        LectureMaterial mat = new LectureMaterial(400, null, null, 10, "Slides", "s.pdf", "/p/s.pdf", "pdf", "application/pdf", 100L, false);
+        mat.setId(41);
+
+        when(materialRepository.findById(41)).thenReturn(Optional.of(mat));
+        when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
+        when(lessonProgressRepository.existsByLessonId(400)).thenReturn(true);
+
+        ContentRemovalResponse response = materialService.removeMaterial(instructor, 41);
+
+        assertNotNull(response);
+        assertEquals(41, response.getId());
+        assertTrue(response.isDeleted());
+        assertTrue(response.isSoftDeleted());
+        assertNotNull(response.getWarning());
+        assertTrue(response.getWarning().contains("active student progress"));
+
+        verify(materialStorageService, never()).deleteMaterialFile(any());
+        verify(materialRepository, never()).delete(any());
+        verify(materialRepository, times(1)).save(mat);
+        assertNotNull(mat.getDeletedAt());
+    }
+
+    @Test
+    void testRemoveMaterial_WithCompletionCriteriaWarning() {
+        LectureMaterial mat = new LectureMaterial(400, null, null, 10, "Slides", "s.pdf", "/p/s.pdf", "pdf", "application/pdf", 100L, false);
+        mat.setId(42);
+
+        CourseCompletionCriteria criteria = new CourseCompletionCriteria(course);
+        criteria.setMandatoryLessonIds("400,401");
+
+        when(materialRepository.findById(42)).thenReturn(Optional.of(mat));
+        when(lessonRepository.findById(400)).thenReturn(Optional.of(lesson));
+        when(lessonProgressRepository.existsByLessonId(400)).thenReturn(false);
+        when(lectureProgressRepository.existsByLectureId(400)).thenReturn(false);
+        when(courseCompletionCriteriaRepository.findByCourseId(100)).thenReturn(Optional.of(criteria));
+
+        ContentRemovalResponse response = materialService.removeMaterial(instructor, 42);
+
+        assertNotNull(response);
+        assertTrue(response.isDeleted());
+        assertFalse(response.isSoftDeleted());
+        assertTrue(response.isCriteriaWarning());
+        assertNotNull(response.getWarning());
+        assertTrue(response.getWarning().contains("course completion criteria"));
+    }
+
+    @Test
+    void testRemoveMaterial_Fails_AlreadyDeleted() {
+        LectureMaterial mat = new LectureMaterial(400, null, null, 10, "Slides", "s.pdf", "/p/s.pdf", "pdf", "application/pdf", 100L, false);
+        mat.setId(43);
+        mat.setDeletedAt(java.time.LocalDateTime.now());
+
+        when(materialRepository.findById(43)).thenReturn(Optional.of(mat));
+
+        assertThrows(ResourceNotFoundException.class, () ->
+                materialService.removeMaterial(instructor, 43));
+        verify(materialRepository, never()).delete(any());
     }
 }
 

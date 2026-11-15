@@ -20,6 +20,14 @@ public class BookmarkController {
         this.bookmarkService = bookmarkService;
     }
 
+    private User resolveStudent(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof User user)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED, "User is not authenticated");
+        }
+        return user;
+    }
+
     /**
      * POST /api/courses/{courseId}/bookmark
      * Add course to bookmarks.
@@ -30,7 +38,7 @@ public class BookmarkController {
             @PathVariable Integer courseId,
             Authentication authentication) {
 
-        User currentUser = (User) authentication.getPrincipal();
+        User currentUser = resolveStudent(authentication);
         bookmarkService.addBookmark(currentUser.getId(), courseId);
 
         return ResponseEntity.ok(Map.of(
@@ -50,7 +58,7 @@ public class BookmarkController {
             @PathVariable Integer courseId,
             Authentication authentication) {
 
-        User currentUser = (User) authentication.getPrincipal();
+        User currentUser = resolveStudent(authentication);
         bookmarkService.removeBookmark(currentUser.getId(), courseId);
 
         return ResponseEntity.ok(Map.of(
@@ -67,7 +75,7 @@ public class BookmarkController {
     @GetMapping("/api/students/bookmarks")
     @PreAuthorize("hasRole('student')")
     public ResponseEntity<List<BookmarkedCourseResponse>> getMyBookmarks(Authentication authentication) {
-        User currentUser = (User) authentication.getPrincipal();
+        User currentUser = resolveStudent(authentication);
         List<BookmarkedCourseResponse> bookmarks = bookmarkService.getBookmarkedCourses(currentUser.getId());
         return ResponseEntity.ok(bookmarks);
     }

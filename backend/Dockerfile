@@ -1,9 +1,9 @@
 # ============================================================
 # Stage 1 – BUILD
-# Use the official Maven image with Java 17 (Eclipse Temurin)
+# Use the official Maven image with Java 25 (Eclipse Temurin)
 # to compile the project and produce the fat JAR.
 # ============================================================
-FROM maven:3.9.9-eclipse-temurin-17 AS builder
+FROM maven:3.9.12-eclipse-temurin-25 AS builder
 
 # Set a consistent working directory inside the build container
 WORKDIR /app
@@ -24,10 +24,10 @@ RUN mvn package -DskipTests -B
 
 # ============================================================
 # Stage 2 – RUNTIME
-# Use a minimal Eclipse Temurin 17 JRE-only image.
+# Use a minimal Eclipse Temurin 25 JRE-only image.
 # ~250 MB vs ~500 MB for the full JDK image.
 # ============================================================
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 # Create a non-root user for security best practice
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup

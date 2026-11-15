@@ -27,7 +27,10 @@ public class StudentLearningController {
     }
 
     private Integer getStudentId(Authentication authentication) {
-        User user = (User) authentication.getPrincipal();
+        if (authentication == null || !(authentication.getPrincipal() instanceof User user)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED, "User is not authenticated");
+        }
         return user.getId();
     }
 
@@ -66,6 +69,15 @@ public class StudentLearningController {
             Authentication authentication) {
         Integer studentId = getStudentId(authentication);
         return ResponseEntity.ok(studentLearningService.getLessonMaterials(studentId, lessonId));
+    }
+
+    // FR-I18: Get lesson details for enrolled student with release gating
+    @GetMapping("/lessons/{lessonId}")
+    public ResponseEntity<LessonResponse> getLesson(
+            @PathVariable Integer lessonId,
+            Authentication authentication) {
+        Integer studentId = getStudentId(authentication);
+        return ResponseEntity.ok(studentLearningService.getLessonForStudent(studentId, lessonId));
     }
 
     // FR-S14, FR-I17: Access learning materials attached to a module

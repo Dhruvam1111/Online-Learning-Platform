@@ -50,6 +50,27 @@ public class QuizAttempt {
     @Column(name = "obtained_marks", precision = 8, scale = 2)
     private BigDecimal obtainedMarks;
 
+    @Column(name = "overall_feedback", columnDefinition = "TEXT")
+    private String overallFeedback;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "grader_id")
+    private User grader;
+
+    @Column(name = "feedback_at")
+    private LocalDateTime feedbackAt;
+
+    @Column(name = "is_published", nullable = false)
+    private Boolean isPublished = false;
+
+    @Column(name = "is_overridden", nullable = false)
+    private Boolean isOverridden = false;
+    @Column(name = "published_at")
+    private LocalDateTime publishedAt;
+
+    @Column(name = "is_locked", nullable = false)
+    private Boolean isLocked = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -160,6 +181,90 @@ public class QuizAttempt {
 
     public void setObtainedMarks(BigDecimal obtainedMarks) {
         this.obtainedMarks = obtainedMarks;
+    }
+
+    public String getOverallFeedback() {
+        return overallFeedback;
+    }
+
+    public void setOverallFeedback(String overallFeedback) {
+        this.overallFeedback = overallFeedback;
+    }
+
+    public String getFeedback() {
+        return overallFeedback;
+    }
+
+    public void setFeedback(String feedback) {
+        this.overallFeedback = feedback;
+    }
+
+    public User getGrader() {
+        return grader;
+    }
+
+    public void setGrader(User grader) {
+        this.grader = grader;
+    }
+
+    public LocalDateTime getFeedbackAt() {
+        return feedbackAt;
+    }
+
+    public void setFeedbackAt(LocalDateTime feedbackAt) {
+        this.feedbackAt = feedbackAt;
+    }
+
+    public Boolean getIsPublished() {
+        return isPublished != null ? isPublished : false;
+    }
+
+    public void setIsPublished(Boolean isPublished) {
+        this.isPublished = isPublished != null ? isPublished : false;
+    }
+
+    public boolean isPublished() {
+        return Boolean.TRUE.equals(this.isPublished);
+    }
+
+    public void setPublished(boolean published) {
+        this.isPublished = published;
+    }
+
+    public Boolean getIsOverridden() {
+        return isOverridden;
+    }
+
+    public boolean isOverridden() {
+        return Boolean.TRUE.equals(isOverridden);
+    }
+
+    public void setIsOverridden(Boolean isOverridden) {
+        this.isOverridden = isOverridden != null ? isOverridden : false;
+    }
+
+    public LocalDateTime getPublishedAt() {
+        return publishedAt;
+    }
+
+    public void setPublishedAt(LocalDateTime publishedAt) {
+        this.publishedAt = publishedAt;
+    }
+
+    public Boolean getIsLocked() {
+        return isLocked != null ? isLocked : false;
+    }
+
+    public void setIsLocked(Boolean isLocked) {
+        this.isLocked = isLocked != null ? isLocked : false;
+    }
+
+    public boolean isLocked() {
+        return Boolean.TRUE.equals(this.isLocked);
+    }
+
+    public void setLocked(boolean locked) {
+        this.isLocked = locked;
     }
 
     public LocalDateTime getCreatedAt() {
