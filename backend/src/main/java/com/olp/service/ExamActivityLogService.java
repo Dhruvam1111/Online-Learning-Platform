@@ -190,8 +190,11 @@ public class ExamActivityLogService {
         // DR-05: Student academic records visible only to student, course instructors, and admins
         boolean isOwner = currentUser.getId().equals(attempt.getStudent().getId());
         boolean isAdmin = "admin".equalsIgnoreCase(currentUser.getRole());
-        boolean isInstructor = courseInstructorRepository != null &&
-                courseInstructorRepository.existsByCourseIdAndInstructorId(attempt.getExam().getCourse().getId(), currentUser.getId());
+        boolean isInstructor = !isOwner && !isAdmin
+                && attempt.getExam() != null
+                && attempt.getExam().getCourse() != null
+                && courseInstructorRepository != null
+                && courseInstructorRepository.existsByCourseIdAndInstructorId(attempt.getExam().getCourse().getId(), currentUser.getId());
 
         if (!isOwner && !isAdmin && !isInstructor) {
             throw new AccessDeniedException("You do not have permission to view activity logs for this attempt");
