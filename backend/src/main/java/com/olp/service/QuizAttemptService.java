@@ -313,6 +313,7 @@ public class QuizAttemptService {
         summary.setPassingMarks(quiz.getPassingMarks());
         summary.setFeedbackReleased(feedbackEnabled);
         summary.setResultsPublished(attemptPublished);
+        summary.setIsOverridden(attempt.isOverridden());
         summary.setCorrectAnswersVisible(answersVisible);
         summary.setShowCorrectAnswers(quiz.getShowCorrectAnswers());
 

@@ -56,6 +56,9 @@ public class QuizAttemptAnswer {
     @JoinColumn(name = "grader_id")
     private User grader;
 
+    @Column(name = "is_overridden", nullable = false)
+    private Boolean isOverridden = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -188,6 +191,18 @@ public class QuizAttemptAnswer {
 
     public void setGrader(User grader) {
         this.grader = grader;
+    }
+
+    public Boolean getIsOverridden() {
+        return isOverridden;
+    }
+
+    public boolean isOverridden() {
+        return Boolean.TRUE.equals(isOverridden);
+    }
+
+    public void setIsOverridden(Boolean isOverridden) {
+        this.isOverridden = isOverridden != null ? isOverridden : false;
     }
 
     public LocalDateTime getCreatedAt() {

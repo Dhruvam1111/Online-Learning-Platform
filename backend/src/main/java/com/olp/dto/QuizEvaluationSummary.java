@@ -27,6 +27,7 @@ public class QuizEvaluationSummary {
     private LocalDateTime feedbackAt;
     private Boolean feedbackReleased;
     private Boolean resultsPublished;
+    private Boolean isOverridden = false;
     private Boolean correctAnswersVisible;
     private Boolean showCorrectAnswers;
     private List<QuestionEvaluationResult> results = new ArrayList<>();
@@ -167,6 +168,18 @@ public class QuizEvaluationSummary {
 
     public void setResultsPublished(Boolean resultsPublished) {
         this.resultsPublished = resultsPublished;
+    }
+
+    public Boolean getIsOverridden() {
+        return isOverridden;
+    }
+
+    public boolean isOverridden() {
+        return Boolean.TRUE.equals(isOverridden);
+    }
+
+    public void setIsOverridden(Boolean isOverridden) {
+        this.isOverridden = isOverridden != null ? isOverridden : false;
     }
 
     public Boolean getCorrectAnswersVisible() {

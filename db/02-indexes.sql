@@ -171,6 +171,12 @@ CREATE INDEX IF NOT EXISTS idx_quizzes_feedback_released ON quizzes(feedback_rel
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_published ON quiz_attempts(is_published);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_grader ON quiz_attempts(grader_id);
 
+-- Step 48 / FR-I32: Grade Override & Result Versioning Indexes
+CREATE INDEX IF NOT EXISTS idx_grading_versions_attempt ON grading_result_versions(attempt_id);
+CREATE INDEX IF NOT EXISTS idx_grading_versions_answer ON grading_result_versions(answer_id);
+CREATE INDEX IF NOT EXISTS idx_grading_versions_instructor ON grading_result_versions(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_grading_versions_created_at ON grading_result_versions(created_at DESC);
+
 -- Step 25 / FR-I65: Marking Rules Indexes
 CREATE INDEX IF NOT EXISTS idx_quizzes_marking_rules ON quizzes(negative_marking, partial_marking);
 

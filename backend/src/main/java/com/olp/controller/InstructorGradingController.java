@@ -3,14 +3,18 @@ package com.olp.controller;
 import com.olp.dto.AnswerFeedbackRequest;
 import com.olp.dto.AnswerFeedbackResponse;
 import com.olp.dto.DescriptiveSubmissionResponse;
+import com.olp.dto.GradeOverrideRequest;
+import com.olp.dto.GradeOverrideResponse;
 import com.olp.dto.GradeSubmissionRequest;
 import com.olp.dto.GradeSubmissionResponse;
+import com.olp.dto.GradingResultVersionResponse;
 import com.olp.dto.PageResponse;
 import com.olp.dto.PublishResultResponse;
 import com.olp.dto.SubmissionFeedbackRequest;
 import com.olp.dto.SubmissionFeedbackResponse;
 import com.olp.entity.User;
 import com.olp.service.DescriptiveGradingService;
+import com.olp.service.GradingResultVersioningService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -30,10 +34,18 @@ import java.util.List;
 public class InstructorGradingController {
 
     private final DescriptiveGradingService descriptiveGradingService;
+    private final GradingResultVersioningService gradingResultVersioningService;
 
     @Autowired
-    public InstructorGradingController(DescriptiveGradingService descriptiveGradingService) {
+    public InstructorGradingController(
+            DescriptiveGradingService descriptiveGradingService,
+            GradingResultVersioningService gradingResultVersioningService) {
         this.descriptiveGradingService = descriptiveGradingService;
+        this.gradingResultVersioningService = gradingResultVersioningService;
+    }
+
+    public InstructorGradingController(DescriptiveGradingService descriptiveGradingService) {
+        this(descriptiveGradingService, null);
     }
 
     /**
@@ -211,5 +223,89 @@ public class InstructorGradingController {
         User currentUser = descriptiveGradingService.resolveUser(authentication);
         SubmissionFeedbackResponse response = descriptiveGradingService.getSubmissionFeedback(currentUser, attemptId);
         return ResponseEntity.ok(response);
+    }
+
+    // =========================================================================
+    // GRADE OVERRIDE & RESULT VERSIONING (FR-I32, DR-01, DR-ED04)
+    // =========================================================================
+
+    /**
+     * POST /api/instructor/grading/answers/{answerId}/override or /{answerId}/override
+     * Overrides an automatically or manually graded answer mark with mandatory justification.
+     * Creates an immutable result version (FR-I32, DR-ED04).
+     */
+    @PostMapping({ "/{answerId:\\d+}/override", "/answers/{answerId:\\d+}/override", "/submissions/{answerId:\\d+}/override" })
+    public ResponseEntity<GradeOverrideResponse> overrideAnswerGrade(
+            Authentication authentication,
+            @PathVariable Integer answerId,
+            @Valid @RequestBody GradeOverrideRequest request) {
+
+        User currentUser = descriptiveGradingService.resolveUser(authentication);
+        GradeOverrideResponse response = gradingResultVersioningService.overrideAnswerGrade(currentUser, answerId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/instructor/grading/attempts/{attemptId}/override
+     * Overrides overall attempt marks with mandatory justification.
+     */
+    @PostMapping({ "/attempts/{attemptId:\\d+}/override", "/attempts/{attemptId:\\d+}/grade-override" })
+    public ResponseEntity<GradeOverrideResponse> overrideAttemptGrade(
+            Authentication authentication,
+            @PathVariable Integer attemptId,
+            @Valid @RequestBody GradeOverrideRequest request) {
+
+        User currentUser = descriptiveGradingService.resolveUser(authentication);
+        GradeOverrideResponse response = gradingResultVersioningService.overrideAttemptGrade(currentUser, attemptId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/instructor/grading/answers/{answerId}/versions or /override-history
+     * Retrieves the complete immutable version history for an answer result (FR-I32, DR-ED04).
+     */
+    @GetMapping({ "/{answerId:\\d+}/versions", "/answers/{answerId:\\d+}/versions", "/{answerId:\\d+}/override-history", "/answers/{answerId:\\d+}/override-history" })
+    public ResponseEntity<List<GradingResultVersionResponse>> getAnswerVersionHistory(
+            Authentication authentication,
+            @PathVariable Integer answerId) {
+
+        User currentUser = descriptiveGradingService.resolveUser(authentication);
+        List<GradingResultVersionResponse> history = gradingResultVersioningService.getAnswerVersionHistory(currentUser, answerId);
+        return ResponseEntity.ok(history);
+    }
+
+    /**
+     * GET /api/instructor/grading/attempts/{attemptId}/versions or /override-history
+     * Retrieves the complete immutable version history for an attempt (FR-I32, DR-ED04).
+     */
+    @GetMapping({ "/attempts/{attemptId:\\d+}/versions", "/attempts/{attemptId:\\d+}/override-history" })
+    public ResponseEntity<List<GradingResultVersionResponse>> getAttemptVersionHistory(
+            Authentication authentication,
+            @PathVariable Integer attemptId) {
+
+        User currentUser = descriptiveGradingService.resolveUser(authentication);
+        List<GradingResultVersionResponse> history = gradingResultVersioningService.getAttemptVersionHistory(currentUser, attemptId);
+        return ResponseEntity.ok(history);
+    }
+
+    /**
+     * POST /api/instructor/grading/override
+     * Unified override endpoint accepting either answerId or attemptId.
+     */
+    @PostMapping("/override")
+    public ResponseEntity<GradeOverrideResponse> overrideGrade(
+            Authentication authentication,
+            @Valid @RequestBody GradeOverrideRequest request) {
+
+        User currentUser = descriptiveGradingService.resolveUser(authentication);
+        if (request.getAnswerId() != null) {
+            GradeOverrideResponse response = gradingResultVersioningService.overrideAnswerGrade(currentUser, request.getAnswerId(), request);
+            return ResponseEntity.ok(response);
+        } else if (request.getAttemptId() != null) {
+            GradeOverrideResponse response = gradingResultVersioningService.overrideAttemptGrade(currentUser, request.getAttemptId(), request);
+            return ResponseEntity.ok(response);
+        } else {
+            throw new IllegalArgumentException("Either answerId or attemptId must be provided for grade override");
+        }
     }
 }

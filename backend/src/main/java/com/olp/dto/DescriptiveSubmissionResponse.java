@@ -41,6 +41,7 @@ public class DescriptiveSubmissionResponse {
     private LocalDateTime submittedAt;
     private boolean isGraded;
     private boolean isPublished;
+    private boolean isOverridden;
 
     public DescriptiveSubmissionResponse() {}
 
@@ -103,6 +104,7 @@ public class DescriptiveSubmissionResponse {
                 || status == EvaluationStatus.CORRECT || status == EvaluationStatus.INCORRECT || status == EvaluationStatus.PARTIALLY_CORRECT;
         dto.setGraded(graded);
         dto.setPublished(status == EvaluationStatus.PUBLISHED);
+        dto.setOverridden(ans.isOverridden());
 
         return dto;
     }
@@ -369,5 +371,13 @@ public class DescriptiveSubmissionResponse {
 
     public void setPublished(boolean published) {
         isPublished = published;
+    }
+
+    public boolean isOverridden() {
+        return isOverridden;
+    }
+
+    public void setOverridden(boolean overridden) {
+        isOverridden = overridden;
     }
 }
