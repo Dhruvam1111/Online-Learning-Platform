@@ -40,6 +40,27 @@ public class EmailService {
     /**
      * Sends an OTP code to the user's real email address.
      */
+    public void sendRefundDecisionEmail(String to, String name, String course, String order, String decision, String reason, BigDecimal amount) {
+        if (senderEmail == null || senderEmail.isBlank()) {
+            log.warn("Refund decision email not sent: mail sender is not configured.");
+            return;
+        }
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(senderEmail, "Focotech");
+            helper.setTo(to);
+            helper.setSubject("Refund request " + decision + " — Focotech");
+            String text = "Hello " + name + ",\nYour refund request for " + course + " (" + order + ") was " + decision
+                + ".\nAdministrator reason: " + reason + "\n"
+                + ("approved".equals(decision) ? "Your refund of INR " + amount.toPlainString() + " has been processed." : "Your payment and course access remain unchanged.");
+            helper.setText(text, false);
+            mailSender.send(message);
+        } catch (Exception e) {
+            log.error("Refund decision email delivery failed for order {}", order, e);
+        }
+    }
+
     public void sendOtpEmail(String toEmail, String name, String otpCode, String purpose, int expiryMinutes) {
         if (senderEmail == null || senderEmail.isBlank()) {
             log.warn("[EmailService] No SMTP username configured in application.properties. Email not dispatched to SMTP network.");
@@ -466,7 +487,7 @@ public class EmailService {
                               </p>
                               
                               <p style="margin: 0 0 18px 0; font-size: 14px; line-height: 22px; color: #443e3a;">
-                                Your refund request for <strong style="color: #1e1b19;">"%s"</strong> has been processed successfully under our 100%% Money-Back Guarantee policy.
+                                Your refund request for <strong style="color: #1e1b19;">"%s"</strong> has been processed successfully. The approved amount is shown below.
                               </p>
 
                               <!-- Embedded Full Official Refund Credit Note Card -->
@@ -545,7 +566,7 @@ public class EmailService {
                                 <tr>
                                   <td>
                                     <p style="margin: 0; font-size: 12px; line-height: 18px; color: #5a524c;">
-                                      <strong style="color: #1e1b19;">Bank Credit Timeline:</strong> The refund of <strong>₹%s</strong> has been issued back to your original payment method. Depending on your bank or UPI provider, it will reflect within 1&ndash;3 business days.
+                                      <strong style="color: #1e1b19;">Refund details:</strong> Your approved refund of <strong>₹%s</strong> has been recorded. View the payment-source breakdown in your account.
                                     </p>
                                   </td>
                                 </tr>
@@ -779,7 +800,7 @@ public class EmailService {
                     </table>
                     <div style="background: #faf7f4; padding: 12px; border-radius: 8px; font-size: 12px; margin-bottom: 20px;">
                       <strong>Reason for Refund:</strong> %s<br>
-                      <strong>Credit Timeline:</strong> Refund credited back to original payment source (1&ndash;3 business days).
+                      <strong>Refund details:</strong> View the payment-source breakdown and refund status in your account.
                     </div>
                     <div style="margin-top: 20px; padding-top: 16px; border-top: 1px dashed #e8dcd5; font-size: 11px; color: #8e8076; text-align: center;">
                       Official Computer-Generated Credit Note &bull; Authorized by Focotech Refund Subsystem.

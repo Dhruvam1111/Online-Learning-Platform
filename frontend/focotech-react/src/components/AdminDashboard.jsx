@@ -38,13 +38,48 @@ export default function AdminDashboard({ onNavigateHome }) {
   const [reviewEvidence, setReviewEvidence] = useState(null);
   useEffect(() => { if (['finance', 'payouts'].includes(activeTab)) loadFinancialData(); }, [transactionPage, refundPage, payoutPage]);
   const [refunds, setRefunds] = useState([]);
-  const [exceptions, setExceptions] = useState([]);
+  const [refundQueue, setRefundQueue] = useState(null);
+  const [reviewingRefund, setReviewingRefund] = useState(null);
+  const [queueStatus, setQueueStatus] = useState('pending');
+  const [queuePage, setQueuePage] = useState(0);
+  const [queueSearch, setQueueSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [queueRevision, setQueueRevision] = useState(0);
+  const [queueError, setQueueError] = useState(false);
+  const [queueLoading, setQueueLoading] = useState(true);
+  const exceptions = refundQueue?.content ?? [];
+  const refreshQueue = () => setQueueRevision(revision => revision + 1);
+
+  useEffect(() => {
+    if (activeTab !== 'refunds') return;
+    const controller = new AbortController();
+    setQueueLoading(true);
+    setQueueError(false);
+    adminAPI.getRefundQueue({ status: queueStatus, search: queueSearch, page: queuePage }, controller.signal)
+      .then(({ data }) => {
+        if (controller.signal.aborted) return;
+        const lastPage = Math.max(0, data.totalPages - 1);
+        if (queuePage > lastPage) {
+          setQueuePage(lastPage);
+          return;
+        }
+        setRefundQueue(data);
+        setQueueLoading(false);
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setQueueError(true);
+        setQueueLoading(false);
+      });
+    return () => controller.abort();
+  }, [activeTab, queueStatus, queueSearch, queuePage, queueRevision]);
   const [auditRows, setAuditRows] = useState([]);
   const [fxEdit, setFxEdit] = useState({currency:'USD',rate:'84.50'});
   const updateFx = async () => {
     try { await api.patch('/payments/currencies/rates', {...fxEdit,rate:Number(fxEdit.rate)}); showToast('Simulated FX rate updated.'); loadFinancialData(); }
     catch(e) { showToast(e.response?.data?.message || 'Rate update failed.'); }
   };
+  const [approvedAmounts, setApprovedAmounts] = useState({});
   const [decisionReasons, setDecisionReasons] = useState({});
   const [decidingId, setDecidingId] = useState(null);
   const [reconciliation, setReconciliation] = useState(null);
@@ -107,7 +142,6 @@ export default function AdminDashboard({ onNavigateHome }) {
 
   const loadFinancialData = () => {
     api.get('/payments/governance/audit').then(r => setAuditRows(r.data)).catch(() => showToast('Audit history unavailable.'));
-    adminAPI.getRefundExceptions().then(res => setExceptions(res.data)).catch(() => showToast('Could not load refund requests.'));
     adminAPI.getReconciliation().then(res => setReconciliation(res.data)).catch(() => showToast('Could not load reconciliation.'));
     api.get(`/payments/admin/transactions?page=${transactionPage}&size=50`)
       .then((res) => {
@@ -241,8 +275,13 @@ export default function AdminDashboard({ onNavigateHome }) {
   const decideException = async (id, decision) => {
     const reason = decisionReasons[id]?.trim();
     if (!reason) { showToast('Enter a decision reason.'); return; }
+    const request = exceptions.find(r => r.eventId === id);
+    const amount = approvedAmounts[id] ?? request?.amount;
+    if (decision === 'approved' && (!Number.isFinite(Number(amount)) || Number(amount) <= 0 || Number(amount) > Number(request.amount) || !/^\d+(\.\d{1,2})?$/.test(String(amount)))) {
+      showToast('Enter a valid refund amount up to the requested amount, with at most two decimal places.'); return;
+    }
     setDecidingId(id);
-    try { await adminAPI.decideRefundException(id, decision, reason); loadFinancialData(); showToast(`Refund request ${decision}.`); }
+    try { await adminAPI.decideRefundException(id, decision, reason, decision === 'approved' ? String(amount) : null); refreshQueue(); showToast(`Refund request ${decision}.`); }
     catch (err) { showToast(err.response?.data?.message || 'Decision failed.'); }
     finally { setDecidingId(null); }
   };
@@ -400,6 +439,9 @@ export default function AdminDashboard({ onNavigateHome }) {
           >
             <span className="material-symbols-outlined text-[18px] text-purple-600">receipt_long</span>
             <span>Financial Ledger</span>
+          </button>
+          <button onClick={() => setActiveTab('refunds')} className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold text-left ${activeTab === 'refunds' ? 'bg-purple-50 text-purple-700' : 'text-[#6d635c] hover:bg-[#fbf7f4]'}`}>
+            <span className="material-symbols-outlined text-[18px]">assignment_return</span>Refund requests
           </button>
           <button
             onClick={() => { setActiveTab('payouts'); loadFinancialData(); }}
@@ -619,6 +661,73 @@ export default function AdminDashboard({ onNavigateHome }) {
             </div>
           )}
 
+          {activeTab === 'refunds' && <div className="min-w-0 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div><p className="text-xs font-bold uppercase tracking-widest text-purple-600 mb-1">Payment gateway</p><h2 className="text-2xl font-extrabold text-[#1f1a17]">Refund requests</h2><p className="text-sm text-[#8e8076] mt-1">Review the student's explanation and record your decision.</p></div>
+              <button onClick={refreshQueue} className="self-start flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#fae8dc] text-sm font-bold text-[#5c4f47] hover:bg-[#fbf7f4]"><span className="material-symbols-outlined text-[18px]">refresh</span>Refresh</button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-[#fae8dc] bg-white p-4"><p className="text-xs font-semibold text-[#8e8076]">Awaiting review</p><p className="mt-2 text-2xl font-extrabold text-[#1f1a17]">{refundQueue?.pendingCount ?? '—'} <span className="text-xs font-normal text-[#8e8076]">requests</span></p></div>
+              <div className="rounded-2xl border border-[#fae8dc] bg-white p-4"><p className="text-xs font-semibold text-[#8e8076]">Longest wait</p><p className="mt-2 text-2xl font-extrabold text-[#1f1a17]">{refundQueue?.oldestPendingAt ? (() => { const hours = Math.max(0, Math.floor((Date.now() - new Date(refundQueue.oldestPendingAt).getTime()) / 3600000)); return hours >= 24 ? `${Math.floor(hours / 24)}d ${hours % 24}h` : hours ? `${hours}h` : 'Under 1h'; })() : '—'}</p><p className="mt-1 text-xs text-[#8e8076]">Pending requests appear oldest first</p></div>
+            </div>
+            <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-[#fae8dc] bg-white p-4" onSubmit={event => {
+              event.preventDefault();
+              setQueuePage(0);
+              setQueueSearch(searchInput.trim());
+            }}>
+              <label className="grid gap-1 text-sm font-semibold">
+                Status
+                <select aria-label="Refund request status" className="w-full rounded-xl border border-[#e5dcd5] bg-[#fdfbf9] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-200" value={queueStatus} onChange={event => {
+                  setQueuePage(0);
+                  setQueueStatus(event.target.value);
+                }}>
+                  <option value="pending">Pending review</option>
+                  <option value="history">History</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm font-semibold">
+                Order ID or student email
+                <input className="w-full rounded-xl border border-[#e5dcd5] bg-[#fdfbf9] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-200" value={searchInput} maxLength={255}
+                  onChange={event => setSearchInput(event.target.value)} />
+              </label>
+              <button className="rounded-xl bg-[#ff5b35] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#e94d29]" type="submit">Search</button>
+            </form>
+            {queueLoading && <p role="status">Loading refund requests…</p>}
+            {queueError && <p role="alert">Could not load refund requests. Use Refresh to try again.</p>}
+            {!queueLoading && !queueError && <>
+            {exceptions.length === 0 && <p>No matching refund requests.</p>}
+            {exceptions.length > 0 && <section aria-label="Refund request table" className="rounded-2xl border border-[#fae8dc] bg-white overflow-hidden">
+              <table className="w-full table-fixed text-left text-xs [overflow-wrap:anywhere]">
+                <caption className="sr-only">Refund requests, student comments, administrator decisions and refund amounts</caption>
+                <colgroup>{(queueStatus === 'pending' ? [23, 13, 24, 20, 20] : [20, 14, 18, 18, 16, 14]).map((width, i) => <col key={i} style={{width: `${width}%`}} />)}</colgroup>
+                <thead className="bg-[#faf6f2] text-[#75675e]"><tr>{['Student / Course', 'Amount', 'Student comment', ...(queueStatus === 'pending' ? ['Status', 'Action'] : ['Admin reply', 'Refunded amount', 'Status'])].map(title => <th key={title} scope="col" className="px-2 py-4 sm:px-3 font-semibold">{title}</th>)}</tr></thead>
+                <tbody>{exceptions.map(r => <React.Fragment key={r.eventId}>
+                  <tr className="border-t border-[#f3eae3] align-top hover:bg-[#fdfbf9]">
+                    <td className="px-2 py-4 sm:px-3"><p className="font-bold text-[#332923]">{r.studentName || `Student #${r.requesterId}`}</p><p className="mt-1 text-[#75675e]">{r.courseTitle || 'Course refund'}</p><p className="mt-2 text-[10px] text-[#8e8076]">{r.orderId}</p></td>
+                    <td className="px-2 py-4 sm:px-3 font-semibold">₹{Number(r.amount).toLocaleString('en-IN', {minimumFractionDigits:2})}</td>
+                    <td className="px-2 py-4 sm:px-3 whitespace-pre-wrap text-[#685b53]">{r.reason || 'No comment provided.'}</td>
+                    {queueStatus !== 'pending' && <><td className="px-2 py-4 sm:px-3 whitespace-pre-wrap text-[#685b53]">{r.decisionRecord?.reason || 'No reply recorded.'}</td><td className="px-2 py-4 sm:px-3"><p className="font-semibold">{r.status === 'rejected' ? '₹0.00' : r.decisionRecord?.approvedAmount != null ? `₹${Number(r.decisionRecord.approvedAmount).toFixed(2)}` : 'Unavailable'}</p>{r.status === 'approved' && r.decisionRecord?.approvedAmount != null && <p className="mt-1 text-[10px] text-[#8e8076]">{Number(r.decisionRecord.approvedAmount) < Number(r.amount) ? 'Partial approval' : 'Full requested amount'}</p>}</td></>}
+                    <td className="px-2 py-4 sm:px-3"><span className={`inline-block rounded-lg px-1 py-1 text-[10px] font-semibold ${r.status === 'approved' ? 'bg-emerald-50 text-emerald-800' : r.status === 'rejected' ? 'bg-rose-50 text-rose-800' : 'bg-amber-50 text-amber-800'}`}>{r.status === 'approved' ? 'Approved' : r.status === 'rejected' ? 'Rejected' : 'Pending review'}</span></td>
+                    {queueStatus === 'pending' && <td className="px-2 py-4 sm:px-3"><button aria-expanded={reviewingRefund === r.eventId} aria-controls={`review-${r.eventId}`} onClick={() => setReviewingRefund(reviewingRefund === r.eventId ? null : r.eventId)} className="rounded-lg border border-[#e5dcd5] px-3 py-2 font-semibold text-[#5c4f47] hover:bg-orange-50">{reviewingRefund === r.eventId ? 'Close' : 'Review'}</button></td>}
+                  </tr>
+                  {queueStatus === 'pending' && reviewingRefund === r.eventId && <tr id={`review-${r.eventId}`}><td colSpan={5} className="bg-[#fdfbf9]">
+                  <div className="border-t border-[#f7ede6] p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div><h5 className="text-xs font-bold uppercase tracking-wide text-[#8e8076] mb-2">Student reason & comments</h5><p className="rounded-xl bg-[#fbf7f4] p-4 whitespace-pre-wrap break-words text-sm text-[#5c4f47] leading-relaxed">{r.reason}</p><p className="text-xs text-[#8e8076] mt-3">Funds and course access remain unchanged until approval.</p></div>
+                    <div><label className="block text-sm font-bold mb-2" htmlFor={`amount-${r.eventId}`}>Approved refund amount (₹)</label><input id={`amount-${r.eventId}`} type="number" min="0.01" max={r.amount} step="0.01" disabled={decidingId !== null} value={approvedAmounts[r.eventId] ?? r.amount} onChange={e => setApprovedAmounts({...approvedAmounts, [r.eventId]: e.target.value})} className="w-full rounded-xl border border-[#e5dcd5] p-3 mb-2" /><p className="text-xs text-[#8e8076] mb-4">Approve the full amount or enter a smaller amount for a partial refund. Processing revokes course access.</p><label htmlFor={`decision-${r.eventId}`} className="block text-sm font-bold mb-2">Decision reason <span className="text-rose-600">*</span></label><textarea id={`decision-${r.eventId}`} rows={3} maxLength={1000} placeholder="Explain why you are approving or rejecting this request…" className="w-full border border-[#e5dcd5] rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:opacity-50" disabled={decidingId !== null} value={decisionReasons[r.eventId] || ''} onChange={e => setDecisionReasons({...decisionReasons,[r.eventId]:e.target.value})} />
+                      <div className="flex flex-wrap gap-2 mt-3"><button disabled={decidingId !== null || !decisionReasons[r.eventId]?.trim()} onClick={() => decideException(r.eventId,'approved')} className="px-4 py-2.5 rounded-xl bg-emerald-700 text-white text-sm font-bold hover:bg-emerald-800 disabled:opacity-40">{decidingId === r.eventId ? 'Saving decision…' : 'Approve refund'}</button><button disabled={decidingId !== null || !decisionReasons[r.eventId]?.trim()} onClick={() => decideException(r.eventId,'rejected')} className="px-4 py-2.5 rounded-xl border border-rose-200 text-rose-700 text-sm font-bold hover:bg-rose-50 disabled:opacity-40">Reject request</button></div>
+                    </div>
+                  </div>
+
+                  </td></tr>}
+                </React.Fragment>)}</tbody>
+              </table>
+            </section>}
+            <PaymentPagination page={queuePage} totalPages={refundQueue?.totalPages}
+              onPage={setQueuePage} label="refund requests" />
+            </>}
+          </div>}
           {/* TAB 4: Financial Ledger & Invoices */}
           {activeTab === 'finance' && (
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#fae8dc] shadow-xs flex flex-col gap-6">
@@ -626,7 +735,7 @@ export default function AdminDashboard({ onNavigateHome }) {
                 <div>
                   <h2 className="text-[20px] font-extrabold text-[#1f1a17]">Platform Financial Ledger</h2>
                   <p className="text-xs text-[#8e8076] mt-0.5">
-                    Live system-wide payment transactions, GST tax invoices, and exceptional refund management.
+                    Live system-wide payment transactions and GST tax invoices. Manage refund requests from the Refund requests menu.
                   </p>
                 </div>
                 <button
@@ -638,18 +747,7 @@ export default function AdminDashboard({ onNavigateHome }) {
                 </button>
               </div>
 
-              <section className="p-4 border rounded-2xl">
-                <h3 className="font-bold">Exceptional refund review</h3>
-                {exceptions.length === 0 && <p className="text-sm">No exceptional refund requests.</p>}
-                {exceptions.map(r => <div key={r.eventId} className="border-t py-3 text-sm">
-                  <strong>{r.orderId}</strong> · ₹{r.amount} · {r.status}<p>{r.reason}</p>
-                  {r.status === 'pending' ? <div className="flex gap-2 flex-wrap">
-                    <input aria-label={`Decision reason for ${r.orderId}`} placeholder="Mandatory decision reason" className="border rounded p-2" value={decisionReasons[r.eventId] || ''} onChange={e => setDecisionReasons({...decisionReasons,[r.eventId]:e.target.value})} />
-                    <button disabled={decidingId !== null} onClick={() => decideException(r.eventId,'approved')} className="border rounded p-2">Approve refund</button>
-                    <button disabled={decidingId !== null} onClick={() => decideException(r.eventId,'rejected')} className="border rounded p-2">Reject refund</button>
-                  </div> : <p>Decision: {r.decisionRecord?.reason} · Admin #{r.decisionRecord?.actorId} · {r.decisionRecord?.recordedAt}</p>}
-                </div>)}
-              </section>
+
               <section className="p-4 border rounded-2xl">
                 <h3 className="font-bold">Simulated gateway reconciliation: {reconciliation?.status || 'Loading'}</h3>
                 {reconciliation?.discrepancyDetails?.map((d,i) => <p key={i} className="text-sm text-red-700">{d}</p>)}
