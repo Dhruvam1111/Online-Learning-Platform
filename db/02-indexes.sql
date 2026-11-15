@@ -241,6 +241,11 @@ CREATE INDEX IF NOT EXISTS idx_reported_questions_escalation ON reported_questio
 CREATE INDEX IF NOT EXISTS idx_student_question_reports_question ON student_question_reports(reported_question_id);
 CREATE INDEX IF NOT EXISTS idx_student_question_reports_student ON student_question_reports(student_id);
 
+-- Step 55 / FR-I29: Examination Monitoring Logs Indexes
+CREATE INDEX IF NOT EXISTS idx_monitoring_events_attempt ON exam_monitoring_events(attempt_id, event_timestamp ASC);
+CREATE INDEX IF NOT EXISTS idx_monitoring_events_severity ON exam_monitoring_events(severity);
+
+
 
 
 
