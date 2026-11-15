@@ -1180,6 +1180,19 @@ CREATE TABLE IF NOT EXISTS student_question_reports (
     CONSTRAINT uq_student_question_report UNIQUE (reported_question_id, student_id)
 );
 
+-- Step 55 / FR-I29: Examination Monitoring Logs
+CREATE TABLE IF NOT EXISTS exam_monitoring_events (
+    id SERIAL PRIMARY KEY,
+    attempt_id INTEGER NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+    event_type VARCHAR(50) NOT NULL,
+    severity VARCHAR(20) NOT NULL DEFAULT 'LOW',
+    event_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    duration_seconds INTEGER,
+    metadata_json TEXT,
+    notes VARCHAR(255)
+);
+
+
 
 
 
