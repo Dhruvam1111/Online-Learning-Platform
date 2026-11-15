@@ -233,6 +233,14 @@ CREATE INDEX IF NOT EXISTS idx_quiz_attempts_published ON quiz_attempts(is_publi
 CREATE INDEX IF NOT EXISTS idx_exam_attempts_review_status ON exam_attempts(review_status);
 CREATE INDEX IF NOT EXISTS idx_exam_attempt_review_history_attempt ON exam_attempt_review_history(attempt_id, created_at DESC);
 
+-- Step 52 / FR-I35: Reported Questions Indexes
+CREATE INDEX IF NOT EXISTS idx_reported_questions_course_id ON reported_questions(course_id);
+CREATE INDEX IF NOT EXISTS idx_reported_questions_assessment ON reported_questions(assessment_type, assessment_id);
+CREATE INDEX IF NOT EXISTS idx_reported_questions_status ON reported_questions(status);
+CREATE INDEX IF NOT EXISTS idx_reported_questions_escalation ON reported_questions(escalate_at, escalated_to_admin);
+CREATE INDEX IF NOT EXISTS idx_student_question_reports_question ON student_question_reports(reported_question_id);
+CREATE INDEX IF NOT EXISTS idx_student_question_reports_student ON student_question_reports(student_id);
+
 
 
 
