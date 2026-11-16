@@ -4,6 +4,8 @@
 -- ============================================================
 
 -- Clean slate (safe to re-run during development)
+DROP TABLE IF EXISTS course_announcements CASCADE;
+DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS quiz_attempt_answers CASCADE;
 DROP TABLE IF EXISTS quiz_attempts CASCADE;
 DROP TABLE IF EXISTS quiz_questions CASCADE;
@@ -821,6 +823,34 @@ CREATE TABLE IF NOT EXISTS quiz_attempt_answers (
     CONSTRAINT uq_attempt_question UNIQUE (attempt_id, question_id)
 );
 
+-- =========================
+-- Step 5 / FR-I70: Notification Centre
+-- =========================
+CREATE TABLE IF NOT EXISTS notifications (
+    id          SERIAL PRIMARY KEY,
+    user_id     INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type        VARCHAR(50)  NOT NULL DEFAULT 'SYSTEM',
+    title       VARCHAR(255),
+    message     TEXT         NOT NULL,
+    link        VARCHAR(500),
+    is_read     BOOLEAN      NOT NULL DEFAULT FALSE,
+    read_at     TIMESTAMP,
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+-- =========================
+-- Step 12 / FR-I39: Course Announcements
+-- =========================
+CREATE TABLE IF NOT EXISTS course_announcements (
+    id            SERIAL PRIMARY KEY,
+    course_id     INTEGER      NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    instructor_id INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title         VARCHAR(255) NOT NULL,
+    content       TEXT         NOT NULL,
+    created_at    TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
 -- Step 35 / FR-I71: Course Review Status and Resubmit
 ALTER TABLE courses DROP CONSTRAINT IF EXISTS chk_courses_status;
 ALTER TABLE courses ADD CONSTRAINT chk_courses_status CHECK (status IN ('draft', 'pending_review', 'published', 'archived', 'rejected', 'changes_requested', 'unpublished'));
@@ -1210,14 +1240,3 @@ CREATE TABLE IF NOT EXISTS exam_monitoring_events (
     metadata_json TEXT,
     notes VARCHAR(255)
 );
-
-
-
-
-
-
-
-
-
-
-

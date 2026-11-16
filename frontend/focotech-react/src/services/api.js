@@ -126,6 +126,15 @@ export const courseAPI = {
   removeBookmark: (courseId) => api.delete(`/courses/${courseId}/bookmark`),
 };
 
+// ─── Notification Centre API (Step 5 / FR-I70) ──────────────────────────────
+export const notificationAPI = {
+  getAll: (unreadOnly = false) =>
+    api.get('/notifications', { params: { unreadOnly } }),
+  getUnreadCount: () => api.get('/notifications/unread-count'),
+  markAsRead: (id) => api.patch(`/notifications/${id}/read`),
+  markAllAsRead: () => api.patch('/notifications/read-all'),
+};
+
 // ─── Instructor API ─────────────────────────────────────────────────────────
 export const instructorAPI = {
   getCourses: () => api.get('/instructor/courses'),
@@ -147,6 +156,19 @@ export const instructorAPI = {
   getEarnings: () => api.get('/payments/instructor/earnings'),
   withdrawEarnings: (bank) => api.post('/payments/instructor/payouts/withdraw-all', bank),
   getPayoutHistory: () => api.get('/payments/instructor/payouts/history'),
+  getNotifications: (unreadOnly = false) =>
+    api.get('/instructor/notifications', { params: { unreadOnly } }),
+  getUnreadNotificationCount: () => api.get('/instructor/notifications/unread-count'),
+  markNotificationRead: (id) => api.patch(`/instructor/notifications/${id}/read`),
+  markAllNotificationsRead: () => api.patch('/instructor/notifications/read-all'),
+  getCourseAnnouncements: (courseId) =>
+    api.get(`/instructor/courses/${courseId}/announcements`),
+  createCourseAnnouncement: (courseId, data) =>
+    api.post(`/instructor/courses/${courseId}/announcements`, data),
+  updateCourseAnnouncement: (courseId, announcementId, data) =>
+    api.put(`/instructor/courses/${courseId}/announcements/${announcementId}`, data),
+  deleteCourseAnnouncement: (courseId, announcementId) =>
+    api.delete(`/instructor/courses/${courseId}/announcements/${announcementId}`),
 };
 
 // ─── Admin API ──────────────────────────────────────────────────────────────

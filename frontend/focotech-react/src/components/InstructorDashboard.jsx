@@ -3,6 +3,7 @@ import PaymentGovernance from './PaymentGovernance';
 import { payoutStatusLabel } from '../utils/payoutStatus';
 import PaymentPagination from './PaymentPagination';
 import { downloadFinancialDocument } from '../utils/financialDocument';
+import NotificationBell from './NotificationBell';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api, { instructorAPI } from '../services/api';
@@ -23,6 +24,13 @@ export default function InstructorDashboard({ onNavigateHome }) {
   // New Lecture Form
   const [newLecture, setNewLecture] = useState({ title: '', youtubeUrl: '', orderIndex: 1 });
   const [addingLecture, setAddingLecture] = useState(false);
+
+  // FR-I39: Course Announcements
+  const [announcements, setAnnouncements] = useState([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
+  const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '' });
+  const [submittingAnnouncement, setSubmittingAnnouncement] = useState(false);
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState(null);
 
   // Instructor Profile
   const [profile, setProfile] = useState({ qualifications: '', expertiseAreas: '', bio: '', name: '' });
@@ -121,8 +129,61 @@ export default function InstructorDashboard({ onNavigateHome }) {
           if (Array.isArray(res.data)) setLectures(res.data);
         })
         .catch(() => setLectures([]));
+      loadCourseAnnouncements(selectedCourse.id);
     }
   }, [selectedCourse]);
+
+  const loadCourseAnnouncements = (courseId) => {
+    if (!courseId) return;
+    setLoadingAnnouncements(true);
+    instructorAPI
+      .getCourseAnnouncements(courseId)
+      .then((res) => {
+        if (Array.isArray(res.data)) setAnnouncements(res.data);
+      })
+      .catch(() => setAnnouncements([]))
+      .finally(() => setLoadingAnnouncements(false));
+  };
+
+  const handleSubmitAnnouncement = async (e) => {
+    e.preventDefault();
+    if (!selectedCourse || !announcementForm.title.trim() || !announcementForm.content.trim()) return;
+    setSubmittingAnnouncement(true);
+    try {
+      if (editingAnnouncementId) {
+        await instructorAPI.updateCourseAnnouncement(selectedCourse.id, editingAnnouncementId, {
+          title: announcementForm.title.trim(),
+          content: announcementForm.content.trim(),
+        });
+        showToast('Announcement updated successfully!');
+      } else {
+        const res = await instructorAPI.createCourseAnnouncement(selectedCourse.id, {
+          title: announcementForm.title.trim(),
+          content: announcementForm.content.trim(),
+        });
+        const count = res.data?.notifiedStudentCount ?? 0;
+        showToast(`Announcement posted! Notified ${count} enrolled student(s).`);
+      }
+      setAnnouncementForm({ title: '', content: '' });
+      setEditingAnnouncementId(null);
+      loadCourseAnnouncements(selectedCourse.id);
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to save announcement.');
+    } finally {
+      setSubmittingAnnouncement(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async (announcementId) => {
+    if (!selectedCourse) return;
+    try {
+      await instructorAPI.deleteCourseAnnouncement(selectedCourse.id, announcementId);
+      showToast('Announcement deleted.');
+      setAnnouncements((prev) => prev.filter((a) => a.id !== announcementId));
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to delete announcement.');
+    }
+  };
 
   const handleCreateCourse = async (e) => {
     e.preventDefault();
@@ -226,6 +287,7 @@ export default function InstructorDashboard({ onNavigateHome }) {
           </button>
 
           <div className="flex items-center gap-3">
+            <NotificationBell isAuthenticated={true} />
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
               Instructor: {user?.name || 'Dr. Instructor'}
             </span>
@@ -306,6 +368,18 @@ export default function InstructorDashboard({ onNavigateHome }) {
           >
             <span className="material-symbols-outlined text-[18px]">smart_display</span>
             <span>Manage Lectures</span>
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('announcements');
+              if (selectedCourse) loadCourseAnnouncements(selectedCourse.id);
+            }}
+            className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all text-left cursor-pointer ${
+              activeTab === 'announcements' ? 'bg-blue-50 text-blue-700' : 'text-[#6d635c] hover:bg-[#fbf7f4]'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">campaign</span>
+            <span>Announcements</span>
           </button>
           <button
             onClick={() => setActiveTab('profile')}
@@ -615,6 +689,178 @@ export default function InstructorDashboard({ onNavigateHome }) {
                 ) : (
                   <p className="text-xs text-[#8e8076] italic">
                     No lectures added to this course yet.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3B: Course Announcements (FR-I39) */}
+          {activeTab === 'announcements' && (
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#fae8dc] shadow-xs flex flex-col gap-6">
+              <div>
+                <h2 className="text-[20px] font-extrabold text-[#1e1916]">
+                  Course Announcements (FR-I39)
+                </h2>
+                <p className="text-xs text-[#8e8076] mt-0.5">
+                  Broadcast announcements to all enrolled students via in-app Notification Bell &amp; email, and manage announcement history.
+                </p>
+              </div>
+
+              {/* Select Target Course */}
+              <div>
+                <label className="block text-xs font-bold text-[#554a43] uppercase tracking-wider mb-1.5">
+                  Select Course
+                </label>
+                <select
+                  value={selectedCourse?.id || ''}
+                  onChange={(e) => {
+                    const found = courses.find((c) => c.id === Number(e.target.value));
+                    setSelectedCourse(found || null);
+                    setEditingAnnouncementId(null);
+                    setAnnouncementForm({ title: '', content: '' });
+                  }}
+                  className="w-full max-w-md p-2.5 rounded-xl border border-[#faeae0] text-sm font-semibold bg-[#fdfaf7]"
+                >
+                  {courses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      #{c.id} — {c.title} ({c.status})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Post / Edit Announcement Form */}
+              {selectedCourse && (
+                <form
+                  onSubmit={handleSubmitAnnouncement}
+                  className="p-5 rounded-2xl bg-[#fbf7f4] border border-[#f0dfd3] flex flex-col gap-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-[#1e1916]">
+                      {editingAnnouncementId
+                        ? `Edit Announcement #${editingAnnouncementId}`
+                        : `Broadcast Announcement for "${selectedCourse.title}"`}
+                    </h3>
+                    {editingAnnouncementId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingAnnouncementId(null);
+                          setAnnouncementForm({ title: '', content: '' });
+                        }}
+                        className="text-xs font-bold text-rose-600 hover:underline cursor-pointer"
+                      >
+                        Cancel Edit
+                      </button>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#6d635c] mb-1">
+                      Announcement Title *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Week 3 Live Q&A Session Details"
+                      value={announcementForm.title}
+                      onChange={(e) =>
+                        setAnnouncementForm({ ...announcementForm, title: e.target.value })
+                      }
+                      className="w-full p-2.5 rounded-xl border border-[#e5d5ca] bg-white text-xs focus:outline-none focus:border-blue-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#6d635c] mb-1">
+                      Message Content *
+                    </label>
+                    <textarea
+                      rows={4}
+                      placeholder="Write the announcement message that will be sent to all enrolled students..."
+                      value={announcementForm.content}
+                      onChange={(e) =>
+                        setAnnouncementForm({ ...announcementForm, content: e.target.value })
+                      }
+                      className="w-full p-2.5 rounded-xl border border-[#e5d5ca] bg-white text-xs focus:outline-none focus:border-blue-500"
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submittingAnnouncement}
+                    className="py-2.5 px-5 bg-blue-600 text-white rounded-xl font-bold text-xs hover:bg-blue-700 transition-all self-start cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">send</span>
+                    <span>
+                      {submittingAnnouncement
+                        ? 'Publishing...'
+                        : editingAnnouncementId
+                        ? 'Update Announcement'
+                        : 'Post & Notify Enrolled Students'}
+                    </span>
+                  </button>
+                </form>
+              )}
+
+              {/* Announcement History List */}
+              <div>
+                <h3 className="text-sm font-bold text-[#1e1916] mb-3">
+                  Announcement History ({announcements.length})
+                </h3>
+                {loadingAnnouncements ? (
+                  <p className="text-xs text-[#8e8076] italic">Loading announcements...</p>
+                ) : announcements.length > 0 ? (
+                  <div className="flex flex-col gap-3">
+                    {announcements.map((ann) => (
+                      <div
+                        key={ann.id}
+                        className="p-4 rounded-2xl border border-[#faeae0] bg-white flex flex-col gap-2"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h4 className="font-bold text-sm text-[#1e1916]">{ann.title}</h4>
+                            <span className="text-[11px] text-[#8e8076]">
+                              Posted by {ann.instructorName || 'Instructor'} ·{' '}
+                              {ann.createdAt
+                                ? new Date(ann.createdAt).toLocaleString()
+                                : 'Just now'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingAnnouncementId(ann.id);
+                                setAnnouncementForm({
+                                  title: ann.title || '',
+                                  content: ann.content || '',
+                                });
+                              }}
+                              className="px-2.5 py-1 rounded-lg text-blue-600 hover:bg-blue-50 text-xs font-bold cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAnnouncement(ann.id)}
+                              className="px-2.5 py-1 rounded-lg text-rose-600 hover:bg-rose-50 text-xs font-bold cursor-pointer"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-xs text-[#4a413c] whitespace-pre-wrap leading-relaxed">
+                          {ann.content}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#8e8076] italic">
+                    No announcements posted for this course yet.
                   </p>
                 )}
               </div>
