@@ -265,3 +265,17 @@ CREATE INDEX IF NOT EXISTS idx_refund_exception_queue
 CREATE INDEX IF NOT EXISTS idx_refund_exception_order
     ON webhook_events (substring(event_id, 11)) WHERE event_type = 'refund.exception.request';
 CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users (lower(email));
+
+-- Step 29 / FR-I40 & Step 30 / FR-I42: Course Discussions, Replies & Moderation Indexes
+CREATE INDEX IF NOT EXISTS idx_course_discussions_course_pinned_created
+    ON course_discussions (course_id, is_pinned DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_course_discussions_course_answered
+    ON course_discussions (course_id, is_answered, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_course_discussions_moderation
+    ON course_discussions (course_id, moderation_status, escalated_to_admin);
+CREATE INDEX IF NOT EXISTS idx_course_discussion_replies_discussion
+    ON course_discussion_replies (discussion_id, created_at ASC);
+CREATE INDEX IF NOT EXISTS idx_discussion_moderation_logs_course
+    ON discussion_moderation_logs (course_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_discussion_moderation_logs_escalated
+    ON discussion_moderation_logs (escalated_to_admin, created_at DESC);

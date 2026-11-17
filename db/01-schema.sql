@@ -1240,3 +1240,64 @@ CREATE TABLE IF NOT EXISTS exam_monitoring_events (
     metadata_json TEXT,
     notes VARCHAR(255)
 );
+
+-- =========================
+-- Step 29 / FR-I40 & Step 30 / FR-I42: Course Discussions, Replies & Moderation
+-- =========================
+CREATE TABLE IF NOT EXISTS course_discussions (
+    id                SERIAL PRIMARY KEY,
+    course_id         INTEGER      NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    lecture_id        INTEGER      REFERENCES lectures(id) ON DELETE SET NULL,
+    author_id         INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title             VARCHAR(255) NOT NULL,
+    body              TEXT         NOT NULL,
+    is_answered       BOOLEAN      NOT NULL DEFAULT FALSE,
+    is_pinned         BOOLEAN      NOT NULL DEFAULT FALSE,
+    is_hidden         BOOLEAN      NOT NULL DEFAULT FALSE,
+    is_deleted        BOOLEAN      NOT NULL DEFAULT FALSE,
+    moderation_status VARCHAR(30)  NOT NULL DEFAULT 'ACTIVE',
+    moderation_reason TEXT,
+    moderated_by      INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+    moderated_at      TIMESTAMP,
+    escalated_to_admin BOOLEAN     NOT NULL DEFAULT FALSE,
+    escalation_reason TEXT,
+    escalated_at      TIMESTAMP,
+    created_at        TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS course_discussion_replies (
+    id                  SERIAL PRIMARY KEY,
+    discussion_id       INTEGER      NOT NULL REFERENCES course_discussions(id) ON DELETE CASCADE,
+    author_id           INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body                TEXT         NOT NULL,
+    is_instructor_reply BOOLEAN      NOT NULL DEFAULT FALSE,
+    is_official_answer  BOOLEAN      NOT NULL DEFAULT FALSE,
+    is_hidden           BOOLEAN      NOT NULL DEFAULT FALSE,
+    is_deleted          BOOLEAN      NOT NULL DEFAULT FALSE,
+    moderation_status   VARCHAR(30)  NOT NULL DEFAULT 'ACTIVE',
+    moderation_reason   TEXT,
+    moderated_by        INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+    moderated_at        TIMESTAMP,
+    escalated_to_admin  BOOLEAN      NOT NULL DEFAULT FALSE,
+    escalation_reason   TEXT,
+    escalated_at        TIMESTAMP,
+    created_at          TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS discussion_moderation_logs (
+    id                  SERIAL PRIMARY KEY,
+    course_id           INTEGER      NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    discussion_id       INTEGER      REFERENCES course_discussions(id) ON DELETE SET NULL,
+    reply_id            INTEGER      REFERENCES course_discussion_replies(id) ON DELETE SET NULL,
+    target_type         VARCHAR(30)  NOT NULL,
+    target_author_id    INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    moderator_id        INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    action              VARCHAR(50)  NOT NULL,
+    reason              TEXT         NOT NULL,
+    previous_content    TEXT,
+    new_content         TEXT,
+    escalated_to_admin  BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at          TIMESTAMP    NOT NULL DEFAULT NOW()
+);

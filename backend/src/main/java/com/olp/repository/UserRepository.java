@@ -22,6 +22,9 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     // Find users by role and account status with pagination (e.g., pending instructors)
     Page<User> findByRoleAndAccountStatus(String role, String accountStatus, Pageable pageable);
 
+    @Query("SELECT u FROM User u WHERE LOWER(u.role) = LOWER(:role)")
+    java.util.List<User> findAllByRoleIgnoreCase(@Param("role") String role);
+
     // Find users by account status with pagination
     Page<User> findByAccountStatus(String accountStatus, Pageable pageable);
 
