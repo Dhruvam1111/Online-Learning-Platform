@@ -265,3 +265,9 @@ CREATE INDEX IF NOT EXISTS idx_refund_exception_queue
 CREATE INDEX IF NOT EXISTS idx_refund_exception_order
     ON webhook_events (substring(event_id, 11)) WHERE event_type = 'refund.exception.request';
 CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users (lower(email));
+
+-- Step 56 / FR-A31 (ADM-015): Admin Audit Logs Indexes
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_created_at ON admin_audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_actor ON admin_audit_logs(actor_id);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_action ON admin_audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_target ON admin_audit_logs(target_type, target_id);

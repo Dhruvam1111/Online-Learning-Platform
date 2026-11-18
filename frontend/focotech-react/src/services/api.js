@@ -201,6 +201,7 @@ export const adminAPI = {
   getRefundQueue: (params, signal) => api.get('/payments/refunds/exceptions/queue', { params, signal }),
   decideRefundException: (id, decision, reason, approvedAmount = null) => api.post(`/payments/refunds/exceptions/${id}/decision`, {decision, reason, approvedAmount}),
   getReconciliation: () => api.get('/payments/reconciliation/report'),
+  getAuditLogs: (params) => api.get('/admin/audit-logs', { params }),
 };
 
 // ─── Payment Gateway API (QR Code Flow) ────────────────────────────────────
