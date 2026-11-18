@@ -29,9 +29,18 @@ public class AdminService {
     private final CourseRepository courseRepository;
     private final CourseSubmissionRepository courseSubmissionRepository;
     private final EmailService emailService;
+    private final AdminAuditService adminAuditService;
 
     public AdminService(UserRepository userRepository, CourseRepository courseRepository) {
-        this(userRepository, courseRepository, null, null);
+        this(userRepository, courseRepository, null, null, null);
+    }
+
+    public AdminService(
+            UserRepository userRepository,
+            CourseRepository courseRepository,
+            CourseSubmissionRepository courseSubmissionRepository,
+            EmailService emailService) {
+        this(userRepository, courseRepository, courseSubmissionRepository, emailService, null);
     }
 
     @Autowired
@@ -39,11 +48,13 @@ public class AdminService {
             UserRepository userRepository,
             CourseRepository courseRepository,
             @Autowired(required = false) CourseSubmissionRepository courseSubmissionRepository,
-            @Autowired(required = false) EmailService emailService) {
+            @Autowired(required = false) EmailService emailService,
+            @Autowired(required = false) AdminAuditService adminAuditService) {
         this.userRepository = userRepository;
         this.courseRepository = courseRepository;
         this.courseSubmissionRepository = courseSubmissionRepository;
         this.emailService = emailService;
+        this.adminAuditService = adminAuditService;
     }
 
     /**
@@ -100,8 +111,15 @@ public class AdminService {
             throw new IllegalArgumentException("Only users with role 'instructor' can be approved as instructors");
         }
 
+        String prevStatus = user.getAccountStatus();
         user.setAccountStatus("active");
         user = userRepository.save(user);
+
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("INSTRUCTOR_APPROVED", "USER", String.valueOf(user.getId()),
+                    user.getName(), "Approved instructor registration", prevStatus, "active");
+        }
+
         return toAdminUserResponse(user);
     }
 
@@ -117,8 +135,15 @@ public class AdminService {
             throw new IllegalArgumentException("Only users with role 'instructor' can be rejected as instructors");
         }
 
+        String prevStatus = user.getAccountStatus();
         user.setAccountStatus("rejected");
         user = userRepository.save(user);
+
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("INSTRUCTOR_REJECTED", "USER", String.valueOf(user.getId()),
+                    user.getName(), "Rejected instructor application", prevStatus, "rejected");
+        }
+
         return toAdminUserResponse(user);
     }
 
@@ -134,8 +159,15 @@ public class AdminService {
             throw new IllegalArgumentException("Admin accounts cannot be suspended");
         }
 
+        String prevStatus = user.getAccountStatus();
         user.setAccountStatus("suspended");
         user = userRepository.save(user);
+
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("USER_SUSPENDED", "USER", String.valueOf(user.getId()),
+                    user.getName(), "Suspended user account", prevStatus, "suspended");
+        }
+
         return toAdminUserResponse(user);
     }
 
@@ -146,8 +178,15 @@ public class AdminService {
     @Transactional
     public AdminUserResponse activateUser(Integer userId) {
         User user = findUserById(userId);
+        String prevStatus = user.getAccountStatus();
         user.setAccountStatus("active");
         user = userRepository.save(user);
+
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("USER_ACTIVATED", "USER", String.valueOf(user.getId()),
+                    user.getName(), "Reactivated user account", prevStatus, "active");
+        }
+
         return toAdminUserResponse(user);
     }
 
@@ -163,7 +202,14 @@ public class AdminService {
             throw new IllegalArgumentException("Admin accounts cannot be deleted");
         }
 
+        String details = "Deleted user: " + user.getName() + " (" + user.getEmail() + ", role: " + user.getRole() + ")";
+        String prevStatus = user.getAccountStatus();
         userRepository.delete(user);
+
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("USER_DELETED", "USER", String.valueOf(userId),
+                    user.getName(), details, prevStatus, "DELETED");
+        }
     }
 
     // =========================================================================
@@ -216,6 +262,7 @@ public class AdminService {
     @Transactional
     public AdminCourseResponse approveCourse(Integer courseId) {
         Course course = findCourseById(courseId);
+        String prevStatus = course.getStatus() != null ? course.getStatus().name() : "UNKNOWN";
         course.setStatus(CourseStatus.PUBLISHED);
         course.setRejectionReason(null);
         course.setReviewComments(null);
@@ -240,6 +287,11 @@ public class AdminService {
                     null);
         }
 
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("COURSE_APPROVED", "COURSE", String.valueOf(course.getId()),
+                    course.getTitle(), "Course approved and published", prevStatus, CourseStatus.PUBLISHED.name());
+        }
+
         return toAdminCourseResponse(course);
     }
 
@@ -251,6 +303,7 @@ public class AdminService {
     @Transactional
     public AdminCourseResponse rejectCourse(Integer courseId, RejectCourseRequest request) {
         Course course = findCourseById(courseId);
+        String prevStatus = course.getStatus() != null ? course.getStatus().name() : "UNKNOWN";
         String reason = (request != null && request.getReason() != null) ? request.getReason().trim() : "";
         course.setStatus(CourseStatus.REJECTED);
         course.setRejectionReason(reason);
@@ -277,6 +330,11 @@ public class AdminService {
                     reason);
         }
 
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("COURSE_REJECTED", "COURSE", String.valueOf(course.getId()),
+                    course.getTitle(), "Course rejected: " + reason, prevStatus, CourseStatus.REJECTED.name());
+        }
+
         return toAdminCourseResponse(course);
     }
 
@@ -290,6 +348,7 @@ public class AdminService {
     @Transactional
     public AdminCourseResponse requestChanges(Integer courseId, CourseReviewRequest request) {
         Course course = findCourseById(courseId);
+        String prevStatus = course.getStatus() != null ? course.getStatus().name() : "UNKNOWN";
         String feedback = (request != null) ? request.resolveFeedback() : "";
         if (feedback.isBlank()) {
             throw new IllegalArgumentException("Change request reason or comments must be provided");
@@ -320,6 +379,11 @@ public class AdminService {
                     feedback);
         }
 
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("COURSE_CHANGES_REQUESTED", "COURSE", String.valueOf(course.getId()),
+                    course.getTitle(), "Requested changes: " + feedback, prevStatus, CourseStatus.CHANGES_REQUESTED.name());
+        }
+
         return toAdminCourseResponse(course);
     }
 
@@ -330,8 +394,15 @@ public class AdminService {
     @Transactional
     public AdminCourseResponse unpublishCourse(Integer courseId) {
         Course course = findCourseById(courseId);
+        String prevStatus = course.getStatus() != null ? course.getStatus().name() : "UNKNOWN";
         course.setStatus(CourseStatus.DRAFT);
         course = courseRepository.save(course);
+
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("COURSE_UNPUBLISHED", "COURSE", String.valueOf(course.getId()),
+                    course.getTitle(), "Course unpublished and returned to draft", prevStatus, CourseStatus.DRAFT.name());
+        }
+
         return toAdminCourseResponse(course);
     }
 
@@ -343,7 +414,14 @@ public class AdminService {
     @Transactional
     public void deleteCourse(Integer courseId) {
         Course course = findCourseById(courseId);
+        String details = "Deleted course: " + course.getTitle() + " (ID: " + courseId + ")";
+        String prevStatus = course.getStatus() != null ? course.getStatus().name() : "";
         courseRepository.delete(course);
+
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("COURSE_DELETED", "COURSE", String.valueOf(courseId),
+                    course.getTitle(), details, prevStatus, "DELETED");
+        }
     }
 
     // ===== Helper Methods =====

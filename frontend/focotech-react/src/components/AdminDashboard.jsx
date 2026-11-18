@@ -4,6 +4,7 @@ import { downloadFinancialDocument } from '../utils/financialDocument';
 import PaymentGovernance from './PaymentGovernance';
 import PaymentPolicies from './PaymentPolicies';
 import { openPaymentReceipt } from '../utils/paymentReceipt';
+import AdminAuditLogs from './AdminAuditLogs';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api, { adminAPI } from '../services/api';
@@ -427,6 +428,15 @@ export default function AdminDashboard({ onNavigateHome }) {
             <span className="material-symbols-outlined text-[18px]">auto_stories</span>
             <span>Course Governance ({courses.length})</span>
           </button>
+          <button
+            onClick={() => setActiveTab('audit')}
+            className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all text-left cursor-pointer ${
+              activeTab === 'audit' ? 'bg-purple-50 text-purple-700 font-extrabold' : 'text-[#6d635c] hover:bg-[#fbf7f4]'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">history</span>
+            <span>Audit Logs</span>
+          </button>
 
           <span className="text-[11px] font-bold uppercase tracking-wider text-[#9d8d85] px-3 block mt-3 mb-1">
             PAYMENT GATEWAY
@@ -660,6 +670,9 @@ export default function AdminDashboard({ onNavigateHome }) {
               </div>
             </div>
           )}
+
+          {/* TAB: Audit Logs (ADM-015, FR-A31) */}
+          {activeTab === 'audit' && <AdminAuditLogs />}
 
           {activeTab === 'refunds' && <div className="min-w-0 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
