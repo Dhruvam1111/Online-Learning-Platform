@@ -4,7 +4,6 @@ import com.olp.entity.ExamAttempt;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
@@ -12,7 +11,6 @@ import java.util.Optional;
 /**
  * Repository interface for managing student exam attempts (FR-I25, Step 38).
  */
-@Repository
 public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, Integer> {
 
     @Query("SELECT ea FROM ExamAttempt ea WHERE ea.exam.id = :examId AND ea.student.id = :studentId ORDER BY ea.attemptNumber DESC")
@@ -55,5 +53,23 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, Intege
            "ORDER BY ea.id DESC")
     List<ExamAttempt> findFlaggedByExamId(@Param("examId") Integer examId,
                                          @Param("status") com.olp.entity.ExamAttemptReviewStatus status);
-}
 
+    @Query("SELECT ea FROM ExamAttempt ea JOIN FETCH ea.student s WHERE ea.exam.id = :examId " +
+           "AND (ea.isPublished = true OR (ea.exam.resultsPublished = true AND ea.status = 'SUBMITTED')) " +
+           "ORDER BY ea.obtainedMarks DESC, ea.submittedAt DESC")
+    List<ExamAttempt> findPublishedAttemptsByExamId(@Param("examId") Integer examId);
+
+    @Query("SELECT ea FROM ExamAttempt ea WHERE ea.exam.id = :examId AND ea.student.id = :studentId " +
+           "AND (ea.isPublished = true OR (ea.exam.resultsPublished = true AND ea.status = 'SUBMITTED')) " +
+           "ORDER BY ea.attemptNumber ASC")
+    List<ExamAttempt> findPublishedAttemptsByExamIdAndStudentId(
+            @Param("examId") Integer examId,
+            @Param("studentId") Integer studentId);
+
+    @Query("SELECT ea FROM ExamAttempt ea JOIN FETCH ea.exam e WHERE e.course.id = :courseId AND ea.student.id = :studentId " +
+           "AND (ea.isPublished = true OR (e.resultsPublished = true AND ea.status = 'SUBMITTED')) " +
+           "ORDER BY e.id ASC, ea.attemptNumber ASC")
+    List<ExamAttempt> findPublishedAttemptsByCourseIdAndStudentId(
+            @Param("courseId") Integer courseId,
+            @Param("studentId") Integer studentId);
+}

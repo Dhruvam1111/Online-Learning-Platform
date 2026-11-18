@@ -5,12 +5,10 @@ import com.olp.entity.QuizAttemptStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
-@Repository
 public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Integer> {
 
     @Query("SELECT a FROM QuizAttempt a JOIN FETCH a.quiz JOIN FETCH a.student WHERE a.id = :id AND a.quiz.id = :quizId")
@@ -34,5 +32,23 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Intege
 
     @Query("SELECT COUNT(a) FROM QuizAttempt a WHERE a.quiz.id = :quizId")
     long countByQuizId(@Param("quizId") Integer quizId);
-}
 
+    @Query("SELECT a FROM QuizAttempt a JOIN FETCH a.student s WHERE a.quiz.id = :quizId " +
+           "AND (a.isPublished = true OR (a.quiz.resultsPublished = true AND a.status = com.olp.entity.QuizAttemptStatus.SUBMITTED)) " +
+           "ORDER BY a.obtainedMarks DESC, a.submittedAt DESC")
+    List<QuizAttempt> findPublishedAttemptsByQuizId(@Param("quizId") Integer quizId);
+
+    @Query("SELECT a FROM QuizAttempt a WHERE a.quiz.id = :quizId AND a.student.id = :studentId " +
+           "AND (a.isPublished = true OR (a.quiz.resultsPublished = true AND a.status = com.olp.entity.QuizAttemptStatus.SUBMITTED)) " +
+           "ORDER BY a.attemptNumber ASC")
+    List<QuizAttempt> findPublishedAttemptsByQuizIdAndStudentId(
+            @Param("quizId") Integer quizId,
+            @Param("studentId") Integer studentId);
+
+    @Query("SELECT a FROM QuizAttempt a JOIN FETCH a.quiz q WHERE q.course.id = :courseId AND a.student.id = :studentId " +
+           "AND (a.isPublished = true OR (q.resultsPublished = true AND a.status = com.olp.entity.QuizAttemptStatus.SUBMITTED)) " +
+           "ORDER BY q.id ASC, a.attemptNumber ASC")
+    List<QuizAttempt> findPublishedAttemptsByCourseIdAndStudentId(
+            @Param("courseId") Integer courseId,
+            @Param("studentId") Integer studentId);
+}
