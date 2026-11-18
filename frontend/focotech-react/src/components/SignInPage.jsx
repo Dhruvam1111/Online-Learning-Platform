@@ -1,3 +1,4 @@
+import { authErrorMessage } from '../utils/authError';
 import React, { useState, useEffect } from 'react';
 import EarthCanvas from './EarthCanvas';
 import OtpAuthModal from './OtpAuthModal';
@@ -26,6 +27,11 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
   const [expertise, setExpertise] = useState('');
   const [qualification, setQualification] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
+
+  useEffect(() => {
+    setPassword('');
+    setShowPassword(false);
+  }, [isSignUp, isForgotPassword]);
 
   // Feedback states
   const [isLoading, setIsLoading] = useState(false);
@@ -189,7 +195,7 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
         }
       }, 1200);
     } catch (err) {
-      const msg = err.response?.data?.message || err.response?.data?.error || err.message;
+      const msg = authErrorMessage(err);
       setAlertMessage({ type: 'error', text: msg });
     } finally {
       setIsLoading(false);
@@ -266,7 +272,7 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
       setIsLoading(false);
       setAlertMessage({
         type: 'error',
-        text: 'An unexpected error occurred. Please check if the backend server is running.'
+        text: 'We cannot complete your request right now. Please try again shortly.'
       });
     }
   };
@@ -376,13 +382,13 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
             {/* Form Headers */}
             <div className="flex flex-col">
               <span className="text-neutral-700 font-semibold text-lg sm:text-xl">
-                {isSignUp ? 'Create your profile' : 'Welcome back!'}
+                {isForgotPassword ? 'Account recovery' : isSignUp ? 'Create your profile' : 'Welcome back!'}
               </span>
               <h2 className="text-neutral-900 font-bold text-2xl sm:text-3xl tracking-tight mt-0.5">
-                {isSignUp ? 'Sign up for Focotech' : 'Login to your account'}
+                {isForgotPassword ? 'Reset your password' : isSignUp ? 'Sign up for Focotech' : 'Login to your account'}
               </h2>
               <p className="text-neutral-500 text-xs sm:text-sm mt-1.5">
-                {isSignUp
+                {isForgotPassword ? 'Use your registered email to receive a reset code.' : isSignUp
                   ? 'Join 120,000+ builders mastering real-world software.'
                   : "It's nice to see you again. Ready to code?"}
               </p>
@@ -390,7 +396,7 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
 
             {/* Alert Banner */}
             {alertMessage && (
-              <div
+              <div role={alertMessage.type === 'error' ? 'alert' : 'status'}
                 className={`p-3 rounded-md text-xs sm:text-sm font-medium flex flex-col gap-1 transition-all animate-fadeIn ${
                   alertMessage.type === 'success'
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
@@ -468,7 +474,8 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
                   {/* Optional Name for Sign Up */}
                   {isSignUp && (
                     <div className="animate-fadeIn">
-                      <input
+                      <label htmlFor="auth-name" className="block mb-1 text-sm font-medium text-neutral-700">Full name</label>
+                      <input id="auth-name" autoComplete="name"
                         type="text"
                         required
                         value={fullname}
@@ -480,19 +487,22 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
                   )}
 
                   <div>
-                    <input
+                    <label htmlFor="auth-email" className="block mb-1 text-sm font-medium text-neutral-700">Email address</label>
+                      <input id="auth-email" autoComplete="username"
                       type="email"
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Your username or email"
+                      placeholder="Email address"
                       className="w-full px-3.5 py-2.5 rounded-md border border-neutral-300 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 text-sm transition-all"
                     />
                   </div>
 
                   {/* Password Input with show/hide toggle */}
+                  <label htmlFor="auth-password" className="text-sm font-medium text-neutral-700 -mb-2">Password</label>
                   <div className="relative">
                     <input
+                      id="auth-password" autoComplete={isSignUp ? 'new-password' : 'current-password'}
                       type={showPassword ? 'text' : 'password'}
                       required
                       minLength={8}
@@ -517,7 +527,8 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
                   {isSignUp && role === 'instructor' && (
                     <>
                       <div className="animate-fadeIn">
-                        <input
+                        <label htmlFor="auth-expertise" className="block mb-1 text-sm font-medium text-neutral-700">Primary expertise</label>
+                      <input id="auth-expertise" autoComplete="off"
                           type="text"
                           required
                           value={expertise}
@@ -527,7 +538,8 @@ export default function SignInPage({ onNavigateHome, onNavigateDashboard, initia
                         />
                       </div>
                       <div className="animate-fadeIn">
-                        <input
+                        <label htmlFor="auth-qualification" className="block mb-1 text-sm font-medium text-neutral-700">Highest qualification</label>
+                      <input id="auth-qualification" autoComplete="off"
                           type="text"
                           required
                           value={qualification}

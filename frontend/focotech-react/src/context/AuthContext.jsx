@@ -1,3 +1,4 @@
+import { authErrorMessage } from '../utils/authError';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authAPI } from '../services/api';
 
@@ -65,7 +66,7 @@ export function AuthProvider({ children }) {
       return { success: true, message, user: userData };
     } catch (err) {
       const msg =
-        err.response?.data?.message || err.response?.data?.error || 'Login failed. Please try again.';
+        authErrorMessage(err, 'Login failed. Please check your email and password.');
       setError(msg);
       return { success: false, message: msg };
     } finally {
@@ -92,7 +93,7 @@ export function AuthProvider({ children }) {
       return { success: true, message, user: userData, verificationLink };
     } catch (err) {
       const msg =
-        err.response?.data?.message || err.response?.data?.error || 'Registration failed. Please try again.';
+        authErrorMessage(err, 'Registration failed. Please try again.');
       setError(msg);
       return { success: false, message: msg };
     } finally {

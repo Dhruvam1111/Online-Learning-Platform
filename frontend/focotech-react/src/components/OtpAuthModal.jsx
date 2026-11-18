@@ -1,3 +1,4 @@
+import { authErrorMessage } from '../utils/authError';
 import React, { useState } from 'react';
 import api from '../services/api';
 
@@ -46,7 +47,7 @@ export default function OtpAuthModal({
         onSuccessSession(data.token, data.user);
       }
     } catch (err) {
-      const msg = err.response?.data?.message || err.response?.data?.error || err.message;
+      const msg = authErrorMessage(err);
       setAlertMessage({ type: 'error', text: msg });
     } finally {
       setIsLoading(false);
@@ -63,7 +64,7 @@ export default function OtpAuthModal({
       startCooldown(15);
       setAlertMessage(null);
     } catch (err) {
-      const msg = err.response?.data?.message || err.response?.data?.error || err.message;
+      const msg = authErrorMessage(err);
       setAlertMessage({ type: 'error', text: msg });
     } finally {
       setIsLoading(false);
@@ -90,7 +91,7 @@ export default function OtpAuthModal({
       startCooldown(15);
       setAlertMessage(null);
     } catch (err) {
-      const msg = err.response?.data?.message || err.response?.data?.error || err.message;
+      const msg = authErrorMessage(err);
       setAlertMessage({ type: 'error', text: msg });
     } finally {
       setIsLoading(false);
@@ -124,7 +125,7 @@ export default function OtpAuthModal({
         if (onCancel) onCancel();
       }, 1600);
     } catch (err) {
-      const msg = err.response?.data?.message || err.response?.data?.error || err.message;
+      const msg = authErrorMessage(err);
       setAlertMessage({ type: 'error', text: msg });
     } finally {
       setIsLoading(false);
@@ -136,10 +137,10 @@ export default function OtpAuthModal({
     return (
       <form onSubmit={handleVerifySignupOtp} className="flex flex-col gap-3.5 animate-fadeIn">
         <div>
-          <label className="block text-xs font-medium text-neutral-600 mb-1">
+          <label htmlFor="signup-code" className="block text-xs font-medium text-neutral-600 mb-1">
             Enter 6-Digit Verification Code
           </label>
-          <input
+          <input id="signup-code" autoComplete="one-time-code"
             type="text"
             maxLength="6"
             required
@@ -194,10 +195,10 @@ export default function OtpAuthModal({
       {!resetOtpSent ? (
         <form onSubmit={handleSendResetOtp} className="flex flex-col gap-3.5">
           <div>
-            <label className="block text-xs font-medium text-neutral-600 mb-1">
+            <label htmlFor="reset-email" className="block text-xs font-medium text-neutral-600 mb-1">
               Registered Email Address
             </label>
-            <input
+            <input id="reset-email" autoComplete="email"
               type="email"
               required
               autoFocus
@@ -227,7 +228,8 @@ export default function OtpAuthModal({
           </div>
 
           <div>
-            <input
+            <label htmlFor="reset-code" className="block mb-1 text-xs font-medium text-neutral-600">Reset code</label>
+            <input id="reset-code" autoComplete="one-time-code"
               type="text"
               maxLength="6"
               required
@@ -240,7 +242,8 @@ export default function OtpAuthModal({
           </div>
 
           <div className="relative">
-            <input
+            <label htmlFor="reset-password" className="block mb-1 text-xs font-medium text-neutral-600">New password</label>
+            <input id="reset-password" autoComplete="new-password"
               type={showNewPassword ? 'text' : 'password'}
               required
               minLength={8}
@@ -261,7 +264,8 @@ export default function OtpAuthModal({
           </div>
 
           <div>
-            <input
+            <label htmlFor="reset-confirm" className="block mb-1 text-xs font-medium text-neutral-600">Confirm new password</label>
+            <input id="reset-confirm" autoComplete="new-password"
               type="password"
               required
               minLength={8}
