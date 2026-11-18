@@ -265,3 +265,7 @@ CREATE INDEX IF NOT EXISTS idx_refund_exception_queue
 CREATE INDEX IF NOT EXISTS idx_refund_exception_order
     ON webhook_events (substring(event_id, 11)) WHERE event_type = 'refund.exception.request';
 CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users (lower(email));
+
+-- Step 42 / FR-I63: Enrolled Student Roster Indexes
+CREATE INDEX IF NOT EXISTS idx_enrollments_course_enrolled_at
+    ON enrollments (course_id, enrolled_at DESC);
