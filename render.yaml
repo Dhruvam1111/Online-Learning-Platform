@@ -1,0 +1,46 @@
+services:
+  # ------------------------------------------------------------
+  # Backend: Spring Boot 3.3 REST API Web Service
+  # ------------------------------------------------------------
+  - type: web
+    name: olp-backend
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    plan: free
+    region: singapore
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRATION_MS
+        value: "86400000"
+      - key: FRONTEND_URL
+        sync: false
+      - key: PORT
+        value: "8080"
+
+  # ------------------------------------------------------------
+  # Frontend: React / Vite SPA Static Site
+  # ------------------------------------------------------------
+  - type: web
+    name: olp-frontend
+    runtime: static
+    rootDir: frontend/focotech-react
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    plan: free
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
