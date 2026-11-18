@@ -265,3 +265,8 @@ CREATE INDEX IF NOT EXISTS idx_refund_exception_queue
 CREATE INDEX IF NOT EXISTS idx_refund_exception_order
     ON webhook_events (substring(event_id, 11)) WHERE event_type = 'refund.exception.request';
 CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users (lower(email));
+
+-- Step 57: Examination Attempt Answers Indexes
+CREATE INDEX IF NOT EXISTS idx_exam_attempt_answers_attempt ON exam_attempt_answers(attempt_id);
+CREATE INDEX IF NOT EXISTS idx_exam_attempts_status_expiry ON exam_attempts(status, expires_at);
+

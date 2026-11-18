@@ -1240,3 +1240,16 @@ CREATE TABLE IF NOT EXISTS exam_monitoring_events (
     metadata_json TEXT,
     notes VARCHAR(255)
 );
+
+-- Step 56: Examination Attempt Answers
+CREATE TABLE IF NOT EXISTS exam_attempt_answers (
+    id SERIAL PRIMARY KEY,
+    attempt_id INTEGER NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+    question_id INTEGER NOT NULL REFERENCES questions(id),
+    answer_text TEXT,
+    marks_awarded NUMERIC(8,2),
+    feedback TEXT,
+    saved_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_exam_attempt_answer UNIQUE (attempt_id, question_id)
+);
+
