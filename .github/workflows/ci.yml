@@ -120,7 +120,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d olp_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
@@ -148,6 +148,8 @@ jobs:
           PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/migrations/20261110-payment-claims.sql
           PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/migrations/20261110-payment-hardening.sql
           PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/migrations/20261111-payment-completion.sql
+          echo "Applying Phase 1 student exam schema..."
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/phase1-student-exams.sql
           echo "PostgreSQL schema successfully initialized."
 
       - name: Run Maven Tests against PostgreSQL
