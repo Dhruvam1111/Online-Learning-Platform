@@ -1,5 +1,10 @@
 package com.olp.service;
 
+import com.olp.dto.AssignCourseInstructorRequest;
+import com.olp.dto.CourseInstructorResponse;
+import com.olp.entity.CourseInstructor;
+import com.olp.entity.CourseInstructorRole;
+import com.olp.repository.CourseInstructorRepository;
 import com.olp.dto.ApiResponse;
 import com.olp.security.JwtUtil;
 import com.olp.dto.AdminUpdateUserRequest;
@@ -48,7 +53,8 @@ public class AdminService {
     }
     @Autowired(required = false)
     private JwtUtil jwtUtil;
-
+    @Autowired(required = false)
+private CourseInstructorRepository courseInstructorRepository;
     public AdminService(
             UserRepository userRepository,
             CourseRepository courseRepository,
@@ -454,7 +460,7 @@ public class AdminService {
         course.setStatus(CourseStatus.PUBLISHED);
         course.setRejectionReason(null);
         course.setReviewComments(null);
-        course = courseRepository.save(course);
+        Course savedCourse = courseRepository.save(course);
 
         // Update latest course submission if present
         if (courseSubmissionRepository != null) {
@@ -500,7 +506,7 @@ public class AdminService {
         course.setStatus(CourseStatus.REJECTED);
         course.setRejectionReason(reason);
         course.setReviewComments(reason);
-        course = courseRepository.save(course);
+        Course savedCourse = courseRepository.save(course);
 
         // Update latest course submission if present
         if (courseSubmissionRepository != null) {
@@ -630,6 +636,147 @@ public class AdminService {
      * enrollments).
      * FR-A08: Remove a live course
      */
+    /**
+   * Assign or reassign an active instructor to a course (OWNER or CO_INSTRUCTOR).
+   * Notifies the previous owner when ownership is reassigned and audits the action.
+   * FR-A10 (ADM-025)
+   */
+  @Transactional
+  public CourseInstructorResponse assignCourseInstructor(Integer courseId, AssignCourseInstructorRequest request) {
+      if (request == null || request.getInstructorId() == null) {
+          throw new IllegalArgumentException("Instructor ID is required");
+      }
+
+      Course course = findCourseById(courseId);
+      User newInstructor = findUserById(request.getInstructorId());
+
+      if (!"instructor".equalsIgnoreCase(newInstructor.getRole())) {
+          throw new IllegalArgumentException("Assigned user must have role 'instructor'");
+      }
+      if (!"active".equalsIgnoreCase(newInstructor.getAccountStatus())) {
+          throw new IllegalArgumentException("Assigned instructor must have 'active' account status");
+      }
+
+      CourseInstructorRole assignedRole = (request.getRole() != null && !request.getRole().isBlank())
+              ? CourseInstructorRole.fromString(request.getRole())
+              : CourseInstructorRole.CO_INSTRUCTOR;
+
+      String prevInstructorInfo = course.getInstructor() != null
+              ? course.getInstructor().getId() + ":" + course.getInstructor().getEmail()
+              : "none";
+
+      if (assignedRole == CourseInstructorRole.OWNER) {
+          User previousOwner = course.getInstructor();
+          course.setInstructor(newInstructor);
+          Course savedCourse = courseRepository.save(course);
+
+          if (courseInstructorRepository != null) {
+              if (previousOwner != null && !previousOwner.getId().equals(newInstructor.getId())) {
+                  courseInstructorRepository.findByCourseIdAndInstructorId(courseId, previousOwner.getId())
+                          .ifPresent(prev -> {
+                              prev.setRole(CourseInstructorRole.CO_INSTRUCTOR);
+                              courseInstructorRepository.save(prev);
+                          });
+              }
+              CourseInstructor mapping = courseInstructorRepository
+                      .findByCourseIdAndInstructorId(courseId, newInstructor.getId())
+                      .orElseGet(() -> new CourseInstructor(savedCourse, newInstructor, CourseInstructorRole.OWNER));
+              mapping.setRole(CourseInstructorRole.OWNER);
+              courseInstructorRepository.save(mapping);
+          }
+
+          if (emailService != null && previousOwner != null && !previousOwner.getId().equals(newInstructor.getId())) {
+              try {
+                  emailService.sendCourseInstructorChangeEmail(
+                          previousOwner.getEmail(),
+                          previousOwner.getName(),
+                          course.getTitle(),
+                          "REASSIGNED",
+                          "Primary ownership of this course has been reassigned to " + newInstructor.getName() + ".");
+              } catch (Exception e) {
+                  log.warn("Failed to notify previous instructor {}: {}", previousOwner.getEmail(), e.getMessage());
+              }
+          }
+      } else {
+          if (courseInstructorRepository != null) {
+              if (courseInstructorRepository.existsByCourseIdAndInstructorId(courseId, newInstructor.getId())) {
+                  throw new IllegalStateException("Instructor is already assigned to this course");
+              }
+              courseInstructorRepository.save(new CourseInstructor(course, newInstructor, CourseInstructorRole.CO_INSTRUCTOR));
+          }
+      }
+
+      if (emailService != null) {
+          try {
+              emailService.sendCourseInstructorChangeEmail(
+                      newInstructor.getEmail(),
+                      newInstructor.getName(),
+                      course.getTitle(),
+                      "ASSIGNED",
+                      "You have been assigned as " + assignedRole.name() + " for this course.");
+          } catch (Exception e) {
+              log.warn("Failed to notify assigned instructor {}: {}", newInstructor.getEmail(), e.getMessage());
+          }
+      }
+
+      if (adminAuditService != null) {
+          adminAuditService.recordLog(
+                  "COURSE_INSTRUCTOR_ASSIGNED",
+                  "COURSE",
+                  String.valueOf(course.getId()),
+                  course.getTitle(),
+                  "Assigned instructor " + newInstructor.getEmail() + " as " + assignedRole.name(),
+                  prevInstructorInfo,
+                  newInstructor.getId() + ":" + newInstructor.getEmail() + " (" + assignedRole.name() + ")");
+      }
+
+      return CourseInstructorResponse.fromUser(newInstructor, assignedRole, null, LocalDateTime.now());
+  }
+
+  /**
+   * Remove a co-instructor from a course and notify them.
+   * FR-A10 (ADM-025)
+   */
+  @Transactional
+  public void removeCourseInstructor(Integer courseId, Integer instructorId) {
+      Course course = findCourseById(courseId);
+      User instructor = findUserById(instructorId);
+
+      if (course.getInstructor() != null && course.getInstructor().getId().equals(instructorId)) {
+          throw new IllegalArgumentException("Cannot remove the primary course owner; reassign course ownership first");
+      }
+
+      if (courseInstructorRepository != null) {
+          CourseInstructor mapping = courseInstructorRepository
+                  .findByCourseIdAndInstructorId(courseId, instructorId)
+                  .orElseThrow(() -> new ResourceNotFoundException("Instructor is not assigned to this course"));
+          courseInstructorRepository.delete(mapping);
+      }
+
+      if (emailService != null) {
+          try {
+              emailService.sendCourseInstructorChangeEmail(
+                      instructor.getEmail(),
+                      instructor.getName(),
+                      course.getTitle(),
+                      "REMOVED",
+                      "You have been removed as an instructor from this course.");
+          } catch (Exception e) {
+              log.warn("Failed to notify removed instructor {}: {}", instructor.getEmail(), e.getMessage());
+          }
+      }
+
+      if (adminAuditService != null) {
+          adminAuditService.recordLog(
+                  "COURSE_INSTRUCTOR_REMOVED",
+                  "COURSE",
+                  String.valueOf(course.getId()),
+                  course.getTitle(),
+                  "Removed instructor " + instructor.getEmail(),
+                  instructor.getId() + ":" + instructor.getEmail(),
+                  null);
+      }
+  }
     @Transactional
     public void deleteCourse(Integer courseId) {
         Course course = findCourseById(courseId);

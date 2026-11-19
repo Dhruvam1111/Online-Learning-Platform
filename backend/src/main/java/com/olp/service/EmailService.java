@@ -1130,6 +1130,52 @@ public class EmailService {
             log.warn("[EmailService] Failed to send account created email via SMTP ({}), continuing.", e.getMessage());
         }
     }
+     /**
+     * Notifies an instructor when they are assigned, reassigned, or removed from a course (FR-A10, ADM-025).
+     */
+    public void sendCourseInstructorChangeEmail(
+            String toEmail,
+            String instructorName,
+            String courseTitle,
+            String action,
+            String details) {
+        if (toEmail == null || toEmail.isBlank()) {
+            return;
+        }
+        String displayName = (instructorName != null && !instructorName.isBlank()) ? instructorName.trim() : toEmail;
+        String safeCourseTitle = (courseTitle != null && !courseTitle.isBlank()) ? courseTitle.trim() : "Course";
+        String safeAction = (action != null && !action.isBlank()) ? action.trim().toUpperCase() : "UPDATED";
+
+        log.info("[EmailService] Dispatched Course Instructor {} Notification to {} for Course '{}'",
+                safeAction, toEmail, safeCourseTitle);
+
+        if (senderEmail == null || senderEmail.isBlank()) {
+            return;
+        }
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(senderEmail, "Focotech");
+            helper.setTo(toEmail);
+            helper.setSubject("Course Instructor Update: " + safeCourseTitle + " (" + safeAction + ")");
+
+            String html = "<div style=\"font-family: Arial, sans-serif; color: #333;\">"
+                    + "<h2>Course Instructor Assignment Update</h2>"
+                    + "<p>Hello " + escapeHtml(displayName) + ",</p>"
+                    + "<p><strong>Course:</strong> " + escapeHtml(safeCourseTitle) + "</p>"
+                    + "<p>" + escapeHtml(details != null ? details : "Your instructor assignment has been updated.") + "</p>"
+                    + "<p>Best regards,<br/>The Focotech Team</p>"
+                    + "</div>";
+            helper.setText(html, true);
+
+            mailSender.send(message);
+        } catch (Exception e) {
+            log.warn("[EmailService] Failed to send course instructor change email to {} ({}), continuing.",
+                    toEmail, e.getMessage());
+        }
+    }
     public void sendInstructorApprovalEmail(String toEmail, String instructorName, boolean approved) {
         if (toEmail == null || toEmail.isBlank()) {
             return;

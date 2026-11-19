@@ -1,5 +1,7 @@
 package com.olp.controller;
 
+import com.olp.dto.AssignCourseInstructorRequest;
+import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.ApiResponse;
 import com.olp.dto.AdminUpdateUserRequest;
 import com.olp.dto.AdminCreateUserRequest;
@@ -81,6 +83,30 @@ class AdminControllerTest {
       assertEquals(200, response.getStatusCode().value());
       assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
       verify(adminService, times(1)).triggerPasswordReset(1);
+  }
+    @Test
+  void testAssignCourseInstructor_Returns201() {
+      AssignCourseInstructorRequest req = new AssignCourseInstructorRequest(20, "CO_INSTRUCTOR");
+      CourseInstructorResponse expected = new CourseInstructorResponse();
+      expected.setInstructorId(20);
+      when(adminService.assignCourseInstructor(10, req)).thenReturn(expected);
+
+      ResponseEntity<CourseInstructorResponse> response = adminController.assignCourseInstructor(10, req);
+
+      assertEquals(201, response.getStatusCode().value());
+      assertEquals(20, Objects.requireNonNull(response.getBody()).getInstructorId());
+      verify(adminService).assignCourseInstructor(10, req);
+  }
+
+  @Test
+  void testRemoveCourseInstructor_Returns200() {
+      doNothing().when(adminService).removeCourseInstructor(10, 20);
+
+      ResponseEntity<ApiResponse> response = adminController.removeCourseInstructor(10, 20);
+
+      assertEquals(200, response.getStatusCode().value());
+      assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
+      verify(adminService).removeCourseInstructor(10, 20);
   }
     @Test
     void testGetUsers() {

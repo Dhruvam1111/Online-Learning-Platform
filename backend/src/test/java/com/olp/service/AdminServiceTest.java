@@ -1,5 +1,10 @@
 package com.olp.service;
 
+import com.olp.dto.AssignCourseInstructorRequest;
+import com.olp.dto.CourseInstructorResponse;
+import com.olp.entity.CourseInstructor;
+import com.olp.entity.CourseInstructorRole;
+import com.olp.repository.CourseInstructorRepository;
 import org.springframework.test.util.ReflectionTestUtils;
 import com.olp.dto.ApiResponse; 
 import com.olp.security.JwtUtil;
@@ -51,6 +56,8 @@ class AdminServiceTest {
     private EmailService emailService;
     @Mock
     private JwtUtil jwtUtil;
+    @Mock private CourseInstructorRepository courseInstructorRepository;
+
     @InjectMocks
     private AdminService adminService;
 
@@ -73,6 +80,7 @@ class AdminServiceTest {
         sampleCourse = new Course(pendingInstructor, "Java 101", "Basics of Java", "pending_review");
         sampleCourse.setId(10);
         ReflectionTestUtils.setField(adminService, "jwtUtil", jwtUtil);
+        ReflectionTestUtils.setField(adminService, "courseInstructorRepository", courseInstructorRepository);    
     }
 
     @Test
@@ -290,6 +298,87 @@ class AdminServiceTest {
         verify(userRepository, never()).save(any());
     }
 
+    @Test
+  void testAssignCourseInstructor_CoInstructor_Success() {
+      User activeInst = new User("Active Inst", "active.inst@olp.com", "hash", "instructor", "active");
+      activeInst.setId(20);
+      when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+      when(userRepository.findById(20)).thenReturn(Optional.of(activeInst));
+      when(courseInstructorRepository.existsByCourseIdAndInstructorId(10, 20)).thenReturn(false);
+
+      CourseInstructorResponse res = adminService.assignCourseInstructor(10, new AssignCourseInstructorRequest(20, "CO_INSTRUCTOR"));
+
+      assertNotNull(res);
+      assertEquals(20, res.getInstructorId());
+      assertEquals(CourseInstructorRole.CO_INSTRUCTOR, res.getRole());
+      verify(courseInstructorRepository).save(any(CourseInstructor.class));
+      verify(emailService).sendCourseInstructorChangeEmail(
+              eq("active.inst@olp.com"), eq("Active Inst"), eq("Java 101"), eq("ASSIGNED"), anyString());
+  }
+
+  @Test
+  void testAssignCourseInstructor_ReassignOwner_NotifiesPreviousOwner() {
+      User activeInst = new User("New Owner", "new.owner@olp.com", "hash", "instructor", "active");
+      activeInst.setId(21);
+      when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+      when(userRepository.findById(21)).thenReturn(Optional.of(activeInst));
+      when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
+      when(courseInstructorRepository.findByCourseIdAndInstructorId(eq(10), anyInt())).thenReturn(Optional.empty());
+
+      CourseInstructorResponse res = adminService.assignCourseInstructor(10, new AssignCourseInstructorRequest(21, "OWNER"));
+
+      assertEquals(CourseInstructorRole.OWNER, res.getRole());
+      assertEquals(activeInst, sampleCourse.getInstructor());
+      verify(emailService).sendCourseInstructorChangeEmail(
+              eq("chen@instructor.com"), eq("Dr. Chen"), eq("Java 101"), eq("REASSIGNED"), anyString());
+      verify(emailService).sendCourseInstructorChangeEmail(
+              eq("new.owner@olp.com"), eq("New Owner"), eq("Java 101"), eq("ASSIGNED"), anyString());
+  }
+
+  @Test
+  void testAssignCourseInstructor_NonActiveInstructor_ThrowsException() {
+      when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+      when(userRepository.findById(2)).thenReturn(Optional.of(pendingInstructor));
+
+      assertThrows(IllegalArgumentException.class,
+              () -> adminService.assignCourseInstructor(10, new AssignCourseInstructorRequest(2, "CO_INSTRUCTOR")));
+      verify(courseInstructorRepository, never()).save(any());
+  }
+
+  @Test
+  void testAssignCourseInstructor_StudentRole_ThrowsException() {
+      when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+      when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
+
+      assertThrows(IllegalArgumentException.class,
+              () -> adminService.assignCourseInstructor(10, new AssignCourseInstructorRequest(1, "CO_INSTRUCTOR")));
+      verify(courseInstructorRepository, never()).save(any());
+  }
+
+  @Test
+  void testRemoveCourseInstructor_Success() {
+      User coInst = new User("Co Inst", "co@olp.com", "hash", "instructor", "active");
+      coInst.setId(22);
+      CourseInstructor mapping = new CourseInstructor(sampleCourse, coInst, CourseInstructorRole.CO_INSTRUCTOR);
+      when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+      when(userRepository.findById(22)).thenReturn(Optional.of(coInst));
+      when(courseInstructorRepository.findByCourseIdAndInstructorId(10, 22)).thenReturn(Optional.of(mapping));
+
+      adminService.removeCourseInstructor(10, 22);
+
+      verify(courseInstructorRepository).delete(mapping);
+      verify(emailService).sendCourseInstructorChangeEmail(
+              eq("co@olp.com"), eq("Co Inst"), eq("Java 101"), eq("REMOVED"), anyString());
+  }
+
+  @Test
+  void testRemoveCourseInstructor_PrimaryOwner_ThrowsException() {
+      when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+      when(userRepository.findById(2)).thenReturn(Optional.of(pendingInstructor));
+
+      assertThrows(IllegalArgumentException.class, () -> adminService.removeCourseInstructor(10, 2));
+      verify(courseInstructorRepository, never()).delete(any());
+  }
     @Test
     void testDeleteUser_Success() {
         when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
