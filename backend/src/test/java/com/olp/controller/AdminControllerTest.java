@@ -1,5 +1,6 @@
 package com.olp.controller;
 
+import com.olp.dto.AdminCreateUserRequest;
 import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
 import com.olp.dto.CourseReviewRequest;
@@ -44,6 +45,18 @@ class AdminControllerTest {
         );
     }
 
+    @Test
+  void testCreateUser_Returns201() {
+      AdminCreateUserRequest req = new AdminCreateUserRequest("Test User", "test@olp.com", "instructor", null);
+      when(adminService.createUser(req)).thenReturn(sampleAdminResponse);
+
+      ResponseEntity<AdminUserResponse> response = adminController.createUser(req);
+
+      assertNotNull(response);
+      assertEquals(201, response.getStatusCode().value());
+      assertEquals("test@olp.com", Objects.requireNonNull(response.getBody()).getEmail());
+      verify(adminService, times(1)).createUser(req);
+  }
     @Test
     void testGetUsers() {
         PageResponse<AdminUserResponse> pageResponse = new PageResponse<>(

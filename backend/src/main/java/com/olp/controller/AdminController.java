@@ -1,5 +1,7 @@
 package com.olp.controller;
 
+import org.springframework.http.HttpStatus;
+import com.olp.dto.AdminCreateUserRequest;
 import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
 import com.olp.dto.ApiResponse;
@@ -54,6 +56,15 @@ public class AdminController {
      * Get all users with optional filtering and pagination.
      * FR-A02: Account and Access Management
      */
+    /**
+   * Create a new student or instructor account.
+   * FR-A02 (ADM-021)
+   */
+  @PostMapping("/users")
+  public ResponseEntity<AdminUserResponse> createUser(@Valid @RequestBody AdminCreateUserRequest request) {
+      AdminUserResponse response = adminService.createUser(request);
+      return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
     @GetMapping("/users")
     public ResponseEntity<PageResponse<AdminUserResponse>> getUsers(
             @RequestParam(required = false) String role,
