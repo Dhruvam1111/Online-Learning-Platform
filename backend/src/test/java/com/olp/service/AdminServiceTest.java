@@ -165,6 +165,43 @@ class AdminServiceTest {
         assertEquals("active", response.getAccountStatus());
         verify(userRepository, times(1)).save(sampleStudent);
     }
+    @Test
+    void testActivateUser_PendingInstructor_ThrowsException() {
+        when(userRepository.findById(2)).thenReturn(Optional.of(pendingInstructor));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                adminService.activateUser(2)
+        );
+
+        assertTrue(exception.getMessage().contains("pending"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void testActivateUser_RejectedInstructor_ThrowsException() {
+        pendingInstructor.setAccountStatus("rejected");
+        when(userRepository.findById(2)).thenReturn(Optional.of(pendingInstructor));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                adminService.activateUser(2)
+        );
+
+        assertTrue(exception.getMessage().contains("rejected"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void testActivateUser_AlreadyActive_ThrowsException() {
+        sampleStudent.setAccountStatus("active");
+        when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                adminService.activateUser(1)
+        );
+
+        assertTrue(exception.getMessage().contains("Only suspended accounts can be reactivated"));
+        verify(userRepository, never()).save(any());
+    }
 
     @Test
     void testDeleteUser_Success() {

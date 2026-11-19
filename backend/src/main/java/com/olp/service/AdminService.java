@@ -179,6 +179,14 @@ public class AdminService {
     public AdminUserResponse activateUser(Integer userId) {
         User user = findUserById(userId);
         String prevStatus = user.getAccountStatus();
+        if (!"suspended".equalsIgnoreCase(prevStatus)) {
+            if ("pending".equalsIgnoreCase(prevStatus) || "rejected".equalsIgnoreCase(prevStatus)) {
+                throw new IllegalArgumentException(
+                        "Cannot activate a " + prevStatus.toLowerCase() + " account; only suspended accounts can be reactivated. Use instructor approval instead.");
+            }
+            throw new IllegalArgumentException(
+                    "Only suspended accounts can be reactivated (current status: " + prevStatus + ")");
+        }
         user.setAccountStatus("active");
         user = userRepository.save(user);
 
