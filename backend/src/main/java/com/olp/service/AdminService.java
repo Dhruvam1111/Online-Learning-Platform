@@ -1,5 +1,7 @@
 package com.olp.service;
 
+import com.olp.dto.ApiResponse;
+import com.olp.security.JwtUtil;
 import com.olp.dto.AdminUpdateUserRequest;
 import com.olp.dto.AdminCreateUserRequest;
 import com.olp.exception.DuplicateEmailException;
@@ -44,6 +46,8 @@ public class AdminService {
     public AdminService(UserRepository userRepository, CourseRepository courseRepository) {
         this(userRepository, courseRepository, null, null, null);
     }
+    @Autowired(required = false)
+    private JwtUtil jwtUtil;
 
     public AdminService(
             UserRepository userRepository,
@@ -196,6 +200,34 @@ public class AdminService {
       }
 
       return toAdminUserResponse(user);
+  }
+
+    /**
+   * Trigger a password reset / account recovery email for a user without exposing any password.
+   * FR-A05 (ADM-023)
+   */
+  public ApiResponse triggerPasswordReset(Integer userId) {
+      User user = findUserById(userId);
+      if ("rejected".equalsIgnoreCase(user.getAccountStatus())) {
+          throw new IllegalArgumentException("Cannot trigger password reset for a rejected account");
+      }
+      if (jwtUtil == null) {
+          throw new IllegalStateException("JwtUtil is not configured");
+      }
+
+      String resetToken = jwtUtil.generatePasswordResetToken(user.getId(), 15 * 60 * 1000L);
+      String resetLink = "http://localhost:8080/api/auth/password-reset/confirm?token=" + resetToken;
+
+      if (emailService != null) {
+          emailService.sendPasswordResetLinkEmail(user.getEmail(), user.getName(), resetLink, 15);
+      }
+
+      if (adminAuditService != null) {
+          adminAuditService.recordLog("USER_PASSWORD_RESET_TRIGGERED", "USER", String.valueOf(user.getId()),
+                  user.getName(), "Admin triggered password reset email for " + user.getEmail(), null, null);
+      }
+
+      return new ApiResponse(true, "Password reset email sent to " + user.getEmail());
   }
     @Transactional(readOnly = true)
     public PageResponse<AdminUserResponse> getUsers(

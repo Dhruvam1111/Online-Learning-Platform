@@ -1,5 +1,8 @@
 package com.olp.service;
 
+import org.springframework.test.util.ReflectionTestUtils;
+import com.olp.dto.ApiResponse; 
+import com.olp.security.JwtUtil;
 import com.olp.exception.DuplicateEmailException;
 import com.olp.dto.AdminUpdateUserRequest;
 import com.olp.dto.AdminCourseResponse;
@@ -46,7 +49,8 @@ class AdminServiceTest {
 
     @Mock
     private EmailService emailService;
-
+    @Mock
+    private JwtUtil jwtUtil;
     @InjectMocks
     private AdminService adminService;
 
@@ -68,6 +72,7 @@ class AdminServiceTest {
 
         sampleCourse = new Course(pendingInstructor, "Java 101", "Basics of Java", "pending_review");
         sampleCourse.setId(10);
+        ReflectionTestUtils.setField(adminService, "jwtUtil", jwtUtil);
     }
 
     @Test
@@ -122,6 +127,31 @@ class AdminServiceTest {
 
       assertThrows(IllegalArgumentException.class, () -> adminService.updateUser(1, req));
       verify(userRepository, never()).save(any());
+  }
+    @Test
+  void testTriggerPasswordReset_Success() {
+      when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
+      when(jwtUtil.generatePasswordResetToken(1, 15 * 60 * 1000L)).thenReturn("reset-jwt-token");
+
+      ApiResponse response = adminService.triggerPasswordReset(1);
+
+      assertTrue(response.isSuccess());
+      assertTrue(response.getMessage().contains("alice@student.com"));
+      assertFalse(response.getMessage().contains("reset-jwt-token"));
+      verify(emailService).sendPasswordResetLinkEmail(
+              eq("alice@student.com"),
+              eq("Alice"),
+              contains("token=reset-jwt-token"),
+              eq(15));
+  }
+
+  @Test
+  void testTriggerPasswordReset_RejectedAccount_ThrowsException() {
+      pendingInstructor.setAccountStatus("rejected");
+      when(userRepository.findById(2)).thenReturn(Optional.of(pendingInstructor));
+
+      assertThrows(IllegalArgumentException.class, () -> adminService.triggerPasswordReset(2));
+      verify(emailService, never()).sendPasswordResetLinkEmail(any(), any(), any(), anyInt());
   }
     @Test
     void testGetUsers_WithFilters() {
