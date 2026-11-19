@@ -145,10 +145,21 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
+
+    /**
+     * Trigger a password reset / account recovery email for a user.
+     * FR-A05 (ADM-023)
+     */
+    @PostMapping("/users/{id}/password-reset")
+    public ResponseEntity<ApiResponse> triggerPasswordReset(@PathVariable Integer id) {
+        ApiResponse response = adminService.triggerPasswordReset(id);
+        return ResponseEntity.ok(response);
+    }
     /**
      * Permanently delete a user account.
      * FR-A02
      */
+
     @DeleteMapping("/users/{id}")
     public ResponseEntity<ApiResponse> deleteUser(@PathVariable Integer id) {
         adminService.deleteUser(id);

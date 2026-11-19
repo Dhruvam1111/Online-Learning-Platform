@@ -1,5 +1,6 @@
 package com.olp.controller;
 
+import com.olp.dto.ApiResponse;
 import com.olp.dto.AdminUpdateUserRequest;
 import com.olp.dto.AdminCreateUserRequest;
 import com.olp.dto.AdminCourseResponse;
@@ -68,6 +69,18 @@ class AdminControllerTest {
       assertNotNull(response);
       assertEquals(200, response.getStatusCode().value());
       verify(adminService, times(1)).updateUser(1, req);
+  }
+    @Test
+  void testTriggerPasswordReset_Returns200() {
+      when(adminService.triggerPasswordReset(1))
+              .thenReturn(new ApiResponse(true, "Password reset email sent to test@olp.com"));
+
+      ResponseEntity<ApiResponse> response = adminController.triggerPasswordReset(1);
+
+      assertNotNull(response);
+      assertEquals(200, response.getStatusCode().value());
+      assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
+      verify(adminService, times(1)).triggerPasswordReset(1);
   }
     @Test
     void testGetUsers() {
