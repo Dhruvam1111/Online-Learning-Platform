@@ -1,5 +1,10 @@
 package com.olp.service;
 
+import com.olp.dto.AdminCreateUserRequest;
+import com.olp.exception.DuplicateEmailException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import java.security.SecureRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.olp.dto.AdminCourseResponse;
@@ -33,7 +38,8 @@ public class AdminService {
     private final CourseSubmissionRepository courseSubmissionRepository;
     private final EmailService emailService;
     private final AdminAuditService adminAuditService;
-
+    @Autowired(required = false)
+    private PasswordEncoder passwordEncoder;
     public AdminService(UserRepository userRepository, CourseRepository courseRepository) {
         this(userRepository, courseRepository, null, null, null);
     }
@@ -65,6 +71,70 @@ public class AdminService {
      * keyword.
      * FR-A02: Account and Access Management
      */
+
+    /**
+   * Create a new student or instructor account on behalf of an admin.
+   * FR-A02 (ADM-021)
+   */
+  @Transactional
+  public AdminUserResponse createUser(AdminCreateUserRequest request) {
+      if (request == null) {
+          throw new IllegalArgumentException("User creation request cannot be null");
+      }
+      String name = request.getName() != null ? request.getName().trim() : "";
+      String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+      String role = request.getRole() != null ? request.getRole().trim().toLowerCase() : "";
+
+      if (name.isBlank()) {
+          throw new IllegalArgumentException("Name is required");
+      }
+      if (email.isBlank()) {
+          throw new IllegalArgumentException("Email is required");
+      }
+      if (!"student".equals(role) && !"instructor".equals(role)) {
+          throw new IllegalArgumentException("Role must be 'student' or 'instructor'");
+      }
+      if (userRepository.existsByEmail(email)) {
+          throw new DuplicateEmailException("An account with this email already exists");
+      }
+
+      String rawPassword = (request.getPassword() != null && !request.getPassword().isBlank())
+              ? request.getPassword()
+              : generateTemporaryPassword();
+      if (rawPassword.length() < 8) {
+          throw new IllegalArgumentException("Password must be at least 8 characters");
+      }
+
+      PasswordEncoder encoder = (passwordEncoder != null) ? passwordEncoder : new BCryptPasswordEncoder();
+      User user = new User(name, email, encoder.encode(rawPassword), role, "active");
+      user = userRepository.save(user);
+
+      if (adminAuditService != null) {
+          adminAuditService.recordLog("USER_CREATED", "USER", String.valueOf(user.getId()),
+                  user.getName(), "Admin created " + role + " account (" + email + ")", null, "active");
+      }
+
+      if (emailService != null) {
+          try {
+              emailService.sendAccountCreatedEmail(user.getEmail(), user.getName(), role, rawPassword);
+          } catch (Exception e) {
+              log.warn("Failed to send account creation email to {}: {}", user.getEmail(), e.getMessage());
+          }
+      }
+
+      return toAdminUserResponse(user);
+  }
+
+  private String generateTemporaryPassword() {
+      String chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$";
+      SecureRandom random = new SecureRandom();
+      StringBuilder sb = new StringBuilder(12);
+      for (int i = 0; i < 12; i++) {
+          sb.append(chars.charAt(random.nextInt(chars.length())));
+      }
+      return sb.toString();
+  }
+
     @Transactional(readOnly = true)
     public PageResponse<AdminUserResponse> getUsers(
             String role,

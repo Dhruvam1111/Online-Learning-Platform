@@ -1090,6 +1090,46 @@ public class EmailService {
     /**
      * Sends an email notification to an instructor when their registration is approved or rejected (FR-A03).
      */
+    /**
+     * Sends an account creation invite email with the initial password (FR-A02, ADM-021).
+     */
+    public void sendAccountCreatedEmail(String toEmail, String name, String role, String initialPassword) {
+        if (toEmail == null || toEmail.isBlank()) {
+            return;
+        }
+        String displayName = (name != null && !name.isBlank()) ? name.trim() : toEmail;
+        String safeRole = (role != null && !role.isBlank()) ? role.trim().toLowerCase() : "user";
+
+        log.info("[EmailService] Dispatched Account Created Email to {} (role={})", toEmail, safeRole);
+
+        if (senderEmail == null || senderEmail.isBlank()) {
+            return;
+        }
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(senderEmail, "Focotech");
+            helper.setTo(toEmail);
+            helper.setSubject("Your Focotech " + safeRole + " account has been created");
+
+            String html = "<div style=\"font-family: Arial, sans-serif; color: #333;\">"
+                    + "<h2>Welcome to Focotech</h2>"
+                    + "<p>Hello " + escapeHtml(displayName) + ",</p>"
+                    + "<p>An administrator has created a <strong>" + escapeHtml(safeRole) + "</strong> account for you.</p>"
+                    + "<p><strong>Temporary Password:</strong> <code>" + escapeHtml(initialPassword) + "</code></p>"
+                    + "<p>Please sign in and change your password right away.</p>"
+                    + "<p>Best regards,<br/>The Focotech Team</p>"
+                    + "</div>";
+            helper.setText(html, true);
+
+            mailSender.send(message);
+            log.info("[EmailService] Account created email sent to: {}", toEmail);
+        } catch (Exception e) {
+            log.warn("[EmailService] Failed to send account created email via SMTP ({}), continuing.", e.getMessage());
+        }
+    }
     public void sendInstructorApprovalEmail(String toEmail, String instructorName, boolean approved) {
         if (toEmail == null || toEmail.isBlank()) {
             return;
