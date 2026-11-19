@@ -155,6 +155,16 @@ public class AdminController {
         ApiResponse response = adminService.triggerPasswordReset(id);
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Archive a published or draft course (hides from catalog, retains data and enrollments).
+     * FR-A08 (ADM-024)
+     */
+    @PutMapping("/courses/{id}/archive")
+    public ResponseEntity<AdminCourseResponse> archiveCourse(@PathVariable Integer id) {
+        AdminCourseResponse response = adminService.archiveCourse(id);
+        return ResponseEntity.ok(response);
+    }
     /**
      * Permanently delete a user account.
      * FR-A02

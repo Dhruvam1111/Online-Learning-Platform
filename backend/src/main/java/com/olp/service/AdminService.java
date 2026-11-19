@@ -601,6 +601,31 @@ public class AdminService {
     }
 
     /**
+     * Archive a published or draft course (hides from catalog, retains all data and enrollments).
+     * FR-A08 (ADM-024)
+     */
+    @Transactional
+    public AdminCourseResponse archiveCourse(Integer courseId) {
+        Course course = findCourseById(courseId);
+        CourseStatus current = course.getStatus();
+        if (current != CourseStatus.PUBLISHED && current != CourseStatus.DRAFT) {
+            String currentName = current != null ? current.name() : "UNKNOWN";
+            throw new IllegalArgumentException(
+                    "Cannot archive a course with status '" + currentName + "'. Only PUBLISHED or DRAFT courses can be archived.");
+        }
+
+        String prevStatus = current.name();
+        course.setStatus(CourseStatus.ARCHIVED);
+        course = courseRepository.save(course);
+
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("COURSE_ARCHIVED", "COURSE", String.valueOf(course.getId()),
+                    course.getTitle(), "Archived course (data and enrollments retained)", prevStatus, CourseStatus.ARCHIVED.name());
+        }
+
+        return toAdminCourseResponse(course);
+    }
+    /**
      * Permanently remove a course from the platform (cascades lectures &
      * enrollments).
      * FR-A08: Remove a live course
