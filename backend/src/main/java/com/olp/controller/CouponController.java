@@ -1,5 +1,6 @@
 package com.olp.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.olp.entity.Coupon;
 import com.olp.entity.User;
 import com.olp.service.CouponService;
@@ -52,6 +53,7 @@ public class CouponController {
      * Admin view: lists all campaigns and promo codes.
      */
     @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('admin')")
     public ResponseEntity<List<Coupon>> getAllCoupons(
             @AuthenticationPrincipal User currentUser) {
         List<Coupon> coupons = couponService.getAllCoupons(currentUser);

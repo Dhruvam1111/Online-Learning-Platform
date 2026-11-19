@@ -1,5 +1,5 @@
 package com.olp.controller;
-
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.olp.dto.InstructorEarningsResponse;
 import com.olp.entity.User;
 import com.olp.service.InstructorPayoutService;
@@ -37,6 +37,7 @@ public class InstructorPayoutController {
      * Admin endpoint: Marks an instructor payout as settled and transferred.
      */
     @PostMapping("/payouts/{earningId}/settle")
+    @PreAuthorize("hasRole('admin')")
     public ResponseEntity<Map<String, String>> settlePayout(
             @AuthenticationPrincipal User currentUser,
             @PathVariable Integer earningId) {

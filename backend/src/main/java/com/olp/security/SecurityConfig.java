@@ -71,6 +71,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/certificates", "/api/certificates/**").permitAll()
                         .requestMatchers("/api/payments/webhook", "/api/webhooks/**", "/api/videos/webhook/**").permitAll()
                         .requestMatchers("/api/payments/simulator/**", "/api/payments/wallet/add-reward").hasRole("admin")
+                        .requestMatchers("/api/payments/admin/**", "/api/payments/coupons/admin/**", "/api/payments/instructor/admin/**").hasRole("admin") 
                         .requestMatchers("/api/payments/**").authenticated()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/actuator/**").hasRole("admin")
