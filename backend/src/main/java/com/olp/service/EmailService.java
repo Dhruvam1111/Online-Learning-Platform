@@ -1087,6 +1087,48 @@ public class EmailService {
      * Sends an email notification to an instructor when their course review decision is made
      * (approved, rejected, or changes requested) by an administrator (FR-I71).
      */
+    /**
+     * Sends an email notification to an instructor when their registration is approved or rejected (FR-A03).
+     */
+    public void sendInstructorApprovalEmail(String toEmail, String instructorName, boolean approved) {
+        if (toEmail == null || toEmail.isBlank()) {
+            return;
+        }
+        String displayName = (instructorName != null && !instructorName.isBlank()) ? instructorName.trim() : toEmail;
+        String decisionLabel = approved ? "Approved" : "Rejected";
+
+        log.info("[EmailService] Dispatched Instructor Application {} Notification to {}", decisionLabel, toEmail);
+
+        if (senderEmail == null || senderEmail.isBlank()) {
+            return;
+        }
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(senderEmail, "Focotech");
+            helper.setTo(toEmail);
+            helper.setSubject("Instructor Application " + decisionLabel + " — Focotech");
+
+            String statusText = approved
+                    ? "Congratulations! Your instructor application has been approved. You can now sign in and start creating courses."
+                    : "Thank you for applying to teach on Focotech. Unfortunately, your instructor application was not approved at this time.";
+            String html = "<div style=\"font-family: Arial, sans-serif; color: #333;\">"
+                    + "<h2>Instructor Application " + decisionLabel + "</h2>"
+                    + "<p>Hello " + escapeHtml(displayName) + ",</p>"
+                    + "<p>" + statusText + "</p>"
+                    + "<p>Best regards,<br/>The Focotech Team</p>"
+                    + "</div>";
+            helper.setText(html, true);
+
+            mailSender.send(message);
+            log.info("[EmailService] Instructor {} email sent to: {}", decisionLabel.toLowerCase(), toEmail);
+        } catch (Exception e) {
+            log.warn("[EmailService] Failed to send instructor {} email via SMTP ({}), continuing.",
+                    decisionLabel.toLowerCase(), e.getMessage());
+        }
+    }
     public void sendCourseReviewDecisionEmail(
             String toEmail,
             String instructorName,
