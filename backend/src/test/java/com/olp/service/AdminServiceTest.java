@@ -1,5 +1,7 @@
 package com.olp.service;
 
+import com.olp.exception.DuplicateEmailException;
+import com.olp.dto.AdminUpdateUserRequest;
 import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
 import com.olp.dto.CourseReviewRequest;
@@ -68,6 +70,59 @@ class AdminServiceTest {
         sampleCourse.setId(10);
     }
 
+    @Test
+  void testUpdateUser_Success() {
+      AdminUpdateUserRequest req = new AdminUpdateUserRequest("Alice Updated", "alice.new@student.com", "instructor");
+      when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
+      when(userRepository.existsByEmail("alice.new@student.com")).thenReturn(false);
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      AdminUserResponse res = adminService.updateUser(1, req);
+
+      assertEquals("Alice Updated", res.getName());
+      assertEquals("alice.new@student.com", res.getEmail());
+      assertEquals("instructor", res.getRole());
+      verify(userRepository).save(sampleStudent);
+  }
+
+  @Test
+  void testUpdateUser_SameEmailAllowed_Success() {
+      AdminUpdateUserRequest req = new AdminUpdateUserRequest("Alice Renamed", "alice@student.com", null);
+      when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      AdminUserResponse res = adminService.updateUser(1, req);
+
+      assertEquals("Alice Renamed", res.getName());
+      verify(userRepository, never()).existsByEmail(anyString());
+  }
+
+  @Test
+  void testUpdateUser_DuplicateEmail_ThrowsDuplicateEmailException() {
+      AdminUpdateUserRequest req = new AdminUpdateUserRequest(null, "taken@olp.com", null);
+      when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
+      when(userRepository.existsByEmail("taken@olp.com")).thenReturn(true);
+
+      assertThrows(DuplicateEmailException.class, () -> adminService.updateUser(1, req));
+      verify(userRepository, never()).save(any());
+  }
+
+  @Test
+  void testUpdateUser_AdminPromotionRejected_ThrowsIllegalArgumentException() {
+      AdminUpdateUserRequest req = new AdminUpdateUserRequest(null, null, "admin");
+      when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
+
+      assertThrows(IllegalArgumentException.class, () -> adminService.updateUser(1, req));
+      verify(userRepository, never()).save(any());
+  }
+
+  @Test
+  void testUpdateUser_NoFieldsProvided_ThrowsIllegalArgumentException() {
+      AdminUpdateUserRequest req = new AdminUpdateUserRequest(null, null, null);
+
+      assertThrows(IllegalArgumentException.class, () -> adminService.updateUser(1, req));
+      verify(userRepository, never()).save(any());
+  }
     @Test
     void testGetUsers_WithFilters() {
         Page<User> userPage = new PageImpl<>(List.of(sampleStudent, adminUser));
