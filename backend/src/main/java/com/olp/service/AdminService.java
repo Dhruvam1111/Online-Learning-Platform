@@ -1,5 +1,6 @@
 package com.olp.service;
 
+import com.olp.dto.AdminUpdateUserRequest;
 import com.olp.dto.AdminCreateUserRequest;
 import com.olp.exception.DuplicateEmailException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -135,6 +136,67 @@ public class AdminService {
       return sb.toString();
   }
 
+    /**
+   * Update allowed user details (name, email, role except admin promotion).
+   * FR-A02 (ADM-022)
+   */
+  @Transactional
+  public AdminUserResponse updateUser(Integer userId, AdminUpdateUserRequest request) {
+      if (request == null) {
+          throw new IllegalArgumentException("User update request cannot be null");
+      }
+      if (request.getName() == null && request.getEmail() == null && request.getRole() == null) {
+          throw new IllegalArgumentException("At least one field (name, email, or role) must be provided");
+      }
+
+      User user = findUserById(userId);
+      String beforeState = String.format("name=%s, email=%s, role=%s",
+              user.getName(), user.getEmail(), user.getRole());
+
+      if (request.getName() != null) {
+          String trimmedName = request.getName().trim();
+          if (trimmedName.isBlank()) {
+              throw new IllegalArgumentException("Name cannot be blank");
+          }
+          user.setName(trimmedName);
+      }
+
+      if (request.getEmail() != null) {
+          String normalizedEmail = request.getEmail().trim().toLowerCase();
+          if (normalizedEmail.isBlank()) {
+              throw new IllegalArgumentException("Email cannot be blank");
+          }
+          if (!normalizedEmail.equalsIgnoreCase(user.getEmail()) && userRepository.existsByEmail(normalizedEmail)) {
+              throw new DuplicateEmailException("An account with this email already exists");
+          }
+          user.setEmail(normalizedEmail);
+      }
+
+      if (request.getRole() != null) {
+          String normalizedRole = request.getRole().trim().toLowerCase();
+          if ("admin".equals(normalizedRole)) {
+              throw new IllegalArgumentException("Cannot promote or assign admin role via this endpoint");
+          }
+          if (!"student".equals(normalizedRole) && !"instructor".equals(normalizedRole)) {
+              throw new IllegalArgumentException("Role must be 'student' or 'instructor'");
+          }
+          if ("admin".equalsIgnoreCase(user.getRole())) {
+              throw new IllegalArgumentException("Admin role cannot be modified via this endpoint");
+          }
+          user.setRole(normalizedRole);
+      }
+
+      user = userRepository.save(user);
+      String afterState = String.format("name=%s, email=%s, role=%s",
+              user.getName(), user.getEmail(), user.getRole());
+
+      if (adminAuditService != null) {
+          adminAuditService.recordLog("USER_UPDATED", "USER", String.valueOf(user.getId()),
+                  user.getName(), "Updated user details", beforeState, afterState);
+      }
+
+      return toAdminUserResponse(user);
+  }
     @Transactional(readOnly = true)
     public PageResponse<AdminUserResponse> getUsers(
             String role,

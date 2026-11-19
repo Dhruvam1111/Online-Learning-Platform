@@ -1,5 +1,6 @@
 package com.olp.controller;
 
+import com.olp.dto.AdminUpdateUserRequest;
 import com.olp.dto.AdminCreateUserRequest;
 import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
@@ -56,6 +57,17 @@ class AdminControllerTest {
       assertEquals(201, response.getStatusCode().value());
       assertEquals("test@olp.com", Objects.requireNonNull(response.getBody()).getEmail());
       verify(adminService, times(1)).createUser(req);
+  }
+     @Test
+  void testUpdateUser_Returns200() {
+      AdminUpdateUserRequest req = new AdminUpdateUserRequest("Updated Name", "updated@olp.com", "instructor");
+      when(adminService.updateUser(1, req)).thenReturn(sampleAdminResponse);
+
+      ResponseEntity<AdminUserResponse> response = adminController.updateUser(1, req);
+
+      assertNotNull(response);
+      assertEquals(200, response.getStatusCode().value());
+      verify(adminService, times(1)).updateUser(1, req);
   }
     @Test
     void testGetUsers() {

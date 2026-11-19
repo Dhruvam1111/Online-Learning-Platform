@@ -1,5 +1,6 @@
 package com.olp.controller;
 
+import com.olp.dto.AdminUpdateUserRequest;
 import org.springframework.http.HttpStatus;
 import com.olp.dto.AdminCreateUserRequest;
 import com.olp.dto.AdminCourseResponse;
@@ -64,6 +65,17 @@ public class AdminController {
   public ResponseEntity<AdminUserResponse> createUser(@Valid @RequestBody AdminCreateUserRequest request) {
       AdminUserResponse response = adminService.createUser(request);
       return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
+    /**
+   * Update user details (name, email, role except admin promotion).
+   * FR-A02 (ADM-022)
+   */
+  @PutMapping("/users/{id}")
+  public ResponseEntity<AdminUserResponse> updateUser(
+          @PathVariable Integer id,
+          @Valid @RequestBody AdminUpdateUserRequest request) {
+      AdminUserResponse response = adminService.updateUser(id, request);
+      return ResponseEntity.ok(response);
   }
     @GetMapping("/users")
     public ResponseEntity<PageResponse<AdminUserResponse>> getUsers(
