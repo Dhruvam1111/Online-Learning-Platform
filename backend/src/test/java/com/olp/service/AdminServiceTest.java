@@ -307,7 +307,29 @@ class AdminServiceTest {
         verify(emailService).sendCourseReviewDecisionEmail(
                 eq("chen@instructor.com"), eq("Dr. Chen"), eq("Java 101"), eq("REJECTED"), eq("Content is incomplete"));
     }
+    @Test
+    void testRejectCourse_BlankReason_ThrowsException() {
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
 
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> adminService.rejectCourse(10, new RejectCourseRequest("   ")));
+
+        assertTrue(ex.getMessage().contains("Rejection reason cannot be blank"));
+        verify(courseRepository, never()).save(any());
+        verify(emailService, never()).sendCourseReviewDecisionEmail(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void testRejectCourse_NullRequest_ThrowsException() {
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> adminService.rejectCourse(10, null));
+
+        assertTrue(ex.getMessage().contains("Rejection reason cannot be blank"));
+        verify(courseRepository, never()).save(any());
+        verify(emailService, never()).sendCourseReviewDecisionEmail(any(), any(), any(), any(), any());
+    }
     @Test
     void testRequestChanges_Success() {
         when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));

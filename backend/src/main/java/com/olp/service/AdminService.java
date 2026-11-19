@@ -315,6 +315,9 @@ public class AdminService {
         requireCourseStatus(course, CourseStatus.PENDING_REVIEW, "reject");
         String prevStatus = course.getStatus() != null ? course.getStatus().name() : "UNKNOWN";
         String reason = (request != null && request.getReason() != null) ? request.getReason().trim() : "";
+        if (reason.isBlank()) {
+            throw new IllegalArgumentException("Rejection reason cannot be blank");
+        }
         course.setStatus(CourseStatus.REJECTED);
         course.setRejectionReason(reason);
         course.setReviewComments(reason);
