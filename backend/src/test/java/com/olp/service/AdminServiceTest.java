@@ -103,6 +103,7 @@ class AdminServiceTest {
         assertNotNull(response);
         assertEquals("active", response.getAccountStatus());
         verify(userRepository, times(1)).save(pendingInstructor);
+        verify(emailService).sendInstructorApprovalEmail("chen@instructor.com", "Dr. Chen", true);
     }
 
     @Test
@@ -127,6 +128,7 @@ class AdminServiceTest {
         assertNotNull(response);
         assertEquals("rejected", response.getAccountStatus());
         verify(userRepository, times(1)).save(pendingInstructor);
+        verify(emailService).sendInstructorApprovalEmail("chen@instructor.com", "Dr. Chen", false);
     }
 
     @Test
@@ -471,4 +473,33 @@ class AdminServiceTest {
                 adminService.approveCourse(999)
         );
     }
+
+    @Test
+  void testApproveInstructor_EmailFailure_DoesNotRollBackDecision() {
+      when(userRepository.findById(2)).thenReturn(Optional.of(pendingInstructor));
+      when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+      doThrow(new RuntimeException("SMTP unavailable"))
+              .when(emailService).sendInstructorApprovalEmail(anyString(), anyString(), eq(true));
+
+      AdminUserResponse response = adminService.approveInstructor(2);
+
+      assertNotNull(response);
+      assertEquals("active", response.getAccountStatus());
+      verify(userRepository, times(1)).save(pendingInstructor);
+  }
+
+  @Test
+  void testRejectInstructor_EmailFailure_DoesNotRollBackDecision() {
+      when(userRepository.findById(2)).thenReturn(Optional.of(pendingInstructor));
+      when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+      doThrow(new RuntimeException("SMTP unavailable"))
+              .when(emailService).sendInstructorApprovalEmail(anyString(), anyString(), eq(false));
+
+      AdminUserResponse response = adminService.rejectInstructor(2);
+
+      assertNotNull(response);
+      assertEquals("rejected", response.getAccountStatus());
+      verify(userRepository, times(1)).save(pendingInstructor);
+      verify(emailService).sendInstructorApprovalEmail("chen@instructor.com", "Dr. Chen", false);
+  }
 }

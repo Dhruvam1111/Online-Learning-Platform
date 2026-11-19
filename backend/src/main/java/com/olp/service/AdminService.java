@@ -1,5 +1,7 @@
 package com.olp.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
 import com.olp.dto.CourseReviewRequest;
@@ -25,6 +27,7 @@ import java.time.LocalDateTime;
 @Service
 public class AdminService {
 
+    private static final Logger log = LoggerFactory.getLogger(AdminService.class);
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
     private final CourseSubmissionRepository courseSubmissionRepository;
@@ -119,7 +122,13 @@ public class AdminService {
             adminAuditService.recordLog("INSTRUCTOR_APPROVED", "USER", String.valueOf(user.getId()),
                     user.getName(), "Approved instructor registration", prevStatus, "active");
         }
-
+        if (emailService != null) {
+          try {
+              emailService.sendInstructorApprovalEmail(user.getEmail(), user.getName(), true);
+          } catch (Exception e) {
+              log.warn("Failed to send instructor approval email to {}: {}", user.getEmail(), e.getMessage());
+          }
+      }
         return toAdminUserResponse(user);
     }
 
@@ -143,7 +152,13 @@ public class AdminService {
             adminAuditService.recordLog("INSTRUCTOR_REJECTED", "USER", String.valueOf(user.getId()),
                     user.getName(), "Rejected instructor application", prevStatus, "rejected");
         }
-
+        if (emailService != null) {
+          try {
+              emailService.sendInstructorApprovalEmail(user.getEmail(), user.getName(), false);
+          } catch (Exception e) {
+              log.warn("Failed to send instructor rejection email to {}: {}", user.getEmail(), e.getMessage());
+          }
+      }
         return toAdminUserResponse(user);
     }
 
