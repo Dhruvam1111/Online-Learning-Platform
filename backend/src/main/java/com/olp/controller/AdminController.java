@@ -1,5 +1,6 @@
 package com.olp.controller;
 
+import com.olp.dto.AssignCourseInstructorRequest;
 import com.olp.dto.AdminUpdateUserRequest;
 import org.springframework.http.HttpStatus;
 import com.olp.dto.AdminCreateUserRequest;
@@ -76,6 +77,27 @@ public class AdminController {
           @Valid @RequestBody AdminUpdateUserRequest request) {
       AdminUserResponse response = adminService.updateUser(id, request);
       return ResponseEntity.ok(response);
+  }
+    /**
+   * Assign or reassign an active instructor to a course (FR-A10, ADM-025).
+   */
+  @PostMapping("/courses/{courseId:[0-9]+}/instructors")
+  public ResponseEntity<CourseInstructorResponse> assignCourseInstructor(
+          @PathVariable Integer courseId,
+          @Valid @RequestBody AssignCourseInstructorRequest request) {
+      CourseInstructorResponse response = adminService.assignCourseInstructor(courseId, request);
+      return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
+
+  /**
+   * Remove a co-instructor from a course (FR-A10, ADM-025).
+   */
+  @DeleteMapping("/courses/{courseId:[0-9]+}/instructors/{instructorId:[0-9]+}")
+  public ResponseEntity<ApiResponse> removeCourseInstructor(
+          @PathVariable Integer courseId,
+          @PathVariable Integer instructorId) {
+      adminService.removeCourseInstructor(courseId, instructorId);
+      return ResponseEntity.ok(new ApiResponse(true, "Instructor removed from course"));
   }
     @GetMapping("/users")
     public ResponseEntity<PageResponse<AdminUserResponse>> getUsers(
