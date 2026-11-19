@@ -260,6 +260,18 @@ class AdminControllerTest {
     }
 
     @Test
+    void testArchiveCourse_Returns200() {
+        sampleCourseResponse.setStatus("archived");
+        when(adminService.archiveCourse(10)).thenReturn(sampleCourseResponse);
+
+        ResponseEntity<AdminCourseResponse> response = adminController.archiveCourse(10);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("archived", Objects.requireNonNull(response.getBody()).getStatus());
+        verify(adminService, times(1)).archiveCourse(10);
+    }
+    @Test
     void testDeleteCourse() {
         doNothing().when(adminService).deleteCourse(10);
 

@@ -541,6 +541,49 @@ class AdminServiceTest {
         verify(courseRepository, never()).save(any());
     }
     @Test
+    void testArchiveCourse_FromPublished_Success() {
+        sampleCourse.setStatus(CourseStatus.PUBLISHED);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+        when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AdminCourseResponse response = adminService.archiveCourse(10);
+
+        assertNotNull(response);
+        assertEquals("archived", response.getStatus());
+        assertEquals(CourseStatus.ARCHIVED, sampleCourse.getStatus());
+        verify(courseRepository, times(1)).save(sampleCourse);
+    }
+
+    @Test
+    void testArchiveCourse_FromDraft_Success() {
+        sampleCourse.setStatus(CourseStatus.DRAFT);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+        when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AdminCourseResponse response = adminService.archiveCourse(10);
+
+        assertEquals("archived", response.getStatus());
+        verify(courseRepository, times(1)).save(sampleCourse);
+    }
+
+    @Test
+    void testArchiveCourse_AlreadyArchived_ThrowsException() {
+        sampleCourse.setStatus(CourseStatus.ARCHIVED);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        assertThrows(IllegalArgumentException.class, () -> adminService.archiveCourse(10));
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testArchiveCourse_FromPendingReview_ThrowsException() {
+        sampleCourse.setStatus(CourseStatus.PENDING_REVIEW);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        assertThrows(IllegalArgumentException.class, () -> adminService.archiveCourse(10));
+        verify(courseRepository, never()).save(any());
+    }
+    @Test
     void testDeleteCourse_Success() {
         when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
         doNothing().when(courseRepository).delete(sampleCourse);
