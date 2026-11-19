@@ -235,12 +235,14 @@ public class AdminAuditServiceTest {
         // Reject course
         RejectCourseRequest rejectReq = new RejectCourseRequest();
         rejectReq.setReason("Lacks quizzes");
+        course.setStatus(CourseStatus.PENDING_REVIEW);
         adminService.rejectCourse(10, rejectReq);
         verify(auditLogRepository, times(2)).save(captor.capture());
         assertEquals("COURSE_REJECTED", captor.getValue().getAction());
         assertTrue(captor.getValue().getDetails().contains("Lacks quizzes"));
 
         // Request changes
+        course.setStatus(CourseStatus.PENDING_REVIEW);
         CourseReviewRequest changeReq = new CourseReviewRequest();
         changeReq.setComments("Improve audio quality");
         adminService.requestChanges(10, changeReq);
@@ -248,6 +250,7 @@ public class AdminAuditServiceTest {
         assertEquals("COURSE_CHANGES_REQUESTED", captor.getValue().getAction());
 
         // Unpublish
+        course.setStatus(CourseStatus.PUBLISHED);
         adminService.unpublishCourse(10);
         verify(auditLogRepository, times(4)).save(captor.capture());
         assertEquals("COURSE_UNPUBLISHED", captor.getValue().getAction());
