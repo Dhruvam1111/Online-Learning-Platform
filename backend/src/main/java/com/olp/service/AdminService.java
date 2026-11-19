@@ -270,6 +270,7 @@ public class AdminService {
     @Transactional
     public AdminCourseResponse approveCourse(Integer courseId) {
         Course course = findCourseById(courseId);
+        requireCourseStatus(course, CourseStatus.PENDING_REVIEW, "approve");
         String prevStatus = course.getStatus() != null ? course.getStatus().name() : "UNKNOWN";
         course.setStatus(CourseStatus.PUBLISHED);
         course.setRejectionReason(null);
@@ -311,6 +312,7 @@ public class AdminService {
     @Transactional
     public AdminCourseResponse rejectCourse(Integer courseId, RejectCourseRequest request) {
         Course course = findCourseById(courseId);
+        requireCourseStatus(course, CourseStatus.PENDING_REVIEW, "reject");
         String prevStatus = course.getStatus() != null ? course.getStatus().name() : "UNKNOWN";
         String reason = (request != null && request.getReason() != null) ? request.getReason().trim() : "";
         course.setStatus(CourseStatus.REJECTED);
@@ -356,6 +358,7 @@ public class AdminService {
     @Transactional
     public AdminCourseResponse requestChanges(Integer courseId, CourseReviewRequest request) {
         Course course = findCourseById(courseId);
+        requireCourseStatus(course, CourseStatus.PENDING_REVIEW, "request changes on");
         String prevStatus = course.getStatus() != null ? course.getStatus().name() : "UNKNOWN";
         String feedback = (request != null) ? request.resolveFeedback() : "";
         if (feedback.isBlank()) {
@@ -402,6 +405,7 @@ public class AdminService {
     @Transactional
     public AdminCourseResponse unpublishCourse(Integer courseId) {
         Course course = findCourseById(courseId);
+        requireCourseStatus(course, CourseStatus.PUBLISHED, "unpublish");
         String prevStatus = course.getStatus() != null ? course.getStatus().name() : "UNKNOWN";
         course.setStatus(CourseStatus.DRAFT);
         course = courseRepository.save(course);
@@ -438,6 +442,18 @@ public class AdminService {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
     }
+    /**
+ * Enforces allowed course status transitions for administrative actions:
+ * - approve / reject / requestChanges: only from PENDING_REVIEW
+ * - unpublish: only from PUBLISHED
+ */
+private void requireCourseStatus(Course course, CourseStatus expected, String action) {
+    if (course.getStatus() != expected) {
+        String current = course.getStatus() != null ? course.getStatus().name() : "UNKNOWN";
+        throw new IllegalArgumentException(
+                "Cannot " + action + " a course with status '" + current + "'. Expected status: " + expected.name());
+    }
+}
 
     private Course findCourseById(Integer courseId) {
         return courseRepository.findById(courseId)

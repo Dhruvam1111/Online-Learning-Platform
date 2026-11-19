@@ -356,7 +356,81 @@ class AdminServiceTest {
         assertEquals("draft", response.getStatus());
         verify(courseRepository, times(1)).save(sampleCourse);
     }
+    @Test
+    void testApproveCourse_FromDraft_ThrowsException() {
+        sampleCourse.setStatus(CourseStatus.DRAFT);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
 
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> adminService.approveCourse(10));
+
+        assertTrue(ex.getMessage().contains("DRAFT"));
+        assertTrue(ex.getMessage().contains("PENDING_REVIEW"));
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testApproveCourse_FromPublished_ThrowsException() {
+        sampleCourse.setStatus(CourseStatus.PUBLISHED);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> adminService.approveCourse(10));
+
+        assertTrue(ex.getMessage().contains("PUBLISHED"));
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testRejectCourse_FromDraft_ThrowsException() {
+        sampleCourse.setStatus(CourseStatus.DRAFT);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> adminService.rejectCourse(10, new RejectCourseRequest("Incomplete")));
+
+        assertTrue(ex.getMessage().contains("DRAFT"));
+        assertTrue(ex.getMessage().contains("PENDING_REVIEW"));
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testRequestChanges_FromPublished_ThrowsException() {
+        sampleCourse.setStatus(CourseStatus.PUBLISHED);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> adminService.requestChanges(10, new CourseReviewRequest("Needs updates")));
+
+        assertTrue(ex.getMessage().contains("PUBLISHED"));
+        assertTrue(ex.getMessage().contains("PENDING_REVIEW"));
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testUnpublishCourse_FromDraft_ThrowsException() {
+        sampleCourse.setStatus(CourseStatus.DRAFT);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> adminService.unpublishCourse(10));
+
+        assertTrue(ex.getMessage().contains("DRAFT"));
+        assertTrue(ex.getMessage().contains("PUBLISHED"));
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testUnpublishCourse_FromPendingReview_ThrowsException() {
+        sampleCourse.setStatus(CourseStatus.PENDING_REVIEW);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> adminService.unpublishCourse(10));
+
+        assertTrue(ex.getMessage().contains("PENDING_REVIEW"));
+        verify(courseRepository, never()).save(any());
+    }
     @Test
     void testDeleteCourse_Success() {
         when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
