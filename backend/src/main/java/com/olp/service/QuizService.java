@@ -19,6 +19,7 @@ import java.util.*;
  * Service implementing FR-I19 (Create Quiz & Quiz-Question ordered mapping).
  */
 @Service
+@SuppressWarnings("null")
 public class QuizService {
 
     private final QuizRepository quizRepository;
@@ -223,7 +224,8 @@ public class QuizService {
 
         if (request.getLessonId() != null) {
             Lesson lesson = lessonRepository.findById(request.getLessonId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Lesson not found with id: " + request.getLessonId()));
+                    .orElseThrow((java.util.function.Supplier<? extends RuntimeException>) () ->
+                            new ResourceNotFoundException("Lesson not found with id: " + request.getLessonId()));
             validateQuizLessonType(lesson);
             validateHierarchyConsistency(quiz.getCourse(), quiz.getModule(), lesson);
             quiz.setLesson(lesson);
@@ -318,6 +320,7 @@ public class QuizService {
     @Transactional
     public ApiResponse deleteQuiz(User currentUser, Integer quizId) {
         Quiz quiz = findAndVerifyQuiz(quizId, currentUser);
+        Objects.requireNonNull(quiz, "Quiz must not be null");
         quizRepository.delete(quiz);
         return new ApiResponse(true, "Quiz deleted successfully");
     }

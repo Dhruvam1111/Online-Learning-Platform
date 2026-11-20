@@ -28,6 +28,12 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Integer>
            "ORDER BY e.enrolledAt DESC")
     List<MyCourseResponse> findMyCourses(@Param("studentId") Integer studentId);
 
+    @Query("SELECT e FROM Enrollment e JOIN FETCH e.course WHERE e.student.id = :studentId")
+    List<Enrollment> findByStudentId(@Param("studentId") Integer studentId);
+
+    @Query("SELECT e FROM Enrollment e JOIN FETCH e.student WHERE e.course.id = :courseId")
+    List<Enrollment> findByCourseId(@Param("courseId") Integer courseId);
+
     @Query("SELECT CASE WHEN COUNT(e) > 0 THEN true ELSE false END FROM Enrollment e WHERE e.student.id = :studentId AND e.course.id = :courseId")
     boolean existsByStudentIdAndCourseId(@Param("studentId") Integer studentId, @Param("courseId") Integer courseId);
 

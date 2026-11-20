@@ -751,6 +751,49 @@ public class CourseCompletionService {
         return CertificateResponse.fromEntity(cert, profile);
     }
 
+    /**
+     * FR-S77: Evaluates whether a student has satisfied the configured completion criteria for a course.
+     */
+    @Transactional(readOnly = true)
+    public CompletionEvaluationResult getStudentCompletionStatus(User student, Integer courseId) {
+        if (student == null) {
+            throw new InvalidCredentialsException("User is not authenticated");
+        }
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found: " + courseId));
+        return evaluate(student, course);
+    }
+
+    /**
+     * FR-S79: Returns a record of all certificates earned by the student.
+     */
+    @Transactional(readOnly = true)
+    public List<CertificateResponse> getStudentCertificates(User student) {
+        if (student == null) {
+            throw new InvalidCredentialsException("User is not authenticated");
+        }
+        List<Certificate> certs = certificateRepository.findByStudentId(student.getId());
+        return certs.stream().map(this::mapToCertificateResponse).collect(Collectors.toList());
+    }
+
+    /**
+     * FR-S78: View/obtain a specific certificate owned by the student.
+     */
+    @Transactional(readOnly = true)
+    public CertificateResponse getStudentCertificate(User student, Integer certificateId) {
+        if (student == null) {
+            throw new InvalidCredentialsException("User is not authenticated");
+        }
+        Certificate cert = certificateRepository.findById(certificateId)
+                .orElseThrow(() -> new ResourceNotFoundException("Certificate not found: " + certificateId));
+
+        if (!student.getId().equals(cert.getStudent().getId())) {
+            throw new AccessDeniedException("Access denied: You are not authorized to view this certificate");
+        }
+
+        return mapToCertificateResponse(cert);
+    }
+
     public LocalDateTime parseDateTime(String input, boolean isEndOfDay) {
         if (input == null || input.trim().isEmpty()) {
             return null;

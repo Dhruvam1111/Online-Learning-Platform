@@ -5,8 +5,9 @@ import com.olp.entity.User;
 import com.olp.service.StudentLearningService;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
+import java.util.Objects;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -97,7 +98,7 @@ public class StudentLearningController {
         Integer studentId = getStudentId(authentication);
         ResourceAndMetadata data = studentLearningService.downloadMaterial(studentId, materialId);
 
-        String contentType = data.getContentType();
+        String contentType = Objects.requireNonNull(data.getContentType(), "Content type must not be null");
         String contentDisposition = "attachment; filename=\"" + data.getFilename() + "\"";
 
         return ResponseEntity.ok()
@@ -114,7 +115,7 @@ public class StudentLearningController {
         Integer studentId = getStudentId(authentication);
         ResourceAndMetadata data = studentLearningService.viewMaterial(studentId, materialId);
 
-        String contentType = data.getContentType();
+        String contentType = Objects.requireNonNull(data.getContentType(), "Content type must not be null");
         String contentDisposition = "inline; filename=\"" + data.getFilename() + "\"";
 
         return ResponseEntity.ok()
