@@ -1,5 +1,9 @@
 package com.olp.service;
 
+import com.olp.dto.AdminDashboardStatsResponse;
+import com.olp.repository.EnrollmentRepository;
+import com.olp.repository.PaymentRepository;
+import java.math.BigDecimal;
 import com.olp.dto.AssignCourseInstructorRequest;
 import com.olp.dto.CourseInstructorResponse;
 import com.olp.entity.CourseInstructor;
@@ -57,6 +61,8 @@ class AdminServiceTest {
     @Mock
     private JwtUtil jwtUtil;
     @Mock private CourseInstructorRepository courseInstructorRepository;
+    @Mock private EnrollmentRepository enrollmentRepository; 
+    @Mock private PaymentRepository paymentRepository;
 
     @InjectMocks
     private AdminService adminService;
@@ -81,6 +87,8 @@ class AdminServiceTest {
         sampleCourse.setId(10);
         ReflectionTestUtils.setField(adminService, "jwtUtil", jwtUtil);
         ReflectionTestUtils.setField(adminService, "courseInstructorRepository", courseInstructorRepository);    
+        ReflectionTestUtils.setField(adminService, "enrollmentRepository", enrollmentRepository);
+        ReflectionTestUtils.setField(adminService, "paymentRepository", paymentRepository);
     }
 
     @Test
@@ -718,5 +726,45 @@ class AdminServiceTest {
       assertEquals("rejected", response.getAccountStatus());
       verify(userRepository, times(1)).save(pendingInstructor);
       verify(emailService).sendInstructorApprovalEmail("chen@instructor.com", "Dr. Chen", false);
+  }
+  @Test
+  void testGetDashboardStats_WithRevenueData_ReturnsAllMetrics() {
+      when(userRepository.countUsersByRole()).thenReturn(List.of(
+              new Object[]{"student", 120L},
+              new Object[]{"instructor", 15L},
+              new Object[]{"admin", 2L}
+      ));
+      when(courseRepository.countCoursesByStatus()).thenReturn(List.of(
+              new Object[]{CourseStatus.PUBLISHED, 10L},
+              new Object[]{CourseStatus.DRAFT, 4L}
+      ));
+      when(enrollmentRepository.count()).thenReturn(350L);
+      when(paymentRepository.summarizeSuccessfulPayments())
+              .thenReturn(List.<Object[]>of(new Object[]{5L, new BigDecimal("4995.00")}));
+
+      AdminDashboardStatsResponse stats = adminService.getDashboardStats();
+
+      assertEquals(137L, stats.getTotalUsers());
+      assertEquals(120L, stats.getUsersByRole().get("student"));
+      assertEquals(14L, stats.getTotalCourses());
+      assertEquals(10L, stats.getActiveCourses());
+      assertEquals(350L, stats.getTotalEnrollments());
+      assertTrue(stats.isRevenueAvailable());
+      assertEquals(new BigDecimal("4995.00"), stats.getTotalRevenue());
+  }
+
+  @Test
+  void testGetDashboardStats_NoPaymentData_HidesRevenue() {
+      when(userRepository.countUsersByRole()).thenReturn(java.util.Collections.singletonList(new Object[]{"student", 5L}));
+      when(courseRepository.countCoursesByStatus()).thenReturn(List.of());
+      when(enrollmentRepository.count()).thenReturn(0L);
+      when(paymentRepository.summarizeSuccessfulPayments())
+              .thenReturn(List.<Object[]>of(new Object[]{0L, BigDecimal.ZERO}));
+
+      AdminDashboardStatsResponse stats = adminService.getDashboardStats();
+
+      assertEquals(5L, stats.getTotalUsers());
+      assertFalse(stats.isRevenueAvailable());
+      assertNull(stats.getTotalRevenue());
   }
 }

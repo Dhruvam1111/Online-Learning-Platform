@@ -1,5 +1,6 @@
 package com.olp.repository;
 
+import java.util.List;
 import com.olp.entity.Payment;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -41,4 +42,6 @@ public interface PaymentRepository extends JpaRepository<Payment, Integer> {
     boolean existsByStudentIdAndCourseIdAndStatus(Integer studentId, Integer courseId, String status);
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths={"student","course","course.instructor"})
     org.springframework.data.domain.Page<Payment> findAllByOrderByCreatedAtDescIdDesc(org.springframework.data.domain.Pageable pageable);
+    @Query("SELECT COUNT(p), COALESCE(SUM(p.amount), 0) FROM Payment p WHERE LOWER(p.status) = 'success'")
+    List<Object[]> summarizeSuccessfulPayments();
 }

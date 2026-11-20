@@ -1,5 +1,12 @@
 package com.olp.service;
 
+import com.olp.dto.AdminDashboardStatsResponse;
+import com.olp.repository.EnrollmentRepository;
+import com.olp.repository.PaymentRepository;
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import com.olp.dto.AssignCourseInstructorRequest;
 import com.olp.dto.CourseInstructorResponse;
 import com.olp.entity.CourseInstructor;
@@ -55,6 +62,11 @@ public class AdminService {
     private JwtUtil jwtUtil;
     @Autowired(required = false)
 private CourseInstructorRepository courseInstructorRepository;
+    @Autowired(required = false)
+private EnrollmentRepository enrollmentRepository;
+
+@Autowired(required = false)
+private PaymentRepository paymentRepository;
     public AdminService(
             UserRepository userRepository,
             CourseRepository courseRepository,
@@ -790,6 +802,69 @@ private CourseInstructorRepository courseInstructorRepository;
         }
     }
 
+    /**
+   * Aggregate platform statistics for the admin dashboard (FR-A20, ADM-026).
+   * Revenue is included only when successful payment records exist.
+   */
+  @Transactional(readOnly = true)
+  public AdminDashboardStatsResponse getDashboardStats() {
+      Map<String, Long> usersByRole = new LinkedHashMap<>();
+      long totalUsers = 0L;
+      List<Object[]> userRows = userRepository.countUsersByRole();
+      if (userRows != null) {
+          for (Object[] row : userRows) {
+              if (row != null && row.length >= 2 && row[0] != null) {
+                  String role = String.valueOf(row[0]).toLowerCase();
+                  long count = ((Number) row[1]).longValue();
+                  usersByRole.put(role, count);
+                  totalUsers += count;
+              }
+          }
+      }
+
+      Map<String, Long> coursesByStatus = new LinkedHashMap<>();
+      long totalCourses = 0L;
+      List<Object[]> courseRows = courseRepository.countCoursesByStatus();
+      if (courseRows != null) {
+          for (Object[] row : courseRows) {
+              if (row != null && row.length >= 2 && row[0] != null) {
+                  String status = String.valueOf(row[0]);
+                  long count = ((Number) row[1]).longValue();
+                  coursesByStatus.put(status, count);
+                  totalCourses += count;
+              }
+          }
+      }
+      long activeCourses = coursesByStatus.getOrDefault(CourseStatus.PUBLISHED.name(), 0L);
+
+      long totalEnrollments = enrollmentRepository != null ? enrollmentRepository.count() : 0L;
+
+      boolean revenueAvailable = false;
+      BigDecimal totalRevenue = null;
+      if (paymentRepository != null) {
+          List<Object[]> payRows = paymentRepository.summarizeSuccessfulPayments();
+          if (payRows != null && !payRows.isEmpty() && payRows.get(0) != null && payRows.get(0).length >= 2) {
+              long successCount = payRows.get(0)[0] != null ? ((Number) payRows.get(0)[0]).longValue() : 0L;
+              if (successCount > 0) {
+                  revenueAvailable = true;
+                  Object sumObj = payRows.get(0)[1];
+                  totalRevenue = sumObj instanceof BigDecimal
+                          ? (BigDecimal) sumObj
+                          : new BigDecimal(String.valueOf(sumObj));
+              }
+          }
+      }
+
+      return new AdminDashboardStatsResponse(
+              totalUsers,
+              usersByRole,
+              totalCourses,
+              activeCourses,
+              coursesByStatus,
+              totalEnrollments,
+              revenueAvailable,
+              totalRevenue);
+  }
     // ===== Helper Methods =====
 
     private User findUserById(Integer userId) {

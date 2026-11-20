@@ -1,5 +1,8 @@
 package com.olp.controller;
 
+import com.olp.dto.AdminDashboardStatsResponse;
+import java.math.BigDecimal;
+import java.util.Map;
 import com.olp.dto.AssignCourseInstructorRequest;
 import com.olp.dto.CourseInstructorResponse;
 import com.olp.dto.ApiResponse;
@@ -308,4 +311,18 @@ class AdminControllerTest {
         assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
         verify(adminService, times(1)).deleteCourse(10);
     }
+    @Test
+  void testGetDashboardStats_Returns200() {
+      AdminDashboardStatsResponse stats = new AdminDashboardStatsResponse(
+              10L, Map.of("student", 8L, "instructor", 2L),
+              4L, 3L, Map.of("PUBLISHED", 3L, "DRAFT", 1L),
+              25L, true, new BigDecimal("999.00"));
+      when(adminService.getDashboardStats()).thenReturn(stats);
+
+      ResponseEntity<AdminDashboardStatsResponse> response = adminController.getDashboardStats();
+
+      assertEquals(200, response.getStatusCode().value());
+      assertEquals(10L, Objects.requireNonNull(response.getBody()).getTotalUsers());
+      verify(adminService).getDashboardStats();
+  }
 }

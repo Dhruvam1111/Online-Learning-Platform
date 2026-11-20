@@ -153,4 +153,6 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
         @Param("search") String search,
         Pageable pageable
     );
+    @Query("SELECT c.status, COUNT(c) FROM Course c GROUP BY c.status")
+    List<Object[]> countCoursesByStatus();
 }

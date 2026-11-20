@@ -1,5 +1,6 @@
 package com.olp.repository;
 
+import java.util.List;
 import com.olp.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,4 +36,6 @@ public interface UserRepository extends JpaRepository<User, Integer> {
             @Param("status") String status,
             @Param("search") String search,
             Pageable pageable);
+    @Query("SELECT u.role, COUNT(u) FROM User u GROUP BY u.role")
+    List<Object[]> countUsersByRole();
 }

@@ -1,5 +1,6 @@
 package com.olp.controller;
 
+import com.olp.dto.AdminDashboardStatsResponse;
 import com.olp.dto.AssignCourseInstructorRequest;
 import com.olp.dto.AdminUpdateUserRequest;
 import org.springframework.http.HttpStatus;
@@ -372,4 +373,11 @@ public class AdminController {
                 courseAssociationService.getCourseInstructorsForAdmin(adminUser, courseId);
         return ResponseEntity.ok(response);
     }
+    /**
+   * Platform statistics dashboard (FR-A20, ADM-026).
+   */
+  @GetMapping("/dashboard/stats")
+  public ResponseEntity<AdminDashboardStatsResponse> getDashboardStats() {
+      return ResponseEntity.ok(adminService.getDashboardStats());
+  }
 }
