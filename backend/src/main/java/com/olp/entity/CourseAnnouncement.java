@@ -6,6 +6,9 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
 
+/**
+ * Entity representing an instructor/course announcement visible to enrolled students (FR-S62).
+ */
 @Entity
 @Table(name = "course_announcements")
 public class CourseAnnouncement {
@@ -24,12 +27,15 @@ public class CourseAnnouncement {
 
     @NotBlank(message = "Announcement title is required")
     @Size(max = 255)
-    @Column(nullable = false, length = 255)
+    @Column(name = "title", nullable = false, length = 255)
     private String title;
 
     @NotBlank(message = "Announcement content is required")
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
+
+    @Column(name = "is_pinned", nullable = false)
+    private Boolean isPinned = false;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -37,14 +43,18 @@ public class CourseAnnouncement {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public CourseAnnouncement() {
-    }
+    public CourseAnnouncement() {}
 
     public CourseAnnouncement(Course course, User instructor, String title, String content) {
+        this(course, instructor, title, content, false);
+    }
+
+    public CourseAnnouncement(Course course, User instructor, String title, String content, Boolean isPinned) {
         this.course = course;
         this.instructor = instructor;
         this.title = title;
         this.content = content;
+        this.isPinned = isPinned != null ? isPinned : false;
     }
 
     @PrePersist
@@ -55,6 +65,9 @@ public class CourseAnnouncement {
         }
         if (this.updatedAt == null) {
             this.updatedAt = now;
+        }
+        if (this.isPinned == null) {
+            this.isPinned = false;
         }
     }
 
@@ -103,6 +116,14 @@ public class CourseAnnouncement {
         this.content = content;
     }
 
+    public Boolean getIsPinned() {
+        return isPinned;
+    }
+
+    public void setIsPinned(Boolean isPinned) {
+        this.isPinned = isPinned;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -119,4 +140,3 @@ public class CourseAnnouncement {
         this.updatedAt = updatedAt;
     }
 }
-
