@@ -6,12 +6,14 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 
 /**
- * Entity representing a student attempt on a scheduled examination (FR-I25, Step 38).
- * Enforces server-authoritative timers (DR-ED06) to prevent client clock tampering.
+ * Entity representing a student attempt on a scheduled examination (FR-I25,
+ * Step 38).
+ * Enforces server-authoritative timers (DR-ED06) to prevent client clock
+ * tampering.
  */
 @Entity
 @Table(name = "exam_attempts", uniqueConstraints = {
-        @UniqueConstraint(name = "uq_exam_student_attempt", columnNames = {"exam_id", "student_id", "attempt_number"})
+        @UniqueConstraint(name = "uq_exam_student_attempt", columnNames = { "exam_id", "student_id", "attempt_number" })
 })
 public class ExamAttempt {
 
@@ -75,6 +77,15 @@ public class ExamAttempt {
     @Column(name = "monitoring_flags", columnDefinition = "TEXT")
     private String monitoringFlags;
 
+    @Column(name = "screen_share_consent_given", nullable = false)
+    private Boolean screenShareConsentGiven = false;
+
+    @Column(name = "screen_share_consent_at")
+    private LocalDateTime screenShareConsentAt;
+
+    @Column(name = "screen_share_active", nullable = false)
+    private Boolean screenShareActive = false;
+
     @Column(name = "is_published", nullable = false)
     private Boolean isPublished = false;
 
@@ -113,10 +124,11 @@ public class ExamAttempt {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public ExamAttempt() {}
+    public ExamAttempt() {
+    }
 
     public ExamAttempt(Exam exam, User student, Integer attemptNumber,
-                       LocalDateTime startedAt, LocalDateTime expiresAt) {
+            LocalDateTime startedAt, LocalDateTime expiresAt) {
         this.exam = exam;
         this.student = student;
         this.attemptNumber = attemptNumber != null ? attemptNumber : 1;
@@ -335,6 +347,30 @@ public class ExamAttempt {
         this.monitoringFlags = monitoringFlags;
     }
 
+    public Boolean getScreenShareConsentGiven() {
+        return screenShareConsentGiven;
+    }
+
+    public void setScreenShareConsentGiven(Boolean screenShareConsentGiven) {
+        this.screenShareConsentGiven = screenShareConsentGiven != null ? screenShareConsentGiven : false;
+    }
+
+    public LocalDateTime getScreenShareConsentAt() {
+        return screenShareConsentAt;
+    }
+
+    public void setScreenShareConsentAt(LocalDateTime screenShareConsentAt) {
+        this.screenShareConsentAt = screenShareConsentAt;
+    }
+
+    public Boolean getScreenShareActive() {
+        return screenShareActive;
+    }
+
+    public void setScreenShareActive(Boolean screenShareActive) {
+        this.screenShareActive = screenShareActive != null ? screenShareActive : false;
+    }
+
     public Boolean getIsPublished() {
         return isPublished != null ? isPublished : false;
     }
@@ -415,4 +451,3 @@ public class ExamAttempt {
         this.escalationRecommendation = escalationRecommendation;
     }
 }
-
