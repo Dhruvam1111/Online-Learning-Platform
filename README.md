@@ -1,6 +1,6 @@
 # Online Learning Platform (OLP)
 
-A full-stack e-learning platform with distinct, role-based workflows for **Students**, **Instructors** and **Administrators** — covering course authoring, video delivery, assessment and grading, certification, and a complete payments and financial-governance layer.
+A full-stack e-learning platform with distinct, role-based workflows for **Students**, **Instructors** and **Administrators** — covering course authoring, video delivery, assessment and grading, certification, and a complete payments and financial-governance  layer.
 
 ---
 
