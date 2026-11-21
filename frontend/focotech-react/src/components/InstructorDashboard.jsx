@@ -4,6 +4,7 @@ import { payoutStatusLabel } from '../utils/payoutStatus';
 import PaymentPagination from './PaymentPagination';
 import { downloadFinancialDocument } from '../utils/financialDocument';
 import NotificationBell from './NotificationBell';
+import AiLectureSynthesisStudio from './AiLectureSynthesisStudio';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api, { instructorAPI } from '../services/api';
@@ -24,6 +25,7 @@ export default function InstructorDashboard({ onNavigateHome }) {
   // New Lecture Form
   const [newLecture, setNewLecture] = useState({ title: '', youtubeUrl: '', orderIndex: 1 });
   const [addingLecture, setAddingLecture] = useState(false);
+  const [aiStudioLecture, setAiStudioLecture] = useState(null);
 
   // FR-I39: Course Announcements
   const [announcements, setAnnouncements] = useState([]);
@@ -678,12 +680,21 @@ export default function InstructorDashboard({ onNavigateHome }) {
                           </span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDeleteLecture(lec.id)}
-                        className="text-rose-600 hover:text-rose-800 text-xs font-bold cursor-pointer"
-                      >
-                        Delete
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setAiStudioLecture(lec)}
+                          className="px-2.5 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition"
+                        >
+                          AI Notes &amp; Synthesis
+                        </button>
+                        <button
+                          onClick={() => handleDeleteLecture(lec.id)}
+                          className="text-rose-600 hover:text-rose-800 text-xs font-bold cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))
                 ) : (
@@ -692,6 +703,15 @@ export default function InstructorDashboard({ onNavigateHome }) {
                   </p>
                 )}
               </div>
+
+              {/* AI Lecture Synthesis Studio Modal / Section */}
+              {aiStudioLecture && (
+                <AiLectureSynthesisStudio
+                  lessonId={aiStudioLecture.id}
+                  lessonTitle={aiStudioLecture.title}
+                  onClose={() => setAiStudioLecture(null)}
+                />
+              )}
             </div>
           )}
 
