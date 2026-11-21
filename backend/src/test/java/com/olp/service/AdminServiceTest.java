@@ -1,5 +1,19 @@
 package com.olp.service;
 
+import com.olp.dto.AdminDashboardStatsResponse;
+import com.olp.repository.EnrollmentRepository;
+import com.olp.repository.PaymentRepository;
+import java.math.BigDecimal;
+import com.olp.dto.AssignCourseInstructorRequest;
+import com.olp.dto.CourseInstructorResponse;
+import com.olp.entity.CourseInstructor;
+import com.olp.entity.CourseInstructorRole;
+import com.olp.repository.CourseInstructorRepository;
+import org.springframework.test.util.ReflectionTestUtils;
+import com.olp.dto.ApiResponse; 
+import com.olp.security.JwtUtil;
+import com.olp.exception.DuplicateEmailException;
+import com.olp.dto.AdminUpdateUserRequest;
 import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
 import com.olp.dto.CourseReviewRequest;
@@ -44,6 +58,11 @@ class AdminServiceTest {
 
     @Mock
     private EmailService emailService;
+    @Mock
+    private JwtUtil jwtUtil;
+    @Mock private CourseInstructorRepository courseInstructorRepository;
+    @Mock private EnrollmentRepository enrollmentRepository; 
+    @Mock private PaymentRepository paymentRepository;
 
     @InjectMocks
     private AdminService adminService;
@@ -66,8 +85,90 @@ class AdminServiceTest {
 
         sampleCourse = new Course(pendingInstructor, "Java 101", "Basics of Java", "pending_review");
         sampleCourse.setId(10);
+        ReflectionTestUtils.setField(adminService, "jwtUtil", jwtUtil);
+        ReflectionTestUtils.setField(adminService, "courseInstructorRepository", courseInstructorRepository);    
+        ReflectionTestUtils.setField(adminService, "enrollmentRepository", enrollmentRepository);
+        ReflectionTestUtils.setField(adminService, "paymentRepository", paymentRepository);
     }
 
+    @Test
+  void testUpdateUser_Success() {
+      AdminUpdateUserRequest req = new AdminUpdateUserRequest("Alice Updated", "alice.new@student.com", "instructor");
+      when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
+      when(userRepository.existsByEmail("alice.new@student.com")).thenReturn(false);
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      AdminUserResponse res = adminService.updateUser(1, req);
+
+      assertEquals("Alice Updated", res.getName());
+      assertEquals("alice.new@student.com", res.getEmail());
+      assertEquals("instructor", res.getRole());
+      verify(userRepository).save(sampleStudent);
+  }
+
+  @Test
+  void testUpdateUser_SameEmailAllowed_Success() {
+      AdminUpdateUserRequest req = new AdminUpdateUserRequest("Alice Renamed", "alice@student.com", null);
+      when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      AdminUserResponse res = adminService.updateUser(1, req);
+
+      assertEquals("Alice Renamed", res.getName());
+      verify(userRepository, never()).existsByEmail(anyString());
+  }
+
+  @Test
+  void testUpdateUser_DuplicateEmail_ThrowsDuplicateEmailException() {
+      AdminUpdateUserRequest req = new AdminUpdateUserRequest(null, "taken@olp.com", null);
+      when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
+      when(userRepository.existsByEmail("taken@olp.com")).thenReturn(true);
+
+      assertThrows(DuplicateEmailException.class, () -> adminService.updateUser(1, req));
+      verify(userRepository, never()).save(any());
+  }
+
+  @Test
+  void testUpdateUser_AdminPromotionRejected_ThrowsIllegalArgumentException() {
+      AdminUpdateUserRequest req = new AdminUpdateUserRequest(null, null, "admin");
+      when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
+
+      assertThrows(IllegalArgumentException.class, () -> adminService.updateUser(1, req));
+      verify(userRepository, never()).save(any());
+  }
+
+  @Test
+  void testUpdateUser_NoFieldsProvided_ThrowsIllegalArgumentException() {
+      AdminUpdateUserRequest req = new AdminUpdateUserRequest(null, null, null);
+
+      assertThrows(IllegalArgumentException.class, () -> adminService.updateUser(1, req));
+      verify(userRepository, never()).save(any());
+  }
+    @Test
+  void testTriggerPasswordReset_Success() {
+      when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
+      when(jwtUtil.generatePasswordResetToken(1, 15 * 60 * 1000L)).thenReturn("reset-jwt-token");
+
+      ApiResponse response = adminService.triggerPasswordReset(1);
+
+      assertTrue(response.isSuccess());
+      assertTrue(response.getMessage().contains("alice@student.com"));
+      assertFalse(response.getMessage().contains("reset-jwt-token"));
+      verify(emailService).sendPasswordResetLinkEmail(
+              eq("alice@student.com"),
+              eq("Alice"),
+              contains("token=reset-jwt-token"),
+              eq(15));
+  }
+
+  @Test
+  void testTriggerPasswordReset_RejectedAccount_ThrowsException() {
+      pendingInstructor.setAccountStatus("rejected");
+      when(userRepository.findById(2)).thenReturn(Optional.of(pendingInstructor));
+
+      assertThrows(IllegalArgumentException.class, () -> adminService.triggerPasswordReset(2));
+      verify(emailService, never()).sendPasswordResetLinkEmail(any(), any(), any(), anyInt());
+  }
     @Test
     void testGetUsers_WithFilters() {
         Page<User> userPage = new PageImpl<>(List.of(sampleStudent, adminUser));
@@ -103,6 +204,7 @@ class AdminServiceTest {
         assertNotNull(response);
         assertEquals("active", response.getAccountStatus());
         verify(userRepository, times(1)).save(pendingInstructor);
+        verify(emailService).sendInstructorApprovalEmail("chen@instructor.com", "Dr. Chen", true);
     }
 
     @Test
@@ -127,6 +229,7 @@ class AdminServiceTest {
         assertNotNull(response);
         assertEquals("rejected", response.getAccountStatus());
         verify(userRepository, times(1)).save(pendingInstructor);
+        verify(emailService).sendInstructorApprovalEmail("chen@instructor.com", "Dr. Chen", false);
     }
 
     @Test
@@ -165,7 +268,125 @@ class AdminServiceTest {
         assertEquals("active", response.getAccountStatus());
         verify(userRepository, times(1)).save(sampleStudent);
     }
+    @Test
+    void testActivateUser_PendingInstructor_ThrowsException() {
+        when(userRepository.findById(2)).thenReturn(Optional.of(pendingInstructor));
 
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                adminService.activateUser(2)
+        );
+
+        assertTrue(exception.getMessage().contains("pending"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void testActivateUser_RejectedInstructor_ThrowsException() {
+        pendingInstructor.setAccountStatus("rejected");
+        when(userRepository.findById(2)).thenReturn(Optional.of(pendingInstructor));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                adminService.activateUser(2)
+        );
+
+        assertTrue(exception.getMessage().contains("rejected"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void testActivateUser_AlreadyActive_ThrowsException() {
+        sampleStudent.setAccountStatus("active");
+        when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                adminService.activateUser(1)
+        );
+
+        assertTrue(exception.getMessage().contains("Only suspended accounts can be reactivated"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+  void testAssignCourseInstructor_CoInstructor_Success() {
+      User activeInst = new User("Active Inst", "active.inst@olp.com", "hash", "instructor", "active");
+      activeInst.setId(20);
+      when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+      when(userRepository.findById(20)).thenReturn(Optional.of(activeInst));
+      when(courseInstructorRepository.existsByCourseIdAndInstructorId(10, 20)).thenReturn(false);
+
+      CourseInstructorResponse res = adminService.assignCourseInstructor(10, new AssignCourseInstructorRequest(20, "CO_INSTRUCTOR"));
+
+      assertNotNull(res);
+      assertEquals(20, res.getInstructorId());
+      assertEquals(CourseInstructorRole.CO_INSTRUCTOR, res.getRole());
+      verify(courseInstructorRepository).save(any(CourseInstructor.class));
+      verify(emailService).sendCourseInstructorChangeEmail(
+              eq("active.inst@olp.com"), eq("Active Inst"), eq("Java 101"), eq("ASSIGNED"), anyString());
+  }
+
+  @Test
+  void testAssignCourseInstructor_ReassignOwner_NotifiesPreviousOwner() {
+      User activeInst = new User("New Owner", "new.owner@olp.com", "hash", "instructor", "active");
+      activeInst.setId(21);
+      when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+      when(userRepository.findById(21)).thenReturn(Optional.of(activeInst));
+      when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
+      when(courseInstructorRepository.findByCourseIdAndInstructorId(eq(10), anyInt())).thenReturn(Optional.empty());
+
+      CourseInstructorResponse res = adminService.assignCourseInstructor(10, new AssignCourseInstructorRequest(21, "OWNER"));
+
+      assertEquals(CourseInstructorRole.OWNER, res.getRole());
+      assertEquals(activeInst, sampleCourse.getInstructor());
+      verify(emailService).sendCourseInstructorChangeEmail(
+              eq("chen@instructor.com"), eq("Dr. Chen"), eq("Java 101"), eq("REASSIGNED"), anyString());
+      verify(emailService).sendCourseInstructorChangeEmail(
+              eq("new.owner@olp.com"), eq("New Owner"), eq("Java 101"), eq("ASSIGNED"), anyString());
+  }
+
+  @Test
+  void testAssignCourseInstructor_NonActiveInstructor_ThrowsException() {
+      when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+      when(userRepository.findById(2)).thenReturn(Optional.of(pendingInstructor));
+
+      assertThrows(IllegalArgumentException.class,
+              () -> adminService.assignCourseInstructor(10, new AssignCourseInstructorRequest(2, "CO_INSTRUCTOR")));
+      verify(courseInstructorRepository, never()).save(any());
+  }
+
+  @Test
+  void testAssignCourseInstructor_StudentRole_ThrowsException() {
+      when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+      when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
+
+      assertThrows(IllegalArgumentException.class,
+              () -> adminService.assignCourseInstructor(10, new AssignCourseInstructorRequest(1, "CO_INSTRUCTOR")));
+      verify(courseInstructorRepository, never()).save(any());
+  }
+
+  @Test
+  void testRemoveCourseInstructor_Success() {
+      User coInst = new User("Co Inst", "co@olp.com", "hash", "instructor", "active");
+      coInst.setId(22);
+      CourseInstructor mapping = new CourseInstructor(sampleCourse, coInst, CourseInstructorRole.CO_INSTRUCTOR);
+      when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+      when(userRepository.findById(22)).thenReturn(Optional.of(coInst));
+      when(courseInstructorRepository.findByCourseIdAndInstructorId(10, 22)).thenReturn(Optional.of(mapping));
+
+      adminService.removeCourseInstructor(10, 22);
+
+      verify(courseInstructorRepository).delete(mapping);
+      verify(emailService).sendCourseInstructorChangeEmail(
+              eq("co@olp.com"), eq("Co Inst"), eq("Java 101"), eq("REMOVED"), anyString());
+  }
+
+  @Test
+  void testRemoveCourseInstructor_PrimaryOwner_ThrowsException() {
+      when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+      when(userRepository.findById(2)).thenReturn(Optional.of(pendingInstructor));
+
+      assertThrows(IllegalArgumentException.class, () -> adminService.removeCourseInstructor(10, 2));
+      verify(courseInstructorRepository, never()).delete(any());
+  }
     @Test
     void testDeleteUser_Success() {
         when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
@@ -270,7 +491,29 @@ class AdminServiceTest {
         verify(emailService).sendCourseReviewDecisionEmail(
                 eq("chen@instructor.com"), eq("Dr. Chen"), eq("Java 101"), eq("REJECTED"), eq("Content is incomplete"));
     }
+    @Test
+    void testRejectCourse_BlankReason_ThrowsException() {
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
 
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> adminService.rejectCourse(10, new RejectCourseRequest("   ")));
+
+        assertTrue(ex.getMessage().contains("Rejection reason cannot be blank"));
+        verify(courseRepository, never()).save(any());
+        verify(emailService, never()).sendCourseReviewDecisionEmail(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void testRejectCourse_NullRequest_ThrowsException() {
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> adminService.rejectCourse(10, null));
+
+        assertTrue(ex.getMessage().contains("Rejection reason cannot be blank"));
+        verify(courseRepository, never()).save(any());
+        verify(emailService, never()).sendCourseReviewDecisionEmail(any(), any(), any(), any(), any());
+    }
     @Test
     void testRequestChanges_Success() {
         when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
@@ -319,7 +562,124 @@ class AdminServiceTest {
         assertEquals("draft", response.getStatus());
         verify(courseRepository, times(1)).save(sampleCourse);
     }
+    @Test
+    void testApproveCourse_FromDraft_ThrowsException() {
+        sampleCourse.setStatus(CourseStatus.DRAFT);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
 
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> adminService.approveCourse(10));
+
+        assertTrue(ex.getMessage().contains("DRAFT"));
+        assertTrue(ex.getMessage().contains("PENDING_REVIEW"));
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testApproveCourse_FromPublished_ThrowsException() {
+        sampleCourse.setStatus(CourseStatus.PUBLISHED);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> adminService.approveCourse(10));
+
+        assertTrue(ex.getMessage().contains("PUBLISHED"));
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testRejectCourse_FromDraft_ThrowsException() {
+        sampleCourse.setStatus(CourseStatus.DRAFT);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> adminService.rejectCourse(10, new RejectCourseRequest("Incomplete")));
+
+        assertTrue(ex.getMessage().contains("DRAFT"));
+        assertTrue(ex.getMessage().contains("PENDING_REVIEW"));
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testRequestChanges_FromPublished_ThrowsException() {
+        sampleCourse.setStatus(CourseStatus.PUBLISHED);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> adminService.requestChanges(10, new CourseReviewRequest("Needs updates")));
+
+        assertTrue(ex.getMessage().contains("PUBLISHED"));
+        assertTrue(ex.getMessage().contains("PENDING_REVIEW"));
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testUnpublishCourse_FromDraft_ThrowsException() {
+        sampleCourse.setStatus(CourseStatus.DRAFT);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> adminService.unpublishCourse(10));
+
+        assertTrue(ex.getMessage().contains("DRAFT"));
+        assertTrue(ex.getMessage().contains("PUBLISHED"));
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testUnpublishCourse_FromPendingReview_ThrowsException() {
+        sampleCourse.setStatus(CourseStatus.PENDING_REVIEW);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> adminService.unpublishCourse(10));
+
+        assertTrue(ex.getMessage().contains("PENDING_REVIEW"));
+        verify(courseRepository, never()).save(any());
+    }
+    @Test
+    void testArchiveCourse_FromPublished_Success() {
+        sampleCourse.setStatus(CourseStatus.PUBLISHED);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+        when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AdminCourseResponse response = adminService.archiveCourse(10);
+
+        assertNotNull(response);
+        assertEquals("archived", response.getStatus());
+        assertEquals(CourseStatus.ARCHIVED, sampleCourse.getStatus());
+        verify(courseRepository, times(1)).save(sampleCourse);
+    }
+
+    @Test
+    void testArchiveCourse_FromDraft_Success() {
+        sampleCourse.setStatus(CourseStatus.DRAFT);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+        when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AdminCourseResponse response = adminService.archiveCourse(10);
+
+        assertEquals("archived", response.getStatus());
+        verify(courseRepository, times(1)).save(sampleCourse);
+    }
+
+    @Test
+    void testArchiveCourse_AlreadyArchived_ThrowsException() {
+        sampleCourse.setStatus(CourseStatus.ARCHIVED);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        assertThrows(IllegalArgumentException.class, () -> adminService.archiveCourse(10));
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void testArchiveCourse_FromPendingReview_ThrowsException() {
+        sampleCourse.setStatus(CourseStatus.PENDING_REVIEW);
+        when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
+
+        assertThrows(IllegalArgumentException.class, () -> adminService.archiveCourse(10));
+        verify(courseRepository, never()).save(any());
+    }
     @Test
     void testDeleteCourse_Success() {
         when(courseRepository.findById(10)).thenReturn(Optional.of(sampleCourse));
@@ -338,4 +698,73 @@ class AdminServiceTest {
                 adminService.approveCourse(999)
         );
     }
+
+    @Test
+  void testApproveInstructor_EmailFailure_DoesNotRollBackDecision() {
+      when(userRepository.findById(2)).thenReturn(Optional.of(pendingInstructor));
+      when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+      doThrow(new RuntimeException("SMTP unavailable"))
+              .when(emailService).sendInstructorApprovalEmail(anyString(), anyString(), eq(true));
+
+      AdminUserResponse response = adminService.approveInstructor(2);
+
+      assertNotNull(response);
+      assertEquals("active", response.getAccountStatus());
+      verify(userRepository, times(1)).save(pendingInstructor);
+  }
+
+  @Test
+  void testRejectInstructor_EmailFailure_DoesNotRollBackDecision() {
+      when(userRepository.findById(2)).thenReturn(Optional.of(pendingInstructor));
+      when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+      doThrow(new RuntimeException("SMTP unavailable"))
+              .when(emailService).sendInstructorApprovalEmail(anyString(), anyString(), eq(false));
+
+      AdminUserResponse response = adminService.rejectInstructor(2);
+
+      assertNotNull(response);
+      assertEquals("rejected", response.getAccountStatus());
+      verify(userRepository, times(1)).save(pendingInstructor);
+      verify(emailService).sendInstructorApprovalEmail("chen@instructor.com", "Dr. Chen", false);
+  }
+  @Test
+  void testGetDashboardStats_WithRevenueData_ReturnsAllMetrics() {
+      when(userRepository.countUsersByRole()).thenReturn(List.of(
+              new Object[]{"student", 120L},
+              new Object[]{"instructor", 15L},
+              new Object[]{"admin", 2L}
+      ));
+      when(courseRepository.countCoursesByStatus()).thenReturn(List.of(
+              new Object[]{CourseStatus.PUBLISHED, 10L},
+              new Object[]{CourseStatus.DRAFT, 4L}
+      ));
+      when(enrollmentRepository.count()).thenReturn(350L);
+      when(paymentRepository.summarizeSuccessfulPayments())
+              .thenReturn(List.<Object[]>of(new Object[]{5L, new BigDecimal("4995.00")}));
+
+      AdminDashboardStatsResponse stats = adminService.getDashboardStats();
+
+      assertEquals(137L, stats.getTotalUsers());
+      assertEquals(120L, stats.getUsersByRole().get("student"));
+      assertEquals(14L, stats.getTotalCourses());
+      assertEquals(10L, stats.getActiveCourses());
+      assertEquals(350L, stats.getTotalEnrollments());
+      assertTrue(stats.isRevenueAvailable());
+      assertEquals(new BigDecimal("4995.00"), stats.getTotalRevenue());
+  }
+
+  @Test
+  void testGetDashboardStats_NoPaymentData_HidesRevenue() {
+      when(userRepository.countUsersByRole()).thenReturn(java.util.Collections.singletonList(new Object[]{"student", 5L}));
+      when(courseRepository.countCoursesByStatus()).thenReturn(List.of());
+      when(enrollmentRepository.count()).thenReturn(0L);
+      when(paymentRepository.summarizeSuccessfulPayments())
+              .thenReturn(List.<Object[]>of(new Object[]{0L, BigDecimal.ZERO}));
+
+      AdminDashboardStatsResponse stats = adminService.getDashboardStats();
+
+      assertEquals(5L, stats.getTotalUsers());
+      assertFalse(stats.isRevenueAvailable());
+      assertNull(stats.getTotalRevenue());
+  }
 }

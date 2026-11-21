@@ -1,5 +1,27 @@
 package com.olp.service;
 
+import com.olp.dto.AdminDashboardStatsResponse;
+import com.olp.repository.EnrollmentRepository;
+import com.olp.repository.PaymentRepository;
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import com.olp.dto.AssignCourseInstructorRequest;
+import com.olp.dto.CourseInstructorResponse;
+import com.olp.entity.CourseInstructor;
+import com.olp.entity.CourseInstructorRole;
+import com.olp.repository.CourseInstructorRepository;
+import com.olp.dto.ApiResponse;
+import com.olp.security.JwtUtil;
+import com.olp.dto.AdminUpdateUserRequest;
+import com.olp.dto.AdminCreateUserRequest;
+import com.olp.exception.DuplicateEmailException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import java.security.SecureRandom;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
 import com.olp.dto.CourseReviewRequest;
@@ -25,13 +47,32 @@ import java.time.LocalDateTime;
 @Service
 public class AdminService {
 
+    private static final Logger log = LoggerFactory.getLogger(AdminService.class);
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
     private final CourseSubmissionRepository courseSubmissionRepository;
     private final EmailService emailService;
-
+    private final AdminAuditService adminAuditService;
+    @Autowired(required = false)
+    private PasswordEncoder passwordEncoder;
     public AdminService(UserRepository userRepository, CourseRepository courseRepository) {
-        this(userRepository, courseRepository, null, null);
+        this(userRepository, courseRepository, null, null, null);
+    }
+    @Autowired(required = false)
+    private JwtUtil jwtUtil;
+    @Autowired(required = false)
+private CourseInstructorRepository courseInstructorRepository;
+    @Autowired(required = false)
+private EnrollmentRepository enrollmentRepository;
+
+@Autowired(required = false)
+private PaymentRepository paymentRepository;
+    public AdminService(
+            UserRepository userRepository,
+            CourseRepository courseRepository,
+            CourseSubmissionRepository courseSubmissionRepository,
+            EmailService emailService) {
+        this(userRepository, courseRepository, courseSubmissionRepository, emailService, null);
     }
 
     @Autowired
@@ -39,11 +80,13 @@ public class AdminService {
             UserRepository userRepository,
             CourseRepository courseRepository,
             @Autowired(required = false) CourseSubmissionRepository courseSubmissionRepository,
-            @Autowired(required = false) EmailService emailService) {
+            @Autowired(required = false) EmailService emailService,
+            @Autowired(required = false) AdminAuditService adminAuditService) {
         this.userRepository = userRepository;
         this.courseRepository = courseRepository;
         this.courseSubmissionRepository = courseSubmissionRepository;
         this.emailService = emailService;
+        this.adminAuditService = adminAuditService;
     }
 
     /**
@@ -51,6 +94,159 @@ public class AdminService {
      * keyword.
      * FR-A02: Account and Access Management
      */
+
+    /**
+   * Create a new student or instructor account on behalf of an admin.
+   * FR-A02 (ADM-021)
+   */
+  @Transactional
+  public AdminUserResponse createUser(AdminCreateUserRequest request) {
+      if (request == null) {
+          throw new IllegalArgumentException("User creation request cannot be null");
+      }
+      String name = request.getName() != null ? request.getName().trim() : "";
+      String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+      String role = request.getRole() != null ? request.getRole().trim().toLowerCase() : "";
+
+      if (name.isBlank()) {
+          throw new IllegalArgumentException("Name is required");
+      }
+      if (email.isBlank()) {
+          throw new IllegalArgumentException("Email is required");
+      }
+      if (!"student".equals(role) && !"instructor".equals(role)) {
+          throw new IllegalArgumentException("Role must be 'student' or 'instructor'");
+      }
+      if (userRepository.existsByEmail(email)) {
+          throw new DuplicateEmailException("An account with this email already exists");
+      }
+
+      String rawPassword = (request.getPassword() != null && !request.getPassword().isBlank())
+              ? request.getPassword()
+              : generateTemporaryPassword();
+      if (rawPassword.length() < 8) {
+          throw new IllegalArgumentException("Password must be at least 8 characters");
+      }
+
+      PasswordEncoder encoder = (passwordEncoder != null) ? passwordEncoder : new BCryptPasswordEncoder();
+      User user = new User(name, email, encoder.encode(rawPassword), role, "active");
+      user = userRepository.save(user);
+
+      if (adminAuditService != null) {
+          adminAuditService.recordLog("USER_CREATED", "USER", String.valueOf(user.getId()),
+                  user.getName(), "Admin created " + role + " account (" + email + ")", null, "active");
+      }
+
+      if (emailService != null) {
+          try {
+              emailService.sendAccountCreatedEmail(user.getEmail(), user.getName(), role, rawPassword);
+          } catch (Exception e) {
+              log.warn("Failed to send account creation email to {}: {}", user.getEmail(), e.getMessage());
+          }
+      }
+
+      return toAdminUserResponse(user);
+  }
+
+  private String generateTemporaryPassword() {
+      String chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$";
+      SecureRandom random = new SecureRandom();
+      StringBuilder sb = new StringBuilder(12);
+      for (int i = 0; i < 12; i++) {
+          sb.append(chars.charAt(random.nextInt(chars.length())));
+      }
+      return sb.toString();
+  }
+
+    /**
+   * Update allowed user details (name, email, role except admin promotion).
+   * FR-A02 (ADM-022)
+   */
+  @Transactional
+  public AdminUserResponse updateUser(Integer userId, AdminUpdateUserRequest request) {
+      if (request == null) {
+          throw new IllegalArgumentException("User update request cannot be null");
+      }
+      if (request.getName() == null && request.getEmail() == null && request.getRole() == null) {
+          throw new IllegalArgumentException("At least one field (name, email, or role) must be provided");
+      }
+
+      User user = findUserById(userId);
+      String beforeState = String.format("name=%s, email=%s, role=%s",
+              user.getName(), user.getEmail(), user.getRole());
+
+      if (request.getName() != null) {
+          String trimmedName = request.getName().trim();
+          if (trimmedName.isBlank()) {
+              throw new IllegalArgumentException("Name cannot be blank");
+          }
+          user.setName(trimmedName);
+      }
+
+      if (request.getEmail() != null) {
+          String normalizedEmail = request.getEmail().trim().toLowerCase();
+          if (normalizedEmail.isBlank()) {
+              throw new IllegalArgumentException("Email cannot be blank");
+          }
+          if (!normalizedEmail.equalsIgnoreCase(user.getEmail()) && userRepository.existsByEmail(normalizedEmail)) {
+              throw new DuplicateEmailException("An account with this email already exists");
+          }
+          user.setEmail(normalizedEmail);
+      }
+
+      if (request.getRole() != null) {
+          String normalizedRole = request.getRole().trim().toLowerCase();
+          if ("admin".equals(normalizedRole)) {
+              throw new IllegalArgumentException("Cannot promote or assign admin role via this endpoint");
+          }
+          if (!"student".equals(normalizedRole) && !"instructor".equals(normalizedRole)) {
+              throw new IllegalArgumentException("Role must be 'student' or 'instructor'");
+          }
+          if ("admin".equalsIgnoreCase(user.getRole())) {
+              throw new IllegalArgumentException("Admin role cannot be modified via this endpoint");
+          }
+          user.setRole(normalizedRole);
+      }
+
+      user = userRepository.save(user);
+      String afterState = String.format("name=%s, email=%s, role=%s",
+              user.getName(), user.getEmail(), user.getRole());
+
+      if (adminAuditService != null) {
+          adminAuditService.recordLog("USER_UPDATED", "USER", String.valueOf(user.getId()),
+                  user.getName(), "Updated user details", beforeState, afterState);
+      }
+
+      return toAdminUserResponse(user);
+  }
+
+    /**
+   * Trigger a password reset / account recovery email for a user without exposing any password.
+   * FR-A05 (ADM-023)
+   */
+  public ApiResponse triggerPasswordReset(Integer userId) {
+      User user = findUserById(userId);
+      if ("rejected".equalsIgnoreCase(user.getAccountStatus())) {
+          throw new IllegalArgumentException("Cannot trigger password reset for a rejected account");
+      }
+      if (jwtUtil == null) {
+          throw new IllegalStateException("JwtUtil is not configured");
+      }
+
+      String resetToken = jwtUtil.generatePasswordResetToken(user.getId(), 15 * 60 * 1000L);
+      String resetLink = "http://localhost:8080/api/auth/password-reset/confirm?token=" + resetToken;
+
+      if (emailService != null) {
+          emailService.sendPasswordResetLinkEmail(user.getEmail(), user.getName(), resetLink, 15);
+      }
+
+      if (adminAuditService != null) {
+          adminAuditService.recordLog("USER_PASSWORD_RESET_TRIGGERED", "USER", String.valueOf(user.getId()),
+                  user.getName(), "Admin triggered password reset email for " + user.getEmail(), null, null);
+      }
+
+      return new ApiResponse(true, "Password reset email sent to " + user.getEmail());
+  }
     @Transactional(readOnly = true)
     public PageResponse<AdminUserResponse> getUsers(
             String role,
@@ -100,8 +296,21 @@ public class AdminService {
             throw new IllegalArgumentException("Only users with role 'instructor' can be approved as instructors");
         }
 
+        String prevStatus = user.getAccountStatus();
         user.setAccountStatus("active");
         user = userRepository.save(user);
+
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("INSTRUCTOR_APPROVED", "USER", String.valueOf(user.getId()),
+                    user.getName(), "Approved instructor registration", prevStatus, "active");
+        }
+        if (emailService != null) {
+          try {
+              emailService.sendInstructorApprovalEmail(user.getEmail(), user.getName(), true);
+          } catch (Exception e) {
+              log.warn("Failed to send instructor approval email to {}: {}", user.getEmail(), e.getMessage());
+          }
+      }
         return toAdminUserResponse(user);
     }
 
@@ -117,8 +326,21 @@ public class AdminService {
             throw new IllegalArgumentException("Only users with role 'instructor' can be rejected as instructors");
         }
 
+        String prevStatus = user.getAccountStatus();
         user.setAccountStatus("rejected");
         user = userRepository.save(user);
+
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("INSTRUCTOR_REJECTED", "USER", String.valueOf(user.getId()),
+                    user.getName(), "Rejected instructor application", prevStatus, "rejected");
+        }
+        if (emailService != null) {
+          try {
+              emailService.sendInstructorApprovalEmail(user.getEmail(), user.getName(), false);
+          } catch (Exception e) {
+              log.warn("Failed to send instructor rejection email to {}: {}", user.getEmail(), e.getMessage());
+          }
+      }
         return toAdminUserResponse(user);
     }
 
@@ -134,8 +356,15 @@ public class AdminService {
             throw new IllegalArgumentException("Admin accounts cannot be suspended");
         }
 
+        String prevStatus = user.getAccountStatus();
         user.setAccountStatus("suspended");
         user = userRepository.save(user);
+
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("USER_SUSPENDED", "USER", String.valueOf(user.getId()),
+                    user.getName(), "Suspended user account", prevStatus, "suspended");
+        }
+
         return toAdminUserResponse(user);
     }
 
@@ -146,8 +375,23 @@ public class AdminService {
     @Transactional
     public AdminUserResponse activateUser(Integer userId) {
         User user = findUserById(userId);
+        String prevStatus = user.getAccountStatus();
+        if (!"suspended".equalsIgnoreCase(prevStatus)) {
+            if ("pending".equalsIgnoreCase(prevStatus) || "rejected".equalsIgnoreCase(prevStatus)) {
+                throw new IllegalArgumentException(
+                        "Cannot activate a " + prevStatus.toLowerCase() + " account; only suspended accounts can be reactivated. Use instructor approval instead.");
+            }
+            throw new IllegalArgumentException(
+                    "Only suspended accounts can be reactivated (current status: " + prevStatus + ")");
+        }
         user.setAccountStatus("active");
         user = userRepository.save(user);
+
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("USER_ACTIVATED", "USER", String.valueOf(user.getId()),
+                    user.getName(), "Reactivated user account", prevStatus, "active");
+        }
+
         return toAdminUserResponse(user);
     }
 
@@ -163,7 +407,14 @@ public class AdminService {
             throw new IllegalArgumentException("Admin accounts cannot be deleted");
         }
 
+        String details = "Deleted user: " + user.getName() + " (" + user.getEmail() + ", role: " + user.getRole() + ")";
+        String prevStatus = user.getAccountStatus();
         userRepository.delete(user);
+
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("USER_DELETED", "USER", String.valueOf(userId),
+                    user.getName(), details, prevStatus, "DELETED");
+        }
     }
 
     // =========================================================================
@@ -216,10 +467,12 @@ public class AdminService {
     @Transactional
     public AdminCourseResponse approveCourse(Integer courseId) {
         Course course = findCourseById(courseId);
+        requireCourseStatus(course, CourseStatus.PENDING_REVIEW, "approve");
+        String prevStatus = course.getStatus() != null ? course.getStatus().name() : "UNKNOWN";
         course.setStatus(CourseStatus.PUBLISHED);
         course.setRejectionReason(null);
         course.setReviewComments(null);
-        course = courseRepository.save(course);
+        Course savedCourse = courseRepository.save(course);
 
         // Update latest course submission if present
         if (courseSubmissionRepository != null) {
@@ -240,6 +493,11 @@ public class AdminService {
                     null);
         }
 
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("COURSE_APPROVED", "COURSE", String.valueOf(course.getId()),
+                    course.getTitle(), "Course approved and published", prevStatus, CourseStatus.PUBLISHED.name());
+        }
+
         return toAdminCourseResponse(course);
     }
 
@@ -251,11 +509,16 @@ public class AdminService {
     @Transactional
     public AdminCourseResponse rejectCourse(Integer courseId, RejectCourseRequest request) {
         Course course = findCourseById(courseId);
+        requireCourseStatus(course, CourseStatus.PENDING_REVIEW, "reject");
+        String prevStatus = course.getStatus() != null ? course.getStatus().name() : "UNKNOWN";
         String reason = (request != null && request.getReason() != null) ? request.getReason().trim() : "";
+        if (reason.isBlank()) {
+            throw new IllegalArgumentException("Rejection reason cannot be blank");
+        }
         course.setStatus(CourseStatus.REJECTED);
         course.setRejectionReason(reason);
         course.setReviewComments(reason);
-        course = courseRepository.save(course);
+        Course savedCourse = courseRepository.save(course);
 
         // Update latest course submission if present
         if (courseSubmissionRepository != null) {
@@ -277,6 +540,11 @@ public class AdminService {
                     reason);
         }
 
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("COURSE_REJECTED", "COURSE", String.valueOf(course.getId()),
+                    course.getTitle(), "Course rejected: " + reason, prevStatus, CourseStatus.REJECTED.name());
+        }
+
         return toAdminCourseResponse(course);
     }
 
@@ -290,6 +558,8 @@ public class AdminService {
     @Transactional
     public AdminCourseResponse requestChanges(Integer courseId, CourseReviewRequest request) {
         Course course = findCourseById(courseId);
+        requireCourseStatus(course, CourseStatus.PENDING_REVIEW, "request changes on");
+        String prevStatus = course.getStatus() != null ? course.getStatus().name() : "UNKNOWN";
         String feedback = (request != null) ? request.resolveFeedback() : "";
         if (feedback.isBlank()) {
             throw new IllegalArgumentException("Change request reason or comments must be provided");
@@ -320,6 +590,11 @@ public class AdminService {
                     feedback);
         }
 
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("COURSE_CHANGES_REQUESTED", "COURSE", String.valueOf(course.getId()),
+                    course.getTitle(), "Requested changes: " + feedback, prevStatus, CourseStatus.CHANGES_REQUESTED.name());
+        }
+
         return toAdminCourseResponse(course);
     }
 
@@ -330,28 +605,284 @@ public class AdminService {
     @Transactional
     public AdminCourseResponse unpublishCourse(Integer courseId) {
         Course course = findCourseById(courseId);
+        requireCourseStatus(course, CourseStatus.PUBLISHED, "unpublish");
+        String prevStatus = course.getStatus() != null ? course.getStatus().name() : "UNKNOWN";
         course.setStatus(CourseStatus.DRAFT);
         course = courseRepository.save(course);
+
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("COURSE_UNPUBLISHED", "COURSE", String.valueOf(course.getId()),
+                    course.getTitle(), "Course unpublished and returned to draft", prevStatus, CourseStatus.DRAFT.name());
+        }
+
         return toAdminCourseResponse(course);
     }
 
+    /**
+     * Archive a published or draft course (hides from catalog, retains all data and enrollments).
+     * FR-A08 (ADM-024)
+     */
+    @Transactional
+    public AdminCourseResponse archiveCourse(Integer courseId) {
+        Course course = findCourseById(courseId);
+        CourseStatus current = course.getStatus();
+        if (current != CourseStatus.PUBLISHED && current != CourseStatus.DRAFT) {
+            String currentName = current != null ? current.name() : "UNKNOWN";
+            throw new IllegalArgumentException(
+                    "Cannot archive a course with status '" + currentName + "'. Only PUBLISHED or DRAFT courses can be archived.");
+        }
+
+        String prevStatus = current.name();
+        course.setStatus(CourseStatus.ARCHIVED);
+        course = courseRepository.save(course);
+
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("COURSE_ARCHIVED", "COURSE", String.valueOf(course.getId()),
+                    course.getTitle(), "Archived course (data and enrollments retained)", prevStatus, CourseStatus.ARCHIVED.name());
+        }
+
+        return toAdminCourseResponse(course);
+    }
     /**
      * Permanently remove a course from the platform (cascades lectures &
      * enrollments).
      * FR-A08: Remove a live course
      */
+    /**
+   * Assign or reassign an active instructor to a course (OWNER or CO_INSTRUCTOR).
+   * Notifies the previous owner when ownership is reassigned and audits the action.
+   * FR-A10 (ADM-025)
+   */
+  @Transactional
+  public CourseInstructorResponse assignCourseInstructor(Integer courseId, AssignCourseInstructorRequest request) {
+      if (request == null || request.getInstructorId() == null) {
+          throw new IllegalArgumentException("Instructor ID is required");
+      }
+
+      Course course = findCourseById(courseId);
+      User newInstructor = findUserById(request.getInstructorId());
+
+      if (!"instructor".equalsIgnoreCase(newInstructor.getRole())) {
+          throw new IllegalArgumentException("Assigned user must have role 'instructor'");
+      }
+      if (!"active".equalsIgnoreCase(newInstructor.getAccountStatus())) {
+          throw new IllegalArgumentException("Assigned instructor must have 'active' account status");
+      }
+
+      CourseInstructorRole assignedRole = (request.getRole() != null && !request.getRole().isBlank())
+              ? CourseInstructorRole.fromString(request.getRole())
+              : CourseInstructorRole.CO_INSTRUCTOR;
+
+      String prevInstructorInfo = course.getInstructor() != null
+              ? course.getInstructor().getId() + ":" + course.getInstructor().getEmail()
+              : "none";
+
+      if (assignedRole == CourseInstructorRole.OWNER) {
+          User previousOwner = course.getInstructor();
+          course.setInstructor(newInstructor);
+          Course savedCourse = courseRepository.save(course);
+
+          if (courseInstructorRepository != null) {
+              if (previousOwner != null && !previousOwner.getId().equals(newInstructor.getId())) {
+                  courseInstructorRepository.findByCourseIdAndInstructorId(courseId, previousOwner.getId())
+                          .ifPresent(prev -> {
+                              prev.setRole(CourseInstructorRole.CO_INSTRUCTOR);
+                              courseInstructorRepository.save(prev);
+                          });
+              }
+              CourseInstructor mapping = courseInstructorRepository
+                      .findByCourseIdAndInstructorId(courseId, newInstructor.getId())
+                      .orElseGet(() -> new CourseInstructor(savedCourse, newInstructor, CourseInstructorRole.OWNER));
+              mapping.setRole(CourseInstructorRole.OWNER);
+              courseInstructorRepository.save(mapping);
+          }
+
+          if (emailService != null && previousOwner != null && !previousOwner.getId().equals(newInstructor.getId())) {
+              try {
+                  emailService.sendCourseInstructorChangeEmail(
+                          previousOwner.getEmail(),
+                          previousOwner.getName(),
+                          course.getTitle(),
+                          "REASSIGNED",
+                          "Primary ownership of this course has been reassigned to " + newInstructor.getName() + ".");
+              } catch (Exception e) {
+                  log.warn("Failed to notify previous instructor {}: {}", previousOwner.getEmail(), e.getMessage());
+              }
+          }
+      } else {
+          if (courseInstructorRepository != null) {
+              if (courseInstructorRepository.existsByCourseIdAndInstructorId(courseId, newInstructor.getId())) {
+                  throw new IllegalStateException("Instructor is already assigned to this course");
+              }
+              courseInstructorRepository.save(new CourseInstructor(course, newInstructor, CourseInstructorRole.CO_INSTRUCTOR));
+          }
+      }
+
+      if (emailService != null) {
+          try {
+              emailService.sendCourseInstructorChangeEmail(
+                      newInstructor.getEmail(),
+                      newInstructor.getName(),
+                      course.getTitle(),
+                      "ASSIGNED",
+                      "You have been assigned as " + assignedRole.name() + " for this course.");
+          } catch (Exception e) {
+              log.warn("Failed to notify assigned instructor {}: {}", newInstructor.getEmail(), e.getMessage());
+          }
+      }
+
+      if (adminAuditService != null) {
+          adminAuditService.recordLog(
+                  "COURSE_INSTRUCTOR_ASSIGNED",
+                  "COURSE",
+                  String.valueOf(course.getId()),
+                  course.getTitle(),
+                  "Assigned instructor " + newInstructor.getEmail() + " as " + assignedRole.name(),
+                  prevInstructorInfo,
+                  newInstructor.getId() + ":" + newInstructor.getEmail() + " (" + assignedRole.name() + ")");
+      }
+
+      return CourseInstructorResponse.fromUser(newInstructor, assignedRole, null, LocalDateTime.now());
+  }
+
+  /**
+   * Remove a co-instructor from a course and notify them.
+   * FR-A10 (ADM-025)
+   */
+  @Transactional
+  public void removeCourseInstructor(Integer courseId, Integer instructorId) {
+      Course course = findCourseById(courseId);
+      User instructor = findUserById(instructorId);
+
+      if (course.getInstructor() != null && course.getInstructor().getId().equals(instructorId)) {
+          throw new IllegalArgumentException("Cannot remove the primary course owner; reassign course ownership first");
+      }
+
+      if (courseInstructorRepository != null) {
+          CourseInstructor mapping = courseInstructorRepository
+                  .findByCourseIdAndInstructorId(courseId, instructorId)
+                  .orElseThrow(() -> new ResourceNotFoundException("Instructor is not assigned to this course"));
+          courseInstructorRepository.delete(mapping);
+      }
+
+      if (emailService != null) {
+          try {
+              emailService.sendCourseInstructorChangeEmail(
+                      instructor.getEmail(),
+                      instructor.getName(),
+                      course.getTitle(),
+                      "REMOVED",
+                      "You have been removed as an instructor from this course.");
+          } catch (Exception e) {
+              log.warn("Failed to notify removed instructor {}: {}", instructor.getEmail(), e.getMessage());
+          }
+      }
+
+      if (adminAuditService != null) {
+          adminAuditService.recordLog(
+                  "COURSE_INSTRUCTOR_REMOVED",
+                  "COURSE",
+                  String.valueOf(course.getId()),
+                  course.getTitle(),
+                  "Removed instructor " + instructor.getEmail(),
+                  instructor.getId() + ":" + instructor.getEmail(),
+                  null);
+      }
+  }
     @Transactional
     public void deleteCourse(Integer courseId) {
         Course course = findCourseById(courseId);
+        String details = "Deleted course: " + course.getTitle() + " (ID: " + courseId + ")";
+        String prevStatus = course.getStatus() != null ? course.getStatus().name() : "";
         courseRepository.delete(course);
+
+        if (adminAuditService != null) {
+            adminAuditService.recordLog("COURSE_DELETED", "COURSE", String.valueOf(courseId),
+                    course.getTitle(), details, prevStatus, "DELETED");
+        }
     }
 
+    /**
+   * Aggregate platform statistics for the admin dashboard (FR-A20, ADM-026).
+   * Revenue is included only when successful payment records exist.
+   */
+  @Transactional(readOnly = true)
+  public AdminDashboardStatsResponse getDashboardStats() {
+      Map<String, Long> usersByRole = new LinkedHashMap<>();
+      long totalUsers = 0L;
+      List<Object[]> userRows = userRepository.countUsersByRole();
+      if (userRows != null) {
+          for (Object[] row : userRows) {
+              if (row != null && row.length >= 2 && row[0] != null) {
+                  String role = String.valueOf(row[0]).toLowerCase();
+                  long count = ((Number) row[1]).longValue();
+                  usersByRole.put(role, count);
+                  totalUsers += count;
+              }
+          }
+      }
+
+      Map<String, Long> coursesByStatus = new LinkedHashMap<>();
+      long totalCourses = 0L;
+      List<Object[]> courseRows = courseRepository.countCoursesByStatus();
+      if (courseRows != null) {
+          for (Object[] row : courseRows) {
+              if (row != null && row.length >= 2 && row[0] != null) {
+                  String status = String.valueOf(row[0]);
+                  long count = ((Number) row[1]).longValue();
+                  coursesByStatus.put(status, count);
+                  totalCourses += count;
+              }
+          }
+      }
+      long activeCourses = coursesByStatus.getOrDefault(CourseStatus.PUBLISHED.name(), 0L);
+
+      long totalEnrollments = enrollmentRepository != null ? enrollmentRepository.count() : 0L;
+
+      boolean revenueAvailable = false;
+      BigDecimal totalRevenue = null;
+      if (paymentRepository != null) {
+          List<Object[]> payRows = paymentRepository.summarizeSuccessfulPayments();
+          if (payRows != null && !payRows.isEmpty() && payRows.get(0) != null && payRows.get(0).length >= 2) {
+              long successCount = payRows.get(0)[0] != null ? ((Number) payRows.get(0)[0]).longValue() : 0L;
+              if (successCount > 0) {
+                  revenueAvailable = true;
+                  Object sumObj = payRows.get(0)[1];
+                  totalRevenue = sumObj instanceof BigDecimal
+                          ? (BigDecimal) sumObj
+                          : new BigDecimal(String.valueOf(sumObj));
+              }
+          }
+      }
+
+      return new AdminDashboardStatsResponse(
+              totalUsers,
+              usersByRole,
+              totalCourses,
+              activeCourses,
+              coursesByStatus,
+              totalEnrollments,
+              revenueAvailable,
+              totalRevenue);
+  }
     // ===== Helper Methods =====
 
     private User findUserById(Integer userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
     }
+    /**
+ * Enforces allowed course status transitions for administrative actions:
+ * - approve / reject / requestChanges: only from PENDING_REVIEW
+ * - unpublish: only from PUBLISHED
+ */
+private void requireCourseStatus(Course course, CourseStatus expected, String action) {
+    if (course.getStatus() != expected) {
+        String current = course.getStatus() != null ? course.getStatus().name() : "UNKNOWN";
+        throw new IllegalArgumentException(
+                "Cannot " + action + " a course with status '" + current + "'. Expected status: " + expected.name());
+    }
+}
 
     private Course findCourseById(Integer courseId) {
         return courseRepository.findById(courseId)

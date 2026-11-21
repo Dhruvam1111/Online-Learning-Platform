@@ -1253,3 +1253,17 @@ CREATE TABLE IF NOT EXISTS exam_attempt_answers (
     CONSTRAINT uq_exam_attempt_answer UNIQUE (attempt_id, question_id)
 );
 
+-- Step 57 / FR-A31 (ADM-015): Admin Action Audit Logs
+CREATE TABLE IF NOT EXISTS admin_audit_logs (
+    id BIGSERIAL PRIMARY KEY,
+    actor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    action VARCHAR(100) NOT NULL,
+    target_type VARCHAR(50) NOT NULL,
+    target_id VARCHAR(100) NOT NULL,
+    target_name VARCHAR(255),
+    details TEXT,
+    previous_state TEXT,
+    new_state TEXT,
+    ip_address VARCHAR(45),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

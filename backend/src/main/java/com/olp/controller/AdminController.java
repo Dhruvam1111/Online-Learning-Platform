@@ -1,5 +1,10 @@
 package com.olp.controller;
 
+import com.olp.dto.AdminDashboardStatsResponse;
+import com.olp.dto.AssignCourseInstructorRequest;
+import com.olp.dto.AdminUpdateUserRequest;
+import org.springframework.http.HttpStatus;
+import com.olp.dto.AdminCreateUserRequest;
 import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
 import com.olp.dto.ApiResponse;
@@ -54,6 +59,47 @@ public class AdminController {
      * Get all users with optional filtering and pagination.
      * FR-A02: Account and Access Management
      */
+    /**
+   * Create a new student or instructor account.
+   * FR-A02 (ADM-021)
+   */
+  @PostMapping("/users")
+  public ResponseEntity<AdminUserResponse> createUser(@Valid @RequestBody AdminCreateUserRequest request) {
+      AdminUserResponse response = adminService.createUser(request);
+      return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
+    /**
+   * Update user details (name, email, role except admin promotion).
+   * FR-A02 (ADM-022)
+   */
+  @PutMapping("/users/{id}")
+  public ResponseEntity<AdminUserResponse> updateUser(
+          @PathVariable Integer id,
+          @Valid @RequestBody AdminUpdateUserRequest request) {
+      AdminUserResponse response = adminService.updateUser(id, request);
+      return ResponseEntity.ok(response);
+  }
+    /**
+   * Assign or reassign an active instructor to a course (FR-A10, ADM-025).
+   */
+  @PostMapping("/courses/{courseId:[0-9]+}/instructors")
+  public ResponseEntity<CourseInstructorResponse> assignCourseInstructor(
+          @PathVariable Integer courseId,
+          @Valid @RequestBody AssignCourseInstructorRequest request) {
+      CourseInstructorResponse response = adminService.assignCourseInstructor(courseId, request);
+      return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
+
+  /**
+   * Remove a co-instructor from a course (FR-A10, ADM-025).
+   */
+  @DeleteMapping("/courses/{courseId:[0-9]+}/instructors/{instructorId:[0-9]+}")
+  public ResponseEntity<ApiResponse> removeCourseInstructor(
+          @PathVariable Integer courseId,
+          @PathVariable Integer instructorId) {
+      adminService.removeCourseInstructor(courseId, instructorId);
+      return ResponseEntity.ok(new ApiResponse(true, "Instructor removed from course"));
+  }
     @GetMapping("/users")
     public ResponseEntity<PageResponse<AdminUserResponse>> getUsers(
             @RequestParam(required = false) String role,
@@ -122,10 +168,31 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
+
+    /**
+     * Trigger a password reset / account recovery email for a user.
+     * FR-A05 (ADM-023)
+     */
+    @PostMapping("/users/{id}/password-reset")
+    public ResponseEntity<ApiResponse> triggerPasswordReset(@PathVariable Integer id) {
+        ApiResponse response = adminService.triggerPasswordReset(id);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Archive a published or draft course (hides from catalog, retains data and enrollments).
+     * FR-A08 (ADM-024)
+     */
+    @PutMapping("/courses/{id}/archive")
+    public ResponseEntity<AdminCourseResponse> archiveCourse(@PathVariable Integer id) {
+        AdminCourseResponse response = adminService.archiveCourse(id);
+        return ResponseEntity.ok(response);
+    }
     /**
      * Permanently delete a user account.
      * FR-A02
      */
+
     @DeleteMapping("/users/{id}")
     public ResponseEntity<ApiResponse> deleteUser(@PathVariable Integer id) {
         adminService.deleteUser(id);
@@ -306,4 +373,11 @@ public class AdminController {
                 courseAssociationService.getCourseInstructorsForAdmin(adminUser, courseId);
         return ResponseEntity.ok(response);
     }
+    /**
+   * Platform statistics dashboard (FR-A20, ADM-026).
+   */
+  @GetMapping("/dashboard/stats")
+  public ResponseEntity<AdminDashboardStatsResponse> getDashboardStats() {
+      return ResponseEntity.ok(adminService.getDashboardStats());
+  }
 }

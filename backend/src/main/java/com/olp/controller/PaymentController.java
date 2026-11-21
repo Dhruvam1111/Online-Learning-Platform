@@ -127,6 +127,7 @@ public class PaymentController {
      * Admin view: Platform-wide financial audit log (FR-A23, NFR-33).
      */
     @GetMapping("/admin/all")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('admin')")
     public ResponseEntity<List<PaymentTransactionResponse>> getAllTransactions(
             @AuthenticationPrincipal User currentUser) {
         List<PaymentTransactionResponse> transactions = paymentService.getAllTransactions(currentUser);

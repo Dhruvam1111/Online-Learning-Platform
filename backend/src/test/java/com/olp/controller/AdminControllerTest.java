@@ -1,5 +1,13 @@
 package com.olp.controller;
 
+import com.olp.dto.AdminDashboardStatsResponse;
+import java.math.BigDecimal;
+import java.util.Map;
+import com.olp.dto.AssignCourseInstructorRequest;
+import com.olp.dto.CourseInstructorResponse;
+import com.olp.dto.ApiResponse;
+import com.olp.dto.AdminUpdateUserRequest;
+import com.olp.dto.AdminCreateUserRequest;
 import com.olp.dto.AdminCourseResponse;
 import com.olp.dto.AdminUserResponse;
 import com.olp.dto.CourseReviewRequest;
@@ -44,6 +52,65 @@ class AdminControllerTest {
         );
     }
 
+    @Test
+  void testCreateUser_Returns201() {
+      AdminCreateUserRequest req = new AdminCreateUserRequest("Test User", "test@olp.com", "instructor", null);
+      when(adminService.createUser(req)).thenReturn(sampleAdminResponse);
+
+      ResponseEntity<AdminUserResponse> response = adminController.createUser(req);
+
+      assertNotNull(response);
+      assertEquals(201, response.getStatusCode().value());
+      assertEquals("test@olp.com", Objects.requireNonNull(response.getBody()).getEmail());
+      verify(adminService, times(1)).createUser(req);
+  }
+     @Test
+  void testUpdateUser_Returns200() {
+      AdminUpdateUserRequest req = new AdminUpdateUserRequest("Updated Name", "updated@olp.com", "instructor");
+      when(adminService.updateUser(1, req)).thenReturn(sampleAdminResponse);
+
+      ResponseEntity<AdminUserResponse> response = adminController.updateUser(1, req);
+
+      assertNotNull(response);
+      assertEquals(200, response.getStatusCode().value());
+      verify(adminService, times(1)).updateUser(1, req);
+  }
+    @Test
+  void testTriggerPasswordReset_Returns200() {
+      when(adminService.triggerPasswordReset(1))
+              .thenReturn(new ApiResponse(true, "Password reset email sent to test@olp.com"));
+
+      ResponseEntity<ApiResponse> response = adminController.triggerPasswordReset(1);
+
+      assertNotNull(response);
+      assertEquals(200, response.getStatusCode().value());
+      assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
+      verify(adminService, times(1)).triggerPasswordReset(1);
+  }
+    @Test
+  void testAssignCourseInstructor_Returns201() {
+      AssignCourseInstructorRequest req = new AssignCourseInstructorRequest(20, "CO_INSTRUCTOR");
+      CourseInstructorResponse expected = new CourseInstructorResponse();
+      expected.setInstructorId(20);
+      when(adminService.assignCourseInstructor(10, req)).thenReturn(expected);
+
+      ResponseEntity<CourseInstructorResponse> response = adminController.assignCourseInstructor(10, req);
+
+      assertEquals(201, response.getStatusCode().value());
+      assertEquals(20, Objects.requireNonNull(response.getBody()).getInstructorId());
+      verify(adminService).assignCourseInstructor(10, req);
+  }
+
+  @Test
+  void testRemoveCourseInstructor_Returns200() {
+      doNothing().when(adminService).removeCourseInstructor(10, 20);
+
+      ResponseEntity<ApiResponse> response = adminController.removeCourseInstructor(10, 20);
+
+      assertEquals(200, response.getStatusCode().value());
+      assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
+      verify(adminService).removeCourseInstructor(10, 20);
+  }
     @Test
     void testGetUsers() {
         PageResponse<AdminUserResponse> pageResponse = new PageResponse<>(
@@ -222,6 +289,18 @@ class AdminControllerTest {
     }
 
     @Test
+    void testArchiveCourse_Returns200() {
+        sampleCourseResponse.setStatus("archived");
+        when(adminService.archiveCourse(10)).thenReturn(sampleCourseResponse);
+
+        ResponseEntity<AdminCourseResponse> response = adminController.archiveCourse(10);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("archived", Objects.requireNonNull(response.getBody()).getStatus());
+        verify(adminService, times(1)).archiveCourse(10);
+    }
+    @Test
     void testDeleteCourse() {
         doNothing().when(adminService).deleteCourse(10);
 
@@ -232,4 +311,18 @@ class AdminControllerTest {
         assertTrue(Objects.requireNonNull(response.getBody()).isSuccess());
         verify(adminService, times(1)).deleteCourse(10);
     }
+    @Test
+  void testGetDashboardStats_Returns200() {
+      AdminDashboardStatsResponse stats = new AdminDashboardStatsResponse(
+              10L, Map.of("student", 8L, "instructor", 2L),
+              4L, 3L, Map.of("PUBLISHED", 3L, "DRAFT", 1L),
+              25L, true, new BigDecimal("999.00"));
+      when(adminService.getDashboardStats()).thenReturn(stats);
+
+      ResponseEntity<AdminDashboardStatsResponse> response = adminController.getDashboardStats();
+
+      assertEquals(200, response.getStatusCode().value());
+      assertEquals(10L, Objects.requireNonNull(response.getBody()).getTotalUsers());
+      verify(adminService).getDashboardStats();
+  }
 }
