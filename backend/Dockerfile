@@ -1,9 +1,9 @@
 # ============================================================
 # Stage 1 – BUILD
-# Use the official Maven image with Java 25 (Eclipse Temurin)
+# Use the official Maven image with Java 21 (Eclipse Temurin)
 # to compile the project and produce the fat JAR.
 # ============================================================
-FROM maven:3.9.12-eclipse-temurin-25 AS builder
+FROM maven:3.9-eclipse-temurin-21 AS builder
 
 # Set a consistent working directory inside the build container
 WORKDIR /app
@@ -17,17 +17,19 @@ RUN mvn dependency:go-offline -B
 
 # --- Source copy & build ---
 # Now copy the rest of the source and build the JAR.
-# -DskipTests skips running tests during the Docker build;
-# run your test suite separately in CI before building the image.
+# If application.properties is absent (due to .gitignore),
+# copy application.properties.example to populate baseline keys.
 COPY src ./src
+RUN if [ ! -f src/main/resources/application.properties ]; then \
+        cp src/main/resources/application.properties.example src/main/resources/application.properties; \
+    fi
 RUN mvn package -DskipTests -B
 
 # ============================================================
 # Stage 2 – RUNTIME
-# Use a minimal Eclipse Temurin 25 JRE-only image.
-# ~250 MB vs ~500 MB for the full JDK image.
+# Use a minimal Eclipse Temurin 21 JRE-only image.
 # ============================================================
-FROM eclipse-temurin:25-jre-alpine
+FROM eclipse-temurin:21-jre-alpine
 
 # Create a non-root user for security best practice
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
@@ -57,6 +59,7 @@ ENV SPRING_DATASOURCE_PASSWORD=""
 ENV JWT_SECRET=""
 ENV JWT_EXPIRATION_MS="86400000"
 ENV PORT="8080"
+ENV FRONTEND_URL=""
 
 # Run the application
 ENTRYPOINT ["java", "-jar", "app.jar"]

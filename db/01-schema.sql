@@ -1415,7 +1415,19 @@ CREATE TABLE IF NOT EXISTS exam_monitoring_events (
     notes VARCHAR(255)
 );
 
--- Step 56 / FR-A31 (ADM-015): Admin Action Audit Logs
+-- Step 56: Examination Attempt Answers
+CREATE TABLE IF NOT EXISTS exam_attempt_answers (
+    id SERIAL PRIMARY KEY,
+    attempt_id INTEGER NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+    question_id INTEGER NOT NULL REFERENCES questions(id),
+    answer_text TEXT,
+    marks_awarded NUMERIC(8,2),
+    feedback TEXT,
+    saved_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_exam_attempt_answer UNIQUE (attempt_id, question_id)
+);
+
+-- Step 57 / FR-A31 (ADM-015): Admin Action Audit Logs
 CREATE TABLE IF NOT EXISTS admin_audit_logs (
     id BIGSERIAL PRIMARY KEY,
     actor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -1429,3 +1441,45 @@ CREATE TABLE IF NOT EXISTS admin_audit_logs (
     ip_address VARCHAR(45),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Step 58: AI Lecture Notes Documents & Synthesis Engine
+CREATE TABLE IF NOT EXISTS lecture_notes_documents (
+    id SERIAL PRIMARY KEY,
+    lesson_id INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+    uploader_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    file_name VARCHAR(255) NOT NULL,
+    file_type VARCHAR(100) NOT NULL,
+    file_size_bytes BIGINT NOT NULL,
+    storage_path VARCHAR(500) NOT NULL,
+    extracted_text TEXT,
+    text_extraction_status VARCHAR(30) NOT NULL DEFAULT 'COMPLETED',
+    page_count INTEGER,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ai_lecture_syntheses (
+    id SERIAL PRIMARY KEY,
+    lesson_id INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+    notes_document_id INTEGER REFERENCES lecture_notes_documents(id) ON DELETE SET NULL,
+    instructor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    model_provider VARCHAR(50) NOT NULL,
+    model_version VARCHAR(50) NOT NULL,
+    prompt_tokens_used INTEGER,
+    completion_tokens_used INTEGER,
+    execution_time_ms INTEGER,
+    executive_summary TEXT NOT NULL,
+    full_study_guide_markdown TEXT NOT NULL,
+    glossary_json TEXT,
+    spoken_nuances_json TEXT,
+    quiz_questions_json TEXT,
+    flashcards_json TEXT,
+    review_status VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
+    reviewed_at TIMESTAMP,
+    published_to_students BOOLEAN NOT NULL DEFAULT FALSE,
+    published_at TIMESTAMP,
+    instructor_notes TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
