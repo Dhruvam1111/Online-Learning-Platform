@@ -150,7 +150,10 @@ jobs:
           PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/migrations/20261111-payment-completion.sql
           echo "Applying Phase 1 student exam schema..."
           PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/phase1-student-exams.sql
+          echo "Applying Phase 4 student study schedule schema..."
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/04-student-study-schedule.sql
           echo "PostgreSQL schema successfully initialized."
+          
 
       - name: Run Maven Tests against PostgreSQL
         working-directory: ./backend
