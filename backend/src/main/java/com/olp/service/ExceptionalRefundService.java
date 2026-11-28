@@ -1,5 +1,6 @@
 package com.olp.service;
 
+import com.olp.dto.PaymentSimulationDtos.RefundQueueResponse;
 import com.olp.dto.RefundRequest;
 import com.olp.entity.*;
 import com.olp.repository.*;
@@ -50,24 +51,33 @@ public class ExceptionalRefundService {
         return audit.get(id);
     }
     @Transactional(readOnly = true)
-    public PaymentAuditService.RefundQueue queue(User user, String status, String search, int page, int size) {
+    public RefundQueueResponse queue(User user, String status, String search, int page, int size) {
         admin(user);
-        if (!Set.of("pending", "history", "approved", "rejected").contains(status))
+        if (status == null || !Set.of("pending", "history", "approved", "rejected").contains(status))
             throw new IllegalArgumentException("Invalid refund queue status.");
         if (page < 0 || size < 1 || size > 100 || (long) page * size > Integer.MAX_VALUE)
             throw new IllegalArgumentException("Invalid refund queue page or size.");
-        return audit.refundQueue(status, search.strip(), page, size);
+        return audit.refundQueue(status, search == null ? "" : search.strip(), page, size);
     }
 
     @Transactional(readOnly=true)
     public List<Map<String,Object>> list(User user) {
         if (user == null) throw new AccessDeniedException("Sign in first.");
-        return audit.list("refund.exception.request").stream().filter(r -> "admin".equalsIgnoreCase(user.getRole()) || user.getId().toString().equals(r.get("requesterId").toString())).map(r -> {
-            String decision="decision-"+r.get("eventId");
-            r.put("status", audit.exists(decision) ? audit.get(decision).get("decision") : "pending");
-            if (audit.exists(decision)) r.put("decisionRecord",audit.get(decision));
-            return r;
-        }).toList();
+        return audit.list("refund.exception.request").stream()
+                .filter(r -> "admin".equalsIgnoreCase(user.getRole())
+                        || (user.getId() != null && r.get("requesterId") != null
+                        && user.getId().toString().equals(r.get("requesterId").toString())))
+                .map(r -> {
+                    String decision = "decision-" + r.get("eventId");
+                    if (audit.exists(decision)) {
+                        var dec = audit.get(decision);
+                        r.put("status", dec.get("decision"));
+                        r.put("decisionRecord", dec);
+                    } else {
+                        r.put("status", "pending");
+                    }
+                    return r;
+                }).toList();
     }
     @Transactional
     public Map<String,Object> decide(User user, String id, String decision, String reason) {
@@ -76,10 +86,10 @@ public class ExceptionalRefundService {
     @Transactional
     public Map<String,Object> decide(User user, String id, String decision, String reason, BigDecimal approvedAmount) {
         admin(user); RefundPolicy.reason(reason);
-        if (!Set.of("approved","rejected").contains(decision)) throw new IllegalArgumentException("Decision must be approved or rejected.");
+        if (decision == null || !Set.of("approved","rejected").contains(decision)) throw new IllegalArgumentException("Decision must be approved or rejected.");
+        if (id == null || !id.startsWith("exception-")) throw new IllegalArgumentException("Not an exceptional refund request.");
         Map<String,Object> request=audit.get(id);
-        if (!id.startsWith("exception-")) throw new IllegalArgumentException("Not an exceptional refund request.");
-        String order=request.get("orderId").toString();
+        String order=String.valueOf(request.get("orderId"));
         payments.findByOrderIdForUpdate(order).orElseThrow(() -> new IllegalArgumentException("Order not found."));
         if (audit.exists("decision-"+id)) throw new IllegalStateException("This request has already been decided.");
         BigDecimal requestedAmount = new BigDecimal(request.get("amount").toString());
@@ -89,15 +99,17 @@ public class ExceptionalRefundService {
         if ("approved".equals(decision)) settlement.processApprovedException(user,new RefundRequest(order,settledAmount,reason));
         audit.record("decision-"+id,"refund.exception.decision",Map.of("requestId",id,"orderId",order,"actorId",user.getId(),"decision",decision,"reason",reason,"approvedAmount",settledAmount));
         var payment = payments.findByOrderIdForUpdate(order).orElseThrow();
-        String recipient = payment.getStudent().getEmail();
-        String studentName = payment.getStudent().getName();
-        String courseTitle = payment.getCourse().getTitle();
-        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-            new org.springframework.transaction.support.TransactionSynchronization() {
-                @Override public void afterCommit() {
-                    email.sendRefundDecisionEmail(recipient, studentName, courseTitle, order, decision, reason, settledAmount);
-                }
-            });
+        if (email != null && payment.getStudent() != null && payment.getCourse() != null) {
+            String recipient = payment.getStudent().getEmail();
+            String studentName = payment.getStudent().getName();
+            String courseTitle = payment.getCourse().getTitle();
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override public void afterCommit() {
+                        email.sendRefundDecisionEmail(recipient, studentName, courseTitle, order, decision, reason, settledAmount);
+                    }
+                });
+        }
         return audit.get("decision-"+id);
     }
 }
