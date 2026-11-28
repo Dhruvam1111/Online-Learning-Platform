@@ -68,18 +68,7 @@ public class AssessmentPublishService {
     }
 
     public User resolveUser(Authentication authentication) {
-        if (authentication == null || authentication.getPrincipal() == null) {
-            throw new InvalidCredentialsException("User is not authenticated");
-        }
-        Object principal = authentication.getPrincipal();
-        if (principal instanceof User user) {
-            return user;
-        }
-        if (principal instanceof String email) {
-            return userRepository.findByEmail(email)
-                    .orElseThrow(() -> new InvalidCredentialsException("User not found: " + email));
-        }
-        throw new InvalidCredentialsException("Invalid authentication principal");
+        return com.olp.security.SecurityUtils.resolveUser(authentication, userRepository);
     }
 
     public AssessmentType parseAssessmentType(String typeStr) {
@@ -97,13 +86,8 @@ public class AssessmentPublishService {
         if (currentUser == null) {
             throw new InvalidCredentialsException("User is not authenticated");
         }
-        if ("ADMIN".equalsIgnoreCase(currentUser.getRole())) {
-            return;
-        }
-        boolean isCreator = course.getInstructor() != null && course.getInstructor().getId().equals(currentUser.getId());
-        boolean isAssociated = courseInstructorRepository != null
-                && courseInstructorRepository.existsByCourseIdAndInstructorId(course.getId(), currentUser.getId());
-        if (!isCreator && !isAssociated) {
+        if (!com.olp.security.SecurityUtils.isCourseOwnerOrCoInstructorOrAdmin(
+                course, currentUser, courseInstructorRepository)) {
             throw new AccessDeniedException("User is not authorized to manage results for course: " + course.getId());
         }
     }

@@ -205,4 +205,31 @@ class JwtAuthenticationFilterBranchTest {
         assertEquals(403, body.getValue().getStatus());
         assertEquals(expectedMessage, body.getValue().getMessage());
     }
+
+    @Test
+    void testMissingRoleInToken_ContinuesChainUnauthenticated() throws Exception {
+        request.addHeader("Authorization", "Bearer good-token");
+        when(jwtUtil.validateToken("good-token")).thenReturn(true);
+        when(jwtUtil.getUserIdFromToken("good-token")).thenReturn(3);
+        when(jwtUtil.getRoleFromToken("good-token")).thenReturn("   ");
+
+        filter.doFilter(request, response, filterChain);
+
+        verify(filterChain, times(1)).doFilter(request, response);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void testMalformedNumericSubjectInToken_ContinuesChainUnauthenticated() throws Exception {
+        request.addHeader("Authorization", "Bearer good-token");
+        when(jwtUtil.validateToken("good-token")).thenReturn(true);
+        when(jwtUtil.getUserIdFromToken("good-token")).thenThrow(new NumberFormatException("bad sub"));
+
+        filter.doFilter(request, response, filterChain);
+
+        verify(filterChain, times(1)).doFilter(request, response);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        verifyNoInteractions(userRepository);
+    }
 }

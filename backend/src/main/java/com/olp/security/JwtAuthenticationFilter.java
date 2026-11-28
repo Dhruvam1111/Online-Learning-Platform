@@ -81,8 +81,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         // 3. Extract user info from the token
-        Integer userId = jwtUtil.getUserIdFromToken(token);
-        String role = jwtUtil.getRoleFromToken(token);
+        Integer userId;
+        String role;
+        try {
+            userId = jwtUtil.getUserIdFromToken(token);
+            role = jwtUtil.getRoleFromToken(token);
+        } catch (RuntimeException ex) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+        if (userId == null || role == null || role.isBlank()) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         // 3b. Check if active sessions for this user were invalidated (e.g. after
         // password reset)

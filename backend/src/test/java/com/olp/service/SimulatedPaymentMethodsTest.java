@@ -1,6 +1,6 @@
 package com.olp.service;
 
-import com.olp.controller.PaymentSimulationController.SavedMethodRequest;
+import com.olp.dto.PaymentSimulationDtos.SavedMethodRequest;
 import com.olp.entity.User;
 import com.olp.entity.WebhookEvent;
 import com.olp.repository.PaymentRepository;
@@ -118,6 +118,39 @@ class SimulatedPaymentMethodsTest {
     void create_withoutConsentThrowsException() {
         SavedMethodRequest req = new SavedMethodRequest("card", false);
         assertThrows(IllegalArgumentException.class, () -> service.create(student, req));
+    }
+
+    @Test
+    void list_handlesRecordsWithMissingOrDifferentOwnerSafely() {
+        String missingOwnerJson = """
+                {
+                    "token": "simtok_11111111111111111111111111111111",
+                    "method": "upi",
+                    "consent": true,
+                    "expiresAt": "%s"
+                }
+                """.formatted(Instant.now().plusSeconds(3600).toString());
+        String otherOwnerJson = """
+                {
+                    "token": "simtok_22222222222222222222222222222222",
+                    "owner": 999,
+                    "method": "upi",
+                    "consent": true,
+                    "expiresAt": "%s"
+                }
+                """.formatted(Instant.now().plusSeconds(3600).toString());
+
+        when(events.findByEventType("method.created")).thenReturn(List.of(
+                new WebhookEvent("simtok_1", "method.created", missingOwnerJson),
+                new WebhookEvent("simtok_2", "method.created", otherOwnerJson)));
+
+        List<Map<String, Object>> result = service.list(student);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void revoke_rejectsMalformedTokenFormat() {
+        assertThrows(IllegalArgumentException.class, () -> service.revoke(student, "invalid-token"));
     }
 }
 
