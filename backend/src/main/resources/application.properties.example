@@ -5,9 +5,9 @@
 # ==============================================================================
 
 # Database Connection (Neon Cloud or Local PostgreSQL)
-spring.datasource.url=jdbc:postgresql://<HOST>:<PORT>/<DATABASE>?sslmode=require
-spring.datasource.username=<USERNAME>
-spring.datasource.password=<PASSWORD>
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://<HOST>:<PORT>/<DATABASE>?sslmode=require}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:<USERNAME>}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:<PASSWORD>}
 spring.datasource.driver-class-name=org.postgresql.Driver
 
 # JPA / Hibernate
@@ -16,11 +16,13 @@ spring.jpa.show-sql=false
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 
 # JWT Security
-jwt.secret=<YOUR_BASE64_ENCODED_256BIT_SECRET>
-jwt.expiration=86400000
+app.jwt.secret=${JWT_SECRET:this-is-a-dev-only-secret-key-that-must-be-at-least-256-bits-long-for-HS256}
+app.jwt.expiration-ms=${JWT_EXPIRATION_MS:86400000}
+jwt.secret=${JWT_SECRET:this-is-a-dev-only-secret-key-that-must-be-at-least-256-bits-long-for-HS256}
+jwt.expiration=${JWT_EXPIRATION_MS:86400000}
 
 # Server Port
-server.port=8080
+server.port=${PORT:8080}
 
 # File Upload Configuration (FR-I04: Profile Picture & Credentials)
 spring.servlet.multipart.max-file-size=10MB

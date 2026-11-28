@@ -81,6 +81,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- PDF Text Extraction for AI Lecture Synthesis -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.3</version>
+        </dependency>
+
         <!-- Lombok (optional but reduces boilerplate) -->
         <dependency>
             <groupId>org.projectlombok</groupId>

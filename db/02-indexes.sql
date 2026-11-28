@@ -302,8 +302,21 @@ CREATE INDEX IF NOT EXISTS idx_refund_exception_order
     ON webhook_events (substring(event_id, 11)) WHERE event_type = 'refund.exception.request';
 CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users (lower(email));
 
--- Step 56 / FR-A31 (ADM-015): Admin Audit Logs Indexes
+-- Step 57: Examination Attempt Answers Indexes
+CREATE INDEX IF NOT EXISTS idx_exam_attempt_answers_attempt ON exam_attempt_answers(attempt_id);
+CREATE INDEX IF NOT EXISTS idx_exam_attempts_status_expiry ON exam_attempts(status, expires_at);
+
+-- Step 58 / FR-A31 (ADM-015): Admin Audit Logs Indexes
 CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_created_at ON admin_audit_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_actor ON admin_audit_logs(actor_id);
 CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_action ON admin_audit_logs(action);
 CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_target ON admin_audit_logs(target_type, target_id);
+
+-- Step 59: AI Lecture Notes Documents & Synthesis Engine Indexes
+CREATE INDEX IF NOT EXISTS idx_lecture_notes_lesson ON lecture_notes_documents(lesson_id);
+CREATE INDEX IF NOT EXISTS idx_lecture_notes_uploader ON lecture_notes_documents(uploader_id);
+CREATE INDEX IF NOT EXISTS idx_ai_synthesis_lesson ON ai_lecture_syntheses(lesson_id);
+CREATE INDEX IF NOT EXISTS idx_ai_synthesis_instructor ON ai_lecture_syntheses(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_ai_synthesis_review_status ON ai_lecture_syntheses(review_status);
+CREATE INDEX IF NOT EXISTS idx_ai_synthesis_published ON ai_lecture_syntheses(lesson_id, published_to_students);
+
