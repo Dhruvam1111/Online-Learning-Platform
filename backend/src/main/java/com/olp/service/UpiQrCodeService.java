@@ -11,6 +11,7 @@ import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.PaymentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,8 +32,26 @@ public class UpiQrCodeService {
 
     private final PaymentRepository paymentRepository;
 
+    @Value("${app.frontend-url:${FRONTEND_URL:http://localhost:3000}}")
+    private String frontendUrl = "http://localhost:3000";
+
     public UpiQrCodeService(PaymentRepository paymentRepository) {
         this.paymentRepository = paymentRepository;
+    }
+
+    public void setFrontendUrl(String frontendUrl) {
+        this.frontendUrl = frontendUrl;
+    }
+
+    private String cleanBaseUrl(String url, String fallback) {
+        if (url == null || url.isBlank()) {
+            url = fallback;
+        }
+        url = url.trim();
+        while (url.endsWith("/")) {
+            url = url.substring(0, url.length() - 1);
+        }
+        return url;
     }
 
     /**
@@ -132,6 +151,7 @@ public class UpiQrCodeService {
                 .orElseThrow(() -> new ResourceNotFoundException("Payment order not found: " + orderId));
 
         UpiQrResponse qrData = generateUpiQr(orderId);
+        String dashboardUrl = cleanBaseUrl(frontendUrl, "http://localhost:3000") + "/#dashboard";
 
         return """
             <!DOCTYPE html>
@@ -317,7 +337,7 @@ public class UpiQrCodeService {
                 orderId,
                 orderId,
                 orderId
-        );
+        ).replace("http://localhost:3000/#dashboard", dashboardUrl);
     }
     private static String encode(String value) { return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20"); }
 

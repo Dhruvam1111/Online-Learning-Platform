@@ -2,6 +2,7 @@ package com.olp.service;
 
 import com.olp.dto.ApiResponse;
 import com.olp.dto.AuthResponse;
+import com.olp.dto.ForgotPasswordRequest;
 import com.olp.dto.LoginRequest;
 import com.olp.dto.RegisterRequest;
 import com.olp.entity.InstructorProfile;
@@ -21,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -185,6 +187,49 @@ class AuthServiceTest {
         when(jwtUtil.validateToken(token)).thenReturn(false);
 
         assertThrows(InvalidCredentialsException.class, () -> authService.verifyEmail(token));
+    }
+
+    @Test
+    void testRegister_Instructor_WithCustomPublicApiUrl_StripsTrailingSlashAndUsesConfiguredUrl() {
+        RegisterRequest request = new RegisterRequest(
+                "Dr. Smith",
+                "smith@test.com",
+                "Password123!",
+                "instructor",
+                "Distributed Systems",
+                "PhD in Computer Science"
+        );
+
+        when(userRepository.existsByEmail("smith@test.com")).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("encodedHash");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            u.setId(2);
+            return u;
+        });
+        when(jwtUtil.generateToken(eq(2), eq("VERIFY_EMAIL"))).thenReturn("verifyToken123");
+        when(jwtUtil.generateToken(eq(2), eq("instructor"))).thenReturn("jwtToken123");
+
+        authService.setPublicApiUrl("https://api.production.com/");
+        AuthResponse response = authService.register(request);
+
+        assertNotNull(response);
+        assertEquals("https://api.production.com/api/auth/verify-email?token=verifyToken123", response.getVerificationLink());
+    }
+
+    @Test
+    void testForgotPassword_WithCustomPublicApiUrl_GeneratesConfiguredResetLink() {
+        ForgotPasswordRequest request = new ForgotPasswordRequest();
+        request.setEmail("alice@test.com");
+
+        when(userRepository.findByEmail("alice@test.com")).thenReturn(Optional.of(activeStudent));
+        when(jwtUtil.generatePasswordResetToken(eq(1), anyLong())).thenReturn("resetToken456");
+
+        authService.setPublicApiUrl("https://api.production.com/");
+        Map<String, String> response = authService.forgotPassword(request);
+
+        assertNotNull(response);
+        assertEquals("https://api.production.com/api/auth/password-reset/confirm?token=resetToken456", response.get("resetLink"));
     }
 }
 

@@ -169,6 +169,22 @@ class AdminServiceTest {
       assertThrows(IllegalArgumentException.class, () -> adminService.triggerPasswordReset(2));
       verify(emailService, never()).sendPasswordResetLinkEmail(any(), any(), any(), anyInt());
   }
+
+  @Test
+  void testTriggerPasswordReset_WithCustomPublicApiUrl_GeneratesConfiguredResetLink() {
+      when(userRepository.findById(1)).thenReturn(Optional.of(sampleStudent));
+      when(jwtUtil.generatePasswordResetToken(1, 15 * 60 * 1000L)).thenReturn("custom-jwt-token");
+
+      adminService.setPublicApiUrl("https://admin.production.com/");
+      ApiResponse response = adminService.triggerPasswordReset(1);
+
+      assertTrue(response.isSuccess());
+      verify(emailService).sendPasswordResetLinkEmail(
+              eq("alice@student.com"),
+              eq("Alice"),
+              eq("https://admin.production.com/api/auth/password-reset/confirm?token=custom-jwt-token"),
+              eq(15));
+  }
     @Test
     void testGetUsers_WithFilters() {
         Page<User> userPage = new PageImpl<>(List.of(sampleStudent, adminUser));

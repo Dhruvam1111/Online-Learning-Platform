@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -40,7 +41,7 @@ class StudentExamLifecycleServiceTest {
         lenient().when(student.getRole()).thenReturn("student");
         exam = mock(Exam.class);
         lenient().when(exam.getId()).thenReturn(100);
-        attempt = new ExamAttempt(exam, student, 1, LocalDateTime.now().minusMinutes(1), LocalDateTime.now().plusMinutes(10));
+        attempt = new ExamAttempt(exam, student, 1, LocalDateTime.now(Clock.systemUTC()).minusMinutes(1), LocalDateTime.now(Clock.systemUTC()).plusMinutes(10));
         attempt.setId(50);
     }
 
@@ -86,7 +87,7 @@ class StudentExamLifecycleServiceTest {
 
     @Test
     void timedOutAttemptIsExpiredAndRejectsLateSave() {
-        attempt.setExpiresAt(LocalDateTime.now().minusMinutes(1));
+        attempt.setExpiresAt(LocalDateTime.now(Clock.systemUTC()).minusMinutes(1));
         when(attempts.findLocked(50)).thenReturn(Optional.of(attempt));
         assertThrows(ResponseStatusException.class,
                 () -> service.save(student, 50, new StudentExamAnswerRequest(4, "late")));
