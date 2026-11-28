@@ -3,68 +3,95 @@ package com.olp.service;
 import com.olp.entity.Payment;
 import com.olp.entity.User;
 import com.olp.repository.PaymentRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class PaymentAccessTest {
 
+    @Mock
     private PaymentRepository payments;
+
+    @InjectMocks
     private PaymentAccess paymentAccess;
-    private User owner;
-    private Payment payment;
 
-    @BeforeEach
-    void setUp() {
-        payments = mock(PaymentRepository.class);
-        paymentAccess = new PaymentAccess(payments);
-        owner = new User("Alice", "alice@example.com", "hash", "student");
-        owner.setId(12);
-        payment = new Payment("ORDER-1", owner, null, new BigDecimal("25.00"), "INR");
-        when(payments.findByOrderId("ORDER-1")).thenReturn(Optional.of(payment));
+    private User student(Integer id, String email) {
+        User u = new User("Student", email, "hash", "student");
+        u.setId(id);
+        return u;
+    }
+
+    private Payment paymentWithStudent(User student) {
+        Payment payment = new Payment();
+        payment.setOrderId("order-123");
+        payment.setStudent(student);
+        return payment;
     }
 
     @Test
-    void ownerCanAccessTheirOrder() {
-        assertTrue(paymentAccess.owns(authenticate(owner, "ROLE_student"), "ORDER-1"));
+    void owns_rejectsNullOrBlankArgumentsAndMissingPayments() {
+        Authentication auth = new UsernamePasswordAuthenticationToken("a@olp.test", null, List.of());
+
+        assertFalse(paymentAccess.owns(null, "order-123"));
+        assertFalse(paymentAccess.owns(auth, null));
+        assertFalse(paymentAccess.owns(auth, "   "));
+
+        when(payments.findByOrderId("order-missing")).thenReturn(Optional.empty());
+        assertFalse(paymentAccess.owns(auth, "order-missing"));
+
+        Payment orphan = new Payment();
+        orphan.setOrderId("order-orphan");
+        when(payments.findByOrderId("order-orphan")).thenReturn(Optional.of(orphan));
+        assertFalse(paymentAccess.owns(auth, "order-orphan"));
     }
 
     @Test
-    void differentStudentCannotAccessOrder() {
-        User other = new User("Bob", "bob@example.com", "hash", "student");
-        other.setId(13);
+    void owns_grantsAdminAuthorityAndAdminUserRole() {
+        User owner = student(10, "owner@olp.test");
+        when(payments.findByOrderId("order-123")).thenReturn(Optional.of(paymentWithStudent(owner)));
 
-        assertFalse(paymentAccess.owns(authenticate(other, "ROLE_student"), "ORDER-1"));
+        Authentication adminAuthority = new UsernamePasswordAuthenticationToken(
+                "admin@olp.test", null, List.of(new SimpleGrantedAuthority("ROLE_admin"))
+        );
+        assertTrue(paymentAccess.owns(adminAuthority, "order-123"));
+
+        User adminEntity = new User("Admin", "admin@olp.test", "hash", "admin");
+        adminEntity.setId(99);
+        Authentication adminRoleUser = new UsernamePasswordAuthenticationToken(adminEntity, null, List.of());
+        assertTrue(paymentAccess.owns(adminRoleUser, "order-123"));
     }
 
     @Test
-    void administratorCanAccessAnyOrder() {
-        User admin = new User("Admin", "admin@example.com", "hash", "admin");
+    void owns_grantsOwnerByIdEmailOrAuthenticationNameAndDeniesOtherStudent() {
+        User owner = student(10, "Owner@olp.test");
+        when(payments.findByOrderId("order-123")).thenReturn(Optional.of(paymentWithStudent(owner)));
 
-        assertTrue(paymentAccess.owns(authenticate(admin, "ROLE_admin"), "ORDER-1"));
-    }
+        User sameIdDifferentEmail = student(10, "alias@olp.test");
+        assertTrue(paymentAccess.owns(
+                new UsernamePasswordAuthenticationToken(sameIdDifferentEmail, null, List.of()), "order-123"));
 
-    @Test
-    void absentAuthenticationOrderOrPaymentIsDenied() {
-        assertFalse(paymentAccess.owns(null, "ORDER-1"));
-        assertFalse(paymentAccess.owns(authenticate(owner, "ROLE_student"), null));
-        assertFalse(paymentAccess.owns(authenticate(owner, "ROLE_student"), " "));
-        assertFalse(paymentAccess.owns(authenticate(owner, "ROLE_student"), "MISSING"));
-        when(payments.findByOrderId("NO-STUDENT")).thenReturn(Optional.of(
-                new Payment("NO-STUDENT", null, null, BigDecimal.ONE, "INR")));
-        assertFalse(paymentAccess.owns(authenticate(owner, "ROLE_student"), "NO-STUDENT"));
-    }
+        User sameEmailDifferentId = student(25, "owner@olp.test");
+        assertTrue(paymentAccess.owns(
+                new UsernamePasswordAuthenticationToken(sameEmailDifferentId, null, List.of()), "order-123"));
 
-    private UsernamePasswordAuthenticationToken authenticate(User user, String authority) {
-        return new UsernamePasswordAuthenticationToken(
-                user, "ignored", List.of(new SimpleGrantedAuthority(authority)));
+        Authentication nameMatch = new UsernamePasswordAuthenticationToken("owner@olp.test", null, List.of());
+        assertTrue(paymentAccess.owns(nameMatch, "order-123"));
+
+        User intruder = student(77, "intruder@olp.test");
+        assertFalse(paymentAccess.owns(
+                new UsernamePasswordAuthenticationToken(intruder, null, List.of(new SimpleGrantedAuthority("ROLE_student"))),
+                "order-123"));
     }
 }
