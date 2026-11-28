@@ -54,6 +54,8 @@ Documentation/WHY_JAVA_SPRING_BOOT_FOR_AI_RAG.md
 Notes - personal/
 
 # Local Backups & Temporary Files
+backend/uploads/
+uploads/
 *.local_backup
 *.backup
 *.bak

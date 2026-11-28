@@ -4,6 +4,7 @@ import StudentSubscriptions from './StudentSubscriptions';
 import DailyStreakCalendar from './DailyStreakCalendar';
 import CourseSyllabusTree from './CourseSyllabusTree';
 import RazorpayPaymentModal from './RazorpayPaymentModal';
+import StudentStudyGuideView from './StudentStudyGuideView';
 import { useAuth } from '../context/AuthContext';
 import api, { studentAPI, courseAPI, paymentAPI } from '../services/api';
 import { getCoursePricing } from '../utils/pricing';
@@ -712,6 +713,14 @@ export default function StudentDashboard({ onNavigateHome }) {
                       )}
                     </div>
                   </div>
+
+                  {/* Verified AI Study Guide & Flashcards */}
+                  {activeLecture && (
+                    <StudentStudyGuideView
+                      lessonId={activeLecture.id}
+                      lessonTitle={activeLecture.title}
+                    />
+                  )}
                 </div>
               )}
 

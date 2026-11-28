@@ -174,22 +174,27 @@ public class StudentPerformanceService {
     }
 
     private static boolean visibleExam(ExamAttempt a) {
-        return a.getObtainedMarks() != null && a.getSubmittedAt() != null &&
-                Boolean.TRUE.equals(a.getIsPublished()) &&
-                Boolean.TRUE.equals(a.getExam().getResultsPublished()) &&
-                !Boolean.TRUE.equals(a.getExam().getResultsWithheld());
+        return a != null && a.getExam() != null && a.getExam().getCourse() != null
+                && a.getObtainedMarks() != null && a.getSubmittedAt() != null
+                && Boolean.TRUE.equals(a.getIsPublished())
+                && Boolean.TRUE.equals(a.getExam().getResultsPublished())
+                && !Boolean.TRUE.equals(a.getExam().getResultsWithheld());
     }
+
     private static boolean visibleQuiz(QuizAttempt a) {
-        return a.getObtainedMarks() != null && a.getSubmittedAt() != null &&
-                Boolean.TRUE.equals(a.getIsPublished()) &&
-                Boolean.TRUE.equals(a.getQuiz().getResultsPublished()) &&
-                !Boolean.TRUE.equals(a.getQuiz().getResultsWithheld());
+        return a != null && a.getQuiz() != null && a.getQuiz().getCourse() != null
+                && a.getObtainedMarks() != null && a.getSubmittedAt() != null
+                && Boolean.TRUE.equals(a.getIsPublished())
+                && Boolean.TRUE.equals(a.getQuiz().getResultsPublished())
+                && !Boolean.TRUE.equals(a.getQuiz().getResultsWithheld());
     }
+
     private static boolean visibleAssignment(AssignmentSubmission a) {
-        return a.getAwardedMarks() != null && a.getSubmittedAt() != null &&
-                Boolean.TRUE.equals(a.getIsPublished()) &&
-                Boolean.TRUE.equals(a.getAssignment().getResultsPublished()) &&
-                !Boolean.TRUE.equals(a.getAssignment().getResultsWithheld());
+        return a != null && a.getAssignment() != null && a.getAssignment().getCourse() != null
+                && a.getAwardedMarks() != null && a.getSubmittedAt() != null
+                && Boolean.TRUE.equals(a.getIsPublished())
+                && Boolean.TRUE.equals(a.getAssignment().getResultsPublished())
+                && !Boolean.TRUE.equals(a.getAssignment().getResultsWithheld());
     }
 
     private static LocalDateTime date(LocalDateTime submitted, LocalDateTime published) {
@@ -206,7 +211,7 @@ public class StudentPerformanceService {
     }
     private static void add(Map<String,TopicAccumulator> map, String topic,
                             BigDecimal awarded, BigDecimal maximum) {
-        if (topic == null || topic.isBlank() || maximum == null || maximum.signum() <= 0) return;
+        if (topic == null || topic.isBlank() || awarded == null || maximum == null || maximum.signum() <= 0) return;
         TopicAccumulator a = map.computeIfAbsent(topic.trim(), k -> new TopicAccumulator());
         a.awarded = a.awarded.add(awarded); a.maximum = a.maximum.add(maximum); a.count++;
     }

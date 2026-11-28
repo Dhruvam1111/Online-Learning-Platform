@@ -732,15 +732,8 @@ public class CourseCompletionService {
     }
 
     private void validateInstructor(User currentUser) {
-        if (currentUser == null) {
-            throw new InvalidCredentialsException("User is not authenticated");
-        }
-        if (!"instructor".equalsIgnoreCase(currentUser.getRole()) && !"admin".equalsIgnoreCase(currentUser.getRole())) {
-            throw new AccessDeniedException("Access denied: only instructors or admins can access issued certificates");
-        }
-        if (!"admin".equalsIgnoreCase(currentUser.getRole()) && !"active".equalsIgnoreCase(currentUser.getAccountStatus())) {
-            throw new AccessDeniedException("Access denied: Instructor account is awaiting admin approval");
-        }
+        com.olp.security.SecurityUtils.requireActiveInstructorOrAdmin(
+                currentUser, "Access denied: only instructors or admins can access issued certificates");
     }
 
     private CertificateResponse mapToCertificateResponse(Certificate cert) {
@@ -795,29 +788,6 @@ public class CourseCompletionService {
     }
 
     public LocalDateTime parseDateTime(String input, boolean isEndOfDay) {
-        if (input == null || input.trim().isEmpty()) {
-            return null;
-        }
-        String s = input.trim();
-        try {
-            LocalDate date = LocalDate.parse(s);
-            return isEndOfDay ? date.atTime(LocalTime.MAX) : date.atStartOfDay();
-        } catch (DateTimeParseException ignored) {}
-
-        try {
-            return LocalDateTime.parse(s);
-        } catch (DateTimeParseException ignored) {}
-
-        try {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm[:ss]");
-            return LocalDateTime.parse(s, formatter);
-        } catch (DateTimeParseException ignored) {}
-
-        try {
-            Instant instant = Instant.parse(s);
-            return LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
-        } catch (DateTimeParseException ignored) {}
-
-        throw new IllegalArgumentException("Invalid date format: " + input + ". Expected yyyy-MM-dd or ISO date-time.");
+        return com.olp.util.DateTimeParseUtils.parseFlexibleDateTime(input, isEndOfDay);
     }
 }

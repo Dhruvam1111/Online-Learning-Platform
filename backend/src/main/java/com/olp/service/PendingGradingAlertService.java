@@ -48,18 +48,7 @@ public class PendingGradingAlertService {
     }
 
     public User resolveUser(Authentication authentication) {
-        if (authentication == null || authentication.getPrincipal() == null) {
-            throw new InvalidCredentialsException("User is not authenticated");
-        }
-        Object principal = authentication.getPrincipal();
-        if (principal instanceof User user) {
-            return user;
-        }
-        if (principal instanceof String email) {
-            return userRepository.findByEmail(email)
-                    .orElseThrow(() -> new InvalidCredentialsException("User not found: " + email));
-        }
-        throw new InvalidCredentialsException("Invalid authentication principal");
+        return com.olp.security.SecurityUtils.resolveUser(authentication, userRepository);
     }
 
     /**
@@ -320,12 +309,7 @@ public class PendingGradingAlertService {
     }
 
     private void validateInstructorOrAdmin(User user) {
-        if (user == null) {
-            throw new InvalidCredentialsException("User is not authenticated");
-        }
-        String role = user.getRole();
-        if (role == null || (!role.equalsIgnoreCase("INSTRUCTOR") && !role.equalsIgnoreCase("ADMIN"))) {
-            throw new AccessDeniedException("Only instructors and administrators can access pending grading alerts");
-        }
+        com.olp.security.SecurityUtils.requireInstructorOrAdmin(
+                user, "Only instructors and administrators can access pending grading alerts");
     }
 }

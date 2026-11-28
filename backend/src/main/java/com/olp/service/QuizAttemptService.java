@@ -80,18 +80,7 @@ public class QuizAttemptService {
     }
 
     public User resolveUser(Authentication authentication) {
-        if (authentication == null || authentication.getPrincipal() == null) {
-            throw new InvalidCredentialsException("User is not authenticated");
-        }
-        Object principal = authentication.getPrincipal();
-        if (principal instanceof User user) {
-            return user;
-        }
-        if (principal instanceof String email) {
-            return userRepository.findByEmail(email)
-                    .orElseThrow(() -> new InvalidCredentialsException("User not found"));
-        }
-        throw new InvalidCredentialsException("Invalid authentication principal");
+        return com.olp.security.SecurityUtils.resolveUser(authentication, userRepository);
     }
 
     @Transactional(readOnly = true)

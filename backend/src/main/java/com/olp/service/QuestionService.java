@@ -75,18 +75,7 @@ public class QuestionService {
     }
 
     public User resolveUser(Authentication authentication) {
-        if (authentication == null || authentication.getPrincipal() == null) {
-            throw new InvalidCredentialsException("User is not authenticated");
-        }
-        Object principal = authentication.getPrincipal();
-        if (principal instanceof User user) {
-            return user;
-        }
-        if (principal instanceof String email) {
-            return userRepository.findByEmail(email)
-                    .orElseThrow(() -> new InvalidCredentialsException("User not found"));
-        }
-        throw new InvalidCredentialsException("Invalid authentication principal");
+        return com.olp.security.SecurityUtils.resolveUser(authentication, userRepository);
     }
 
     @Transactional
@@ -639,28 +628,16 @@ public class QuestionService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + courseId));
 
-        boolean isOwner = course.getInstructor() != null && currentUser.getId().equals(course.getInstructor().getId());
-        boolean isCoInstructor = courseInstructorRepository != null &&
-                courseInstructorRepository.existsByCourseIdAndInstructorId(courseId, currentUser.getId());
-        boolean isAdmin = "admin".equalsIgnoreCase(currentUser.getRole());
-
-        if (!isOwner && !isCoInstructor && !isAdmin) {
+        if (!com.olp.security.SecurityUtils.isCourseOwnerOrCoInstructorOrAdmin(
+                course, currentUser, courseInstructorRepository)) {
             throw new AccessDeniedException("Cannot manage questions: you are not an authorized instructor for this course");
         }
         return course;
     }
 
     private void validateInstructor(User currentUser) {
-        if (currentUser == null) {
-            throw new InvalidCredentialsException("User is not authenticated");
-        }
-        if (!"instructor".equalsIgnoreCase(currentUser.getRole()) && !"admin".equalsIgnoreCase(currentUser.getRole())) {
-            throw new AccessDeniedException("Access denied: only instructors or admins can manage questions");
-        }
-        if ("instructor".equalsIgnoreCase(currentUser.getRole())
-                && !"active".equalsIgnoreCase(currentUser.getAccountStatus())) {
-            throw new AccessDeniedException("Access denied: Instructor account is awaiting admin approval");
-        }
+        com.olp.security.SecurityUtils.requireActiveInstructorOrAdmin(
+                currentUser, "Access denied: only instructors or admins can manage questions");
     }
 
     private String trimToNull(String value) {

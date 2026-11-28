@@ -26,17 +26,7 @@ public class MyCoursesService {
 
     /** Resolves the current User from the Spring Security Authentication. */
     public User resolveUser(Authentication authentication) {
-        if (authentication == null || authentication.getPrincipal() == null) {
-            throw new InvalidCredentialsException("User is not authenticated");
-        }
-
-        Object principal = authentication.getPrincipal();
-        if (principal instanceof User user) {
-            return user;
-        }
-
-        return userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new InvalidCredentialsException("User not found"));
+        return com.olp.security.SecurityUtils.resolveUserByName(authentication, userRepository);
     }
 
     /** Returns all courses the given student is enrolled in (empty list if none). */

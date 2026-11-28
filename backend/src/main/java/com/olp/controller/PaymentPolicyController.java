@@ -1,27 +1,83 @@
 package com.olp.controller;
+
+import com.olp.dto.PaymentSimulationDtos.CoursePaymentPolicyUpdateRequest;
+import com.olp.dto.PaymentSimulationDtos.PaymentPolicyUpdateRequest;
+import com.olp.entity.CourseStatus;
 import com.olp.entity.User;
+import com.olp.repository.CourseRepository;
 import com.olp.service.PaymentPolicyService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import java.math.BigDecimal;
+
+import java.util.List;
 import java.util.Map;
+
 @RestController
 @RequestMapping("/api/payments/policy")
 public class PaymentPolicyController {
     private final PaymentPolicyService policies;
-    public PaymentPolicyController(PaymentPolicyService policies){this.policies=policies;}
-    public record Update(BigDecimal commissionRate,BigDecimal taxRate,BigDecimal defaultPrice){}
-    public record CourseUpdate(BigDecimal price,BigDecimal taxRate){}
-    @org.springframework.beans.factory.annotation.Autowired private com.olp.repository.CourseRepository courses;
-    @PutMapping("/courses/{id}") public Map<String,Object> course(@AuthenticationPrincipal User user,@PathVariable Integer id,@RequestBody CourseUpdate request){
-        if(!courses.existsById(id))throw new IllegalArgumentException("Course not found.");
-        return policies.updateCourse(user,id,request.price(),request.taxRate());
+    private final CourseRepository courses;
+
+    public PaymentPolicyController(PaymentPolicyService policies) {
+        this(policies, null);
     }
-    @GetMapping("/courses/{id}") public Map<String,Object> quote(@PathVariable Integer id){
-        var course=courses.findById(id).orElseThrow(() -> new IllegalArgumentException("Course not found."));
-        return Map.of("amount",policies.price(course),"currency","INR","taxInclusive",true);
+
+    @Autowired
+    public PaymentPolicyController(PaymentPolicyService policies,
+                                   @Autowired(required = false) CourseRepository courses) {
+        this.policies = policies;
+        this.courses = courses;
     }
-    @GetMapping("/catalog") public java.util.List<Map<String,Object>> catalog(){return courses.findAll().stream().filter(c -> c.getStatus()==com.olp.entity.CourseStatus.PUBLISHED).map(c -> Map.<String,Object>of("courseId",c.getId(),"amount",policies.price(c),"currency","INR","taxInclusive",true)).toList();}
-    @GetMapping public Map<String,Object> current(){return policies.current();}
-    @PutMapping public Map<String,Object> update(@AuthenticationPrincipal User user,@RequestBody Update request){return policies.update(user,request.commissionRate(),request.taxRate(),request.defaultPrice());}
+
+    @PutMapping("/courses/{id}")
+    public Map<String, Object> course(@AuthenticationPrincipal User user,
+                                      @PathVariable Integer id,
+                                      @RequestBody CoursePaymentPolicyUpdateRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Course policy update request body is required.");
+        }
+        if (courses == null || !courses.existsById(id)) {
+            throw new IllegalArgumentException("Course not found.");
+        }
+        return policies.updateCourse(user, id, request.price(), request.taxRate());
+    }
+
+    @GetMapping("/courses/{id}")
+    public Map<String, Object> quote(@PathVariable Integer id) {
+        if (courses == null) {
+            throw new IllegalArgumentException("Course not found.");
+        }
+        var course = courses.findById(id).orElseThrow(() -> new IllegalArgumentException("Course not found."));
+        return Map.of("amount", policies.price(course), "currency", "INR", "taxInclusive", true);
+    }
+
+    @GetMapping("/catalog")
+    public List<Map<String, Object>> catalog() {
+        if (courses == null) {
+            return List.of();
+        }
+        return courses.findAll().stream()
+                .filter(c -> c.getStatus() == CourseStatus.PUBLISHED)
+                .map(c -> Map.<String, Object>of(
+                        "courseId", c.getId(),
+                        "amount", policies.price(c),
+                        "currency", "INR",
+                        "taxInclusive", true))
+                .toList();
+    }
+
+    @GetMapping
+    public Map<String, Object> current() {
+        return policies.current();
+    }
+
+    @PutMapping
+    public Map<String, Object> update(@AuthenticationPrincipal User user,
+                                      @RequestBody PaymentPolicyUpdateRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Payment policy update request body is required.");
+        }
+        return policies.update(user, request.commissionRate(), request.taxRate(), request.defaultPrice());
+    }
 }

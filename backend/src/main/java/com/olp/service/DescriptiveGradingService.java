@@ -514,16 +514,10 @@ public class DescriptiveGradingService {
     }
 
     private void verifyCourseAssociation(Course course, User currentUser) {
-        if ("admin".equalsIgnoreCase(currentUser.getRole())) {
-            return;
-        }
-        boolean isOwner = course.getInstructor() != null && currentUser.getId().equals(course.getInstructor().getId());
-        boolean isAssociated = courseInstructorRepository != null &&
-                courseInstructorRepository.existsByCourseIdAndInstructorId(course.getId(), currentUser.getId());
-
-        if (!isOwner && !isAssociated) {
+        if (!com.olp.security.SecurityUtils.isCourseOwnerOrCoInstructorOrAdmin(
+                course, currentUser, courseInstructorRepository)) {
             throw new AccessDeniedException(
-                    "Access denied: You are not associated with course " + course.getId() + " (DR-05)");
+                    "Access denied: You are not associated with course " + (course != null ? course.getId() : null) + " (DR-05)");
         }
     }
 
@@ -536,30 +530,12 @@ public class DescriptiveGradingService {
     }
 
     public User resolveUser(Authentication authentication) {
-        if (authentication == null || authentication.getPrincipal() == null) {
-            throw new InvalidCredentialsException("User is not authenticated");
-        }
-        Object principal = authentication.getPrincipal();
-        if (principal instanceof User user) {
-            return user;
-        }
-        if (principal instanceof String email) {
-            return userRepository.findByEmail(email)
-                    .orElseThrow(() -> new InvalidCredentialsException("User not found with email: " + email));
-        }
-        throw new InvalidCredentialsException("Invalid authentication principal");
+        return com.olp.security.SecurityUtils.resolveUser(authentication, userRepository);
     }
 
     private void validateInstructor(User currentUser) {
-        if (currentUser == null) {
-            throw new InvalidCredentialsException("User is not authenticated");
-        }
-        if (!"instructor".equalsIgnoreCase(currentUser.getRole()) && !"admin".equalsIgnoreCase(currentUser.getRole())) {
-            throw new AccessDeniedException("Access denied: only instructors or admins can grade submissions");
-        }
-        if (!"admin".equalsIgnoreCase(currentUser.getRole()) && !"active".equalsIgnoreCase(currentUser.getAccountStatus())) {
-            throw new AccessDeniedException("Access denied: Instructor account is awaiting admin approval");
-        }
+        com.olp.security.SecurityUtils.requireActiveInstructorOrAdmin(
+                currentUser, "Access denied: only instructors or admins can grade submissions");
     }
 
     private EvaluationStatus parseEvaluationStatus(String statusStr) {

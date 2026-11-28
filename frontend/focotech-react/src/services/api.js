@@ -247,3 +247,23 @@ export const subscriptionAPI = {
   getQuote: (id) => api.get(`/payments/subscriptions/${id}/quote`),
   approveRenewal: (id, data) => api.post(`/payments/subscriptions/${id}/approve`, data),
 };
+
+export const aiLectureSynthesisAPI = {
+  uploadNotesDocument: (lessonId, formData) =>
+    api.post(`/instructor/lessons/${lessonId}/notes-documents`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  getNotesDocuments: (lessonId) =>
+    api.get(`/instructor/lessons/${lessonId}/notes-documents`),
+  triggerSynthesis: (lessonId, data = {}) =>
+    api.post(`/instructor/lessons/${lessonId}/ai-synthesis`, data),
+  getLatestSynthesis: (lessonId) =>
+    api.get(`/instructor/lessons/${lessonId}/ai-synthesis`),
+  updateDraft: (synthesisId, data) =>
+    api.put(`/instructor/ai-syntheses/${synthesisId}`, data),
+  publishSynthesis: (synthesisId, data = {}) =>
+    api.post(`/instructor/ai-syntheses/${synthesisId}/publish`, data),
+  getStudentStudyGuide: (lessonId) =>
+    api.get(`/student/lessons/${lessonId}/study-guide`),
+};
+
