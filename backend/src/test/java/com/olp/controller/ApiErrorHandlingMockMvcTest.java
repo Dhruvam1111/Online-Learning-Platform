@@ -334,6 +334,17 @@ class ApiErrorHandlingMockMvcTest {
                 .andExpect(jsonPath("$.message").value("Logged out successfully"));
     }
 
+    @Test
+    void testUnhandledException_Returns500WithTraceIdAndStandardizedBody() throws Exception {
+        when(authService.login(any(LoginRequest.class))).thenThrow(new RuntimeException("Simulated unexpected database failure"));
+
+        mockMvc.perform(postJson("/api/auth/login", new LoginRequest("sam@example.com", "password123")))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(jsonPath("$.error").isNotEmpty());
+    }
+
     private User instructorUser(Integer id) {
         User user = new User("Dr. Chen", "chen@example.com", "hash", "instructor");
         user.setId(id);

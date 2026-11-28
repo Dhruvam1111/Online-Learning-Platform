@@ -25,6 +25,7 @@ import java.util.List;
 @EnableMethodSecurity // enables @PreAuthorize on controller methods
 public class SecurityConfig {
 
+    private final TraceIdFilter traceIdFilter;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final CustomAccessDeniedHandler customAccessDeniedHandler;
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
@@ -33,9 +34,11 @@ public class SecurityConfig {
     private String allowedOrigins;
 
     public SecurityConfig(
+            TraceIdFilter traceIdFilter,
             JwtAuthenticationFilter jwtAuthenticationFilter,
             CustomAccessDeniedHandler customAccessDeniedHandler,
             CustomAuthenticationEntryPoint customAuthenticationEntryPoint) {
+        this.traceIdFilter = traceIdFilter;
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.customAccessDeniedHandler = customAccessDeniedHandler;
         this.customAuthenticationEntryPoint = customAuthenticationEntryPoint;
@@ -93,7 +96,9 @@ public class SecurityConfig {
                         // Everything else requires authentication
                         .anyRequest().authenticated())
 
-                // Add our JWT filter BEFORE Spring's default username/password filter
+                // Add correlation / trace ID filter first, then JWT filter BEFORE Spring's default username/password filter
+                .addFilterBefore(traceIdFilter,
+                        JwtAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class);
 

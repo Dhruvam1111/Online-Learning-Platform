@@ -1,14 +1,22 @@
 package com.olp.exception;
 
 import com.olp.dto.ErrorResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.UUID;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(DuplicateEmailException.class)
     public ResponseEntity<ErrorResponse> handleDuplicateEmail(DuplicateEmailException ex) {
@@ -61,7 +69,6 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(400, message));
     }
 
-
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
         return ResponseEntity
@@ -87,5 +94,34 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(ex.getStatusCode())
                 .body(new ErrorResponse(ex.getStatusCode().value(), reason));
+    }
+
+    /**
+     * Fallback catch-all exception handler.
+     * Captures any uncaught runtime/checked exception, logs with traceId, and returns 500.
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, HttpServletRequest request) {
+        String traceId = resolveTraceId(request);
+        logger.error("Unhandled exception caught by GlobalExceptionHandler [traceId={}]: ", traceId, ex);
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                        "An unexpected internal server error occurred. Reference ID: " + traceId,
+                        traceId));
+    }
+
+    private String resolveTraceId(HttpServletRequest request) {
+        String traceId = MDC.get("traceId");
+        if (traceId != null && !traceId.trim().isEmpty()) {
+            return traceId;
+        }
+        if (request != null) {
+            Object attr = request.getAttribute("traceId");
+            if (attr instanceof String && !((String) attr).trim().isEmpty()) {
+                return (String) attr;
+            }
+        }
+        return UUID.randomUUID().toString();
     }
 }

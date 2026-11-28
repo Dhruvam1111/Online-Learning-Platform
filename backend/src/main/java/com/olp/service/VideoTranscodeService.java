@@ -42,7 +42,7 @@ public class VideoTranscodeService {
     /**
      * Enqueues a video transcoding job to produce adaptive bitrate streams (HLS/DASH).
      */
-    @Async
+    @Async("taskExecutor")
     @Transactional
     public CompletableFuture<VideoUpload> enqueueTranscode(String uploadId) {
         logger.info("Starting transcoding job for upload: {}", uploadId);

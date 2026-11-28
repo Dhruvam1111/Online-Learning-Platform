@@ -1,22 +1,36 @@
 package com.olp.exception;
 
 import com.olp.dto.ErrorResponse;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 class GlobalExceptionHandlerTest {
 
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+
+    @AfterEach
+    void tearDown() {
+        MDC.clear();
+    }
 
     @Test
     void handlesAllCustomAndStandardExceptionsWithExpectedStatusAndBody() {
@@ -60,5 +74,69 @@ class GlobalExceptionHandlerTest {
                 new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE));
         assertEquals(406, rRseNullReason.getStatusCode().value());
         assertNotNull(rRseNullReason.getBody().getError());
+    }
+
+    @Test
+    void handleGenericException_UsesTraceIdFromMdc() {
+        MDC.put("traceId", "mdc-trace-123");
+        MockHttpServletRequest request = new MockHttpServletRequest();
+
+        ResponseEntity<ErrorResponse> response = handler.handleGenericException(
+                new RuntimeException("Database timeout"), request);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(500, response.getBody().getStatus());
+        assertEquals("mdc-trace-123", response.getBody().getTraceId());
+        assertTrue(response.getBody().getError().contains("mdc-trace-123"));
+    }
+
+    @Test
+    void handleGenericException_UsesTraceIdFromRequestAttributeWhenMdcEmpty() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setAttribute("traceId", "request-attr-trace-456");
+
+        ResponseEntity<ErrorResponse> response = handler.handleGenericException(
+                new NullPointerException("Null pointer"), request);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("request-attr-trace-456", response.getBody().getTraceId());
+        assertTrue(response.getBody().getError().contains("request-attr-trace-456"));
+    }
+
+    @Test
+    void handleGenericException_GeneratesUuidWhenNoTracePresent() {
+        ResponseEntity<ErrorResponse> response = handler.handleGenericException(
+                new IllegalStateException("Unexpected crash"), null);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertNotNull(response.getBody().getTraceId());
+        assertFalse(response.getBody().getTraceId().trim().isEmpty());
+        assertTrue(response.getBody().getError().contains(response.getBody().getTraceId()));
+    }
+
+    @Test
+    void handleValidation_WithFieldErrorsAndWithoutFieldErrors() throws Exception {
+        org.springframework.core.MethodParameter parameter = new org.springframework.core.MethodParameter(
+                GlobalExceptionHandlerTest.class.getDeclaredMethod("handleValidation_WithFieldErrorsAndWithoutFieldErrors"), -1);
+
+        org.springframework.validation.BeanPropertyBindingResult bindingResult =
+                new org.springframework.validation.BeanPropertyBindingResult(new Object(), "user");
+        bindingResult.addError(new FieldError("user", "email", "must not be blank"));
+        MethodArgumentNotValidException exWithErrors = new MethodArgumentNotValidException(parameter, bindingResult);
+
+        ResponseEntity<ErrorResponse> res = handler.handleValidation(exWithErrors);
+        assertEquals(400, res.getStatusCode().value());
+        assertEquals("email: must not be blank", res.getBody().getError());
+
+        org.springframework.validation.BeanPropertyBindingResult bindingResultEmpty =
+                new org.springframework.validation.BeanPropertyBindingResult(new Object(), "user");
+        MethodArgumentNotValidException exEmpty = new MethodArgumentNotValidException(parameter, bindingResultEmpty);
+
+        ResponseEntity<ErrorResponse> resEmpty = handler.handleValidation(exEmpty);
+        assertEquals(400, resEmpty.getStatusCode().value());
+        assertEquals("Validation failed", resEmpty.getBody().getError());
     }
 }
