@@ -24,7 +24,7 @@ public class StudentExamLifecycleService {
     private final ExamQuestionRepository examQuestions;
     private final QuestionRepository questions;
     private final ExamService existingExamService;
-    private final Clock clock = Clock.systemUTC();
+    private Clock clock = Clock.systemUTC();
 
     public StudentExamLifecycleService(StudentExamReadRepository exams,
             StudentExamAttemptReadRepository attempts,
@@ -33,6 +33,10 @@ public class StudentExamLifecycleService {
         this.exams = exams; this.attempts = attempts; this.answers = answers;
         this.examQuestions = examQuestions; this.questions = questions;
         this.existingExamService = existingExamService;
+    }
+
+    void setClock(Clock clock) {
+        this.clock = clock != null ? clock : Clock.systemUTC();
     }
 
     public static void requireStudent(User user) {
@@ -134,8 +138,12 @@ public class StudentExamLifecycleService {
                 || !Boolean.TRUE.equals(a.getIsPublished()) || !"GRADED".equalsIgnoreCase(a.getStatus())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Result not graded and published");
         }
-        Map<Integer, java.math.BigDecimal> maxima = examQuestions.findByExamIdOrderByOrderIndexAsc(exam.getId())
-            .stream().collect(Collectors.toMap(e -> e.getQuestion().getId(), ExamQuestion::getMarks, (x,y) -> x));
+        Map<Integer, java.math.BigDecimal> maxima = new HashMap<>();
+        for (ExamQuestion eq : examQuestions.findByExamIdOrderByOrderIndexAsc(exam.getId())) {
+            if (eq != null && eq.getQuestion() != null && eq.getQuestion().getId() != null) {
+                maxima.putIfAbsent(eq.getQuestion().getId(), eq.getMarks());
+            }
+        }
         List<QuestionResult> detail = answers.findAnswers(attemptId).stream()
             .map(ans -> new QuestionResult(ans.getQuestion().getId(), maxima.get(ans.getQuestion().getId()),
                     ans.getMarksAwarded(), ans.getFeedback())).toList();

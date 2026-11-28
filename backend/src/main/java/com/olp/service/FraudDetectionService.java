@@ -46,15 +46,21 @@ public class FraudDetectionService {
      * Evaluates real-time risk score for an incoming order request.
      */
     public RiskAssessment evaluateRisk(User student, BigDecimal amount) {
+        if (student == null || student.getId() == null) {
+            throw new IllegalArgumentException("Student is required for risk assessment");
+        }
         int score = 5; // Base low baseline score
         List<String> factors = new java.util.ArrayList<>();
 
         LocalDateTime fiveMinsAgo = LocalDateTime.now().minusMinutes(5);
         List<Payment> recentPayments = paymentRepository.findByStudentIdOrderByCreatedAtDesc(student.getId());
+        if (recentPayments == null) {
+            recentPayments = List.of();
+        }
 
         // 1. Velocity Check: high checkout attempts in short window
         long recentCount = recentPayments.stream()
-                .filter(p -> p.getCreatedAt().isAfter(fiveMinsAgo))
+                .filter(p -> p != null && p.getCreatedAt() != null && p.getCreatedAt().isAfter(fiveMinsAgo))
                 .count();
 
         if (recentCount >= 3) {
@@ -64,6 +70,7 @@ public class FraudDetectionService {
 
         // 2. Failure Rate Check: multiple recent failed transactions
         long recentFailures = recentPayments.stream()
+                .filter(p -> p != null)
                 .limit(5)
                 .filter(p -> "failed".equalsIgnoreCase(p.getStatus()))
                 .count();

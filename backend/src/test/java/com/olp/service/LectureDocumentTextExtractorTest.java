@@ -81,4 +81,44 @@ class LectureDocumentTextExtractorTest {
         assertEquals("FAILED", result.status());
         assertTrue(result.text().contains("Failed to extract text"));
     }
+
+    @Test
+    void testExtractPlainTextWhenMultipartFileIsNullReadsFromSavedFile(@TempDir Path tempDir) throws IOException {
+        Path filePath = tempDir.resolve("saved_notes.txt");
+        Files.writeString(filePath, "Null byte \u0000 sanitized text  ", StandardCharsets.UTF_8);
+
+        LectureDocumentTextExtractor.ExtractionResult result = extractor.extract(null, filePath.toFile());
+        assertEquals("COMPLETED", result.status());
+        assertEquals("Null byte  sanitized text", result.text());
+    }
+
+    @Test
+    void testExtractBinaryFallbackPrefersSavedFileWhenPresent(@TempDir Path tempDir) throws IOException {
+        Path filePath = tempDir.resolve("slides.bin");
+        Files.writeString(filePath, "Recovered from saved disk file", StandardCharsets.UTF_8);
+
+        MockMultipartFile file = new MockMultipartFile("file", "slides.bin", "application/octet-stream", new byte[0]);
+        LectureDocumentTextExtractor.ExtractionResult result = extractor.extract(file, filePath.toFile());
+
+        assertEquals("COMPLETED", result.status());
+        assertTrue(result.text().contains("Recovered from saved disk file"));
+    }
+
+    @Test
+    void testExtractWhenSavedFileIsNullFallsBackToMultipartBytes() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "inline.txt", "text/plain", "Inline content".getBytes(StandardCharsets.UTF_8));
+        LectureDocumentTextExtractor.ExtractionResult result = extractor.extract(file, null);
+
+        assertEquals("COMPLETED", result.status());
+        assertEquals("Inline content", result.text());
+    }
+
+    @Test
+    void testExtractBothSourcesNullReturnsFailedResult() {
+        LectureDocumentTextExtractor.ExtractionResult result = extractor.extract(null, null);
+        assertEquals("FAILED", result.status());
+        assertEquals(0, result.pageCount());
+        assertTrue(result.text().contains("Failed to extract text"));
+    }
 }

@@ -164,12 +164,15 @@ public class StudentAiLearningService {
         if (student == null) {
             throw new InvalidCredentialsException("User is not authenticated");
         }
+        if (questionId == null) {
+            throw new IllegalArgumentException("Question ID is required");
+        }
         Question question = questionRepository.findByIdWithDetails(questionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
 
         if (attemptId != null) {
             ExamAttempt attempt = examAttemptRepository.findById(Objects.requireNonNull(attemptId)).orElse(null);
-            if (attempt != null && !student.getId().equals(attempt.getStudent().getId())) {
+            if (attempt != null && (attempt.getStudent() == null || !student.getId().equals(attempt.getStudent().getId()))) {
                 throw new AccessDeniedException("Access denied to attempt questions");
             }
         }
@@ -287,6 +290,9 @@ public class StudentAiLearningService {
 
         List<Lecture> allLectures = lectureRepository.findByCourseIdOrderByOrderIndexAsc(courseId);
         for (Lecture lec : allLectures) {
+            if (lec == null || lec.getTitle() == null) {
+                continue;
+            }
             boolean matches = weakTopics.isEmpty() || weakTopics.stream().anyMatch(t ->
                     lec.getTitle().toLowerCase().contains(t.toLowerCase()));
 
@@ -299,8 +305,21 @@ public class StudentAiLearningService {
             }
         }
 
+        Set<Integer> courseLectureIds = allLectures.stream()
+                .filter(Objects::nonNull)
+                .map(Lecture::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
         List<LectureMaterial> materials = lectureMaterialRepository.findAllActiveMaterials();
         for (LectureMaterial mat : materials) {
+            if (mat == null) {
+                continue;
+            }
+            if (mat.getLectureId() != null && !courseLectureIds.isEmpty()
+                    && !courseLectureIds.contains(mat.getLectureId())) {
+                continue;
+            }
             if (recMaterials.size() < 3) {
                 recMaterials.add(new ResourceRecommendationResponse.RecommendedItemDto(
                         mat.getId(), mat.getTitle(), "READING_MATERIAL",
