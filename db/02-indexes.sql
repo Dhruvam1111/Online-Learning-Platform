@@ -235,6 +235,42 @@ CREATE INDEX IF NOT EXISTS idx_grading_alerts_instructor ON pending_grading_aler
 CREATE INDEX IF NOT EXISTS idx_grading_alerts_course ON pending_grading_alerts(course_id);
 CREATE INDEX IF NOT EXISTS idx_grading_alerts_sent_at ON pending_grading_alerts(sent_at DESC);
 
+-- ============================================================
+-- STUDENT BACKEND INDEXES: FR-S52 TO FR-S79
+-- ============================================================
+
+-- FR-S52: Personalized Study Schedule Indexes
+CREATE INDEX IF NOT EXISTS idx_study_schedules_student ON study_schedules(student_id);
+CREATE INDEX IF NOT EXISTS idx_study_schedules_course ON study_schedules(course_id);
+CREATE INDEX IF NOT EXISTS idx_study_schedules_window ON study_schedules(scheduled_start, scheduled_end);
+CREATE INDEX IF NOT EXISTS idx_study_schedules_status ON study_schedules(student_id, is_completed);
+
+-- FR-S52 to FR-S61: Examination Monitoring Logs Indexes
+CREATE INDEX IF NOT EXISTS idx_exam_monitoring_logs_attempt ON exam_monitoring_logs(attempt_id);
+CREATE INDEX IF NOT EXISTS idx_exam_monitoring_logs_student ON exam_monitoring_logs(student_id);
+CREATE INDEX IF NOT EXISTS idx_exam_monitoring_logs_exam ON exam_monitoring_logs(exam_id);
+CREATE INDEX IF NOT EXISTS idx_exam_monitoring_logs_event_type ON exam_monitoring_logs(event_type);
+CREATE INDEX IF NOT EXISTS idx_exam_monitoring_logs_timestamp ON exam_monitoring_logs(attempt_id, event_timestamp DESC);
+
+-- FR-S62 to FR-S65: Communication & Interaction Indexes
+CREATE INDEX IF NOT EXISTS idx_course_announcements_course ON course_announcements(course_id, is_pinned, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_course_discussions_course ON course_discussions(course_id, category);
+CREATE INDEX IF NOT EXISTS idx_course_discussions_student ON course_discussions(student_id);
+CREATE INDEX IF NOT EXISTS idx_discussion_replies_thread ON discussion_replies(discussion_id, created_at ASC);
+CREATE INDEX IF NOT EXISTS idx_student_notifications_student ON student_notifications(student_id, is_read, created_at DESC);
+
+-- FR-S66 to FR-S70: Gamification Indexes
+CREATE INDEX IF NOT EXISTS idx_student_gamification_points ON student_gamification(total_points DESC);
+CREATE INDEX IF NOT EXISTS idx_gamification_point_logs_student ON gamification_point_logs(student_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_badges_code ON badges(code);
+CREATE INDEX IF NOT EXISTS idx_student_badges_student ON student_badges(student_id);
+CREATE INDEX IF NOT EXISTS idx_learning_challenges_active ON learning_challenges(is_active, start_date, end_date);
+CREATE INDEX IF NOT EXISTS idx_student_challenge_progress_student ON student_challenge_progress(student_id);
+
+-- FR-S71 to FR-S76: AI Learning Assistance Indexes
+CREATE INDEX IF NOT EXISTS idx_ai_learning_queries_student ON ai_learning_queries(student_id, course_id, created_at DESC);
+
+
 -- Step 51 / FR-I34: Publish or Withhold Results Indexes
 CREATE INDEX IF NOT EXISTS idx_quizzes_publish ON quizzes(results_published, results_withheld);
 CREATE INDEX IF NOT EXISTS idx_assignments_publish ON assignments(results_published, results_withheld);

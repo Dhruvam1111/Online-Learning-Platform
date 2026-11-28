@@ -42,4 +42,7 @@ public interface LectureMaterialRepository extends JpaRepository<LectureMaterial
 
     @Query("SELECT m FROM LectureMaterial m WHERE m.lectureId = :lectureId AND m.deletedAt IS NULL AND (m.isReleased = true OR m.releaseAt IS NULL OR m.releaseAt <= :now) ORDER BY m.orderIndex ASC, m.id ASC")
     List<LectureMaterial> findAvailableByLectureId(@Param("lectureId") Integer lectureId, @Param("now") java.time.LocalDateTime now);
+
+    @Query("SELECT m FROM LectureMaterial m WHERE m.deletedAt IS NULL")
+    List<LectureMaterial> findAllActiveMaterials();
 }

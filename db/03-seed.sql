@@ -234,4 +234,30 @@ VALUES
     (1, 1, 1, 2, 'HTML5 Tags Cheat Sheet', 'html5_tags_cheatsheet.pdf', '/uploads/materials/html5_tags_cheatsheet.pdf', 'pdf', 'application/pdf', 1048576, FALSE, 'CLEAN')
 ON CONFLICT (id) DO NOTHING;
 
+-- ============================================================
+-- STUDENT BACKEND SEED DATA: FR-S68, FR-S70, FR-S62
+-- ============================================================
+
+-- FR-S68: Predefined Badges
+INSERT INTO badges (id, code, name, description, icon_url, points_required, category) VALUES
+    (1, 'FIRST_ENROLLMENT', 'First Step', 'Enrolled in your first course on the platform', '/badges/first_enrollment.svg', 10, 'MILESTONE'),
+    (2, 'STREAK_3_DAYS', 'Consistent Learner', 'Maintained an active learning streak for 3 consecutive days', '/badges/streak_3.svg', 30, 'STREAK'),
+    (3, 'STREAK_7_DAYS', 'Week Warrior', 'Maintained an active learning streak for 7 consecutive days', '/badges/streak_7.svg', 70, 'STREAK'),
+    (4, 'QUIZ_MASTER', 'Quiz Master', 'Scored a passing mark or higher on a course quiz', '/badges/quiz_master.svg', 50, 'ACADEMIC'),
+    (5, 'PERFECT_EXAM', 'Exam Ace', 'Achieved high performance on a proctored examination', '/badges/perfect_exam.svg', 100, 'ACADEMIC'),
+    (6, 'COURSE_COMPLETED', 'Course Finisher', 'Successfully fulfilled all completion criteria and earned a course certificate', '/badges/course_completed.svg', 150, 'CERTIFICATE'),
+    (7, 'ACTIVE_COMMUNICATOR', 'Engaged Student', 'Participated actively in course discussions and community Q&A', '/badges/communicator.svg', 25, 'COMMUNITY')
+ON CONFLICT (id) DO NOTHING;
+
+-- FR-S70: Sample Learning Challenge
+INSERT INTO learning_challenges (id, course_id, title, description, points_reward, target_type, target_count, start_date, end_date, is_active) VALUES
+    (1, 1, 'HTML Mastery Sprint', 'Complete 3 lessons or quizzes in Web Development Fundamentals this week', 50, 'COMPLETE_LESSONS', 3, NOW() - INTERVAL '1 day', NOW() + INTERVAL '14 days', TRUE)
+ON CONFLICT (id) DO NOTHING;
+
+-- FR-S62: Sample Course Announcement
+INSERT INTO course_announcements (id, course_id, instructor_id, title, content, is_pinned, created_at) VALUES
+    (1, 1, 2, 'Welcome to Web Development Fundamentals!', 'Welcome all students to this course! Please make sure to check out Section 1 and post any questions in the discussions tab.', TRUE, NOW())
+ON CONFLICT (id) DO NOTHING;
+
+
 

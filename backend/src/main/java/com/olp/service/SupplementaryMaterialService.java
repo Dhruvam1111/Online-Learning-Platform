@@ -23,7 +23,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Service managing supplementary learning materials upload, reorder, replace, remove, and security validation
+ * Service managing supplementary learning materials upload, reorder, replace,
+ * remove, and security validation
  * (FR-I14, FR-I16, FR-I17).
  */
 @Service
@@ -105,7 +106,8 @@ public class SupplementaryMaterialService {
     }
 
     /**
-     * Upload a supplementary material file with MIME, size, and virus scan validations (FR-I14).
+     * Upload a supplementary material file with MIME, size, and virus scan
+     * validations (FR-I14).
      */
     public SupplementaryMaterialResponse uploadMaterial(
             User instructor,
@@ -124,17 +126,17 @@ public class SupplementaryMaterialService {
         Course targetCourse = null;
 
         if (lessonId != null) {
-            Lesson lesson = lessonRepository.findById(lessonId)
+            Lesson lesson = lessonRepository.findById(Objects.requireNonNull(lessonId))
                     .orElseThrow(() -> new ResourceNotFoundException("Lesson not found with id: " + lessonId));
             targetCourse = extractCourseFromLesson(lesson);
             // Gate: Content ownership declaration check (Step 14 / FR-I64)
             contentDeclarationService.assertDeclared(lessonId);
         } else if (moduleId != null) {
-            CourseModule module = moduleRepository.findById(moduleId)
+            CourseModule module = moduleRepository.findById(Objects.requireNonNull(moduleId))
                     .orElseThrow(() -> new ResourceNotFoundException("Module not found with id: " + moduleId));
             targetCourse = module.getCourse();
         } else {
-            Lecture lecture = lectureRepository.findById(lectureId)
+            Lecture lecture = lectureRepository.findById(Objects.requireNonNull(lectureId))
                     .orElseThrow(() -> new ResourceNotFoundException("Lecture not found with id: " + lectureId));
             targetCourse = lecture.getCourse();
         }
@@ -148,7 +150,8 @@ public class SupplementaryMaterialService {
         try (InputStream inputStream = file.getInputStream()) {
             VirusScanner.ScanResult scanResult = virusScanner.scan(inputStream, file.getOriginalFilename());
             if (!scanResult.isClean()) {
-                logger.warn("Virus/malware detected during upload of {}: {}", file.getOriginalFilename(), scanResult.getThreatName());
+                logger.warn("Virus/malware detected during upload of {}: {}", file.getOriginalFilename(),
+                        scanResult.getThreatName());
                 throw new IllegalArgumentException("Malicious content detected in file: " + scanResult.getThreatName());
             }
         } catch (IOException e) {
@@ -197,16 +200,19 @@ public class SupplementaryMaterialService {
      */
     @Transactional(readOnly = true)
     public List<SupplementaryMaterialResponse> getMaterialsByLesson(User user, Integer lessonId) {
-        Lesson lesson = lessonRepository.findById(lessonId)
+        Lesson lesson = lessonRepository.findById(Objects.requireNonNull(lessonId))
                 .orElseThrow(() -> new ResourceNotFoundException("Lesson not found with id: " + lessonId));
         Course course = extractCourseFromLesson(lesson);
         assertInstructorAccess(course, user);
 
+        Comparator<LectureMaterial> materialComparator = Comparator
+                .comparing((LectureMaterial m) -> m.getOrderIndex(), Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(m -> m.getId(), Comparator.nullsLast(Comparator.naturalOrder()));
+
         return materialRepository.findByLessonId(lessonId)
                 .stream()
                 .filter(m -> m.getDeletedAt() == null)
-                .sorted(Comparator.comparing(LectureMaterial::getOrderIndex, Comparator.nullsLast(Integer::compareTo))
-                        .thenComparing(LectureMaterial::getId, Comparator.nullsLast(Integer::compareTo)))
+                .sorted(materialComparator)
                 .map(SupplementaryMaterialResponse::fromEntity)
                 .collect(Collectors.toList());
     }
@@ -216,15 +222,18 @@ public class SupplementaryMaterialService {
      */
     @Transactional(readOnly = true)
     public List<SupplementaryMaterialResponse> getMaterialsByModule(User user, Integer moduleId) {
-        CourseModule module = moduleRepository.findById(moduleId)
+        CourseModule module = moduleRepository.findById(Objects.requireNonNull(moduleId))
                 .orElseThrow(() -> new ResourceNotFoundException("Module not found with id: " + moduleId));
         assertInstructorAccess(module.getCourse(), user);
+
+        Comparator<LectureMaterial> materialComparator = Comparator
+                .comparing((LectureMaterial m) -> m.getOrderIndex(), Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(m -> m.getId(), Comparator.nullsLast(Comparator.naturalOrder()));
 
         return materialRepository.findByModuleId(moduleId)
                 .stream()
                 .filter(m -> m.getDeletedAt() == null)
-                .sorted(Comparator.comparing(LectureMaterial::getOrderIndex, Comparator.nullsLast(Integer::compareTo))
-                        .thenComparing(LectureMaterial::getId, Comparator.nullsLast(Integer::compareTo)))
+                .sorted(materialComparator)
                 .map(SupplementaryMaterialResponse::fromEntity)
                 .collect(Collectors.toList());
     }
@@ -234,7 +243,7 @@ public class SupplementaryMaterialService {
      */
     @Transactional(readOnly = true)
     public SupplementaryMaterialResponse getMaterialById(User user, Integer id) {
-        LectureMaterial material = materialRepository.findById(id)
+        LectureMaterial material = materialRepository.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Material not found with id: " + id));
 
         if (material.getDeletedAt() != null) {
@@ -248,12 +257,14 @@ public class SupplementaryMaterialService {
     }
 
     /**
-     * Toggles or updates the downloadable vs view-only status of a material (FR-I17, Step 16).
+     * Toggles or updates the downloadable vs view-only status of a material
+     * (FR-I17, Step 16).
      */
-    public SupplementaryMaterialResponse updateDownloadableStatus(User instructor, Integer materialId, boolean isDownloadable) {
+    public SupplementaryMaterialResponse updateDownloadableStatus(User instructor, Integer materialId,
+            boolean isDownloadable) {
         validateInstructorRole(instructor);
 
-        LectureMaterial material = materialRepository.findById(materialId)
+        LectureMaterial material = materialRepository.findById(Objects.requireNonNull(materialId))
                 .orElseThrow(() -> new ResourceNotFoundException("Material not found with id: " + materialId));
 
         if (material.getDeletedAt() != null) {
@@ -273,7 +284,8 @@ public class SupplementaryMaterialService {
 
     /**
      * Reorders materials inside a lesson according to orderedIds (FR-I16, Step 19).
-     * Enforces contiguous 1-based order_index and rejects IDs that do not belong to the target lesson.
+     * Enforces contiguous 1-based order_index and rejects IDs that do not belong to
+     * the target lesson.
      */
     public List<SupplementaryMaterialResponse> reorderMaterialsInLesson(
             User instructor, Integer lessonId, List<Integer> orderedIds) {
@@ -311,7 +323,7 @@ public class SupplementaryMaterialService {
                 .toList();
 
         Map<Integer, LectureMaterial> materialMap = activeMaterials.stream()
-                .collect(Collectors.toMap(LectureMaterial::getId, Function.identity()));
+                .collect(Collectors.toMap(m -> m.getId(), Function.identity()));
 
         // Check that every ID in orderedIds belongs to this lesson
         for (Integer id : orderedIds) {
@@ -334,7 +346,8 @@ public class SupplementaryMaterialService {
     }
 
     /**
-     * Replaces the file of a supplementary material item while preserving lesson, order, and progress references (FR-I16, Step 19).
+     * Replaces the file of a supplementary material item while preserving lesson,
+     * order, and progress references (FR-I16, Step 19).
      */
     public SupplementaryMaterialResponse replaceMaterialFile(
             User instructor, Integer materialId, MultipartFile file) {
@@ -345,7 +358,7 @@ public class SupplementaryMaterialService {
             throw new IllegalArgumentException("Material ID cannot be null");
         }
 
-        LectureMaterial material = materialRepository.findById(materialId)
+        LectureMaterial material = materialRepository.findById(Objects.requireNonNull(materialId))
                 .orElseThrow(() -> new ResourceNotFoundException("Material not found with id: " + materialId));
 
         if (material.getDeletedAt() != null) {
@@ -362,7 +375,8 @@ public class SupplementaryMaterialService {
         try (InputStream inputStream = file.getInputStream()) {
             VirusScanner.ScanResult scanResult = virusScanner.scan(inputStream, file.getOriginalFilename());
             if (!scanResult.isClean()) {
-                logger.warn("Virus/malware detected during material replacement {}: {}", file.getOriginalFilename(), scanResult.getThreatName());
+                logger.warn("Virus/malware detected during material replacement {}: {}", file.getOriginalFilename(),
+                        scanResult.getThreatName());
                 throw new IllegalArgumentException("Malicious content detected in file: " + scanResult.getThreatName());
             }
         } catch (IOException e) {
@@ -377,11 +391,13 @@ public class SupplementaryMaterialService {
         try {
             storedPath = materialStorageService.storeMaterial(file);
         } catch (IOException e) {
-            logger.error("Failed to store replacement material file {}: {}", file.getOriginalFilename(), e.getMessage());
+            logger.error("Failed to store replacement material file {}: {}", file.getOriginalFilename(),
+                    e.getMessage());
             throw new RuntimeException("Failed to persist replacement material file to storage", e);
         }
 
-        // 5. Update metadata while strictly preserving id, lessonId, moduleId, lectureId, createdAt, orderIndex, isDownloadable
+        // 5. Update metadata while strictly preserving id, lessonId, moduleId,
+        // lectureId, createdAt, orderIndex, isDownloadable
         String originalFilename = file.getOriginalFilename();
         String ext = StringUtils.getFilenameExtension(originalFilename);
         String fileType = ext != null ? ext.toLowerCase(Locale.ROOT) : "file";
@@ -404,7 +420,8 @@ public class SupplementaryMaterialService {
     /**
      * Removes content with confirmation (FR-I16, Step 19).
      * Soft-deletes when students already have progress, hard-deletes otherwise.
-     * Evaluates course completion criteria and includes warning flag in the response.
+     * Evaluates course completion criteria and includes warning flag in the
+     * response.
      */
     public ContentRemovalResponse removeMaterial(User instructor, Integer materialId) {
         validateInstructorRole(instructor);
@@ -413,7 +430,7 @@ public class SupplementaryMaterialService {
             throw new IllegalArgumentException("Material ID cannot be null");
         }
 
-        LectureMaterial material = materialRepository.findById(materialId)
+        LectureMaterial material = materialRepository.findById(Objects.requireNonNull(materialId))
                 .orElseThrow(() -> new ResourceNotFoundException("Material not found with id: " + materialId));
 
         if (material.getDeletedAt() != null) {
@@ -428,7 +445,8 @@ public class SupplementaryMaterialService {
 
         String warning = null;
         if (criteriaWarning) {
-            warning = "Warning: This content item is part of the course completion criteria (mandatory lesson " + material.getLessonId() + ")";
+            warning = "Warning: This content item is part of the course completion criteria (mandatory lesson "
+                    + material.getLessonId() + ")";
         }
 
         if (progressExists) {
@@ -439,15 +457,18 @@ public class SupplementaryMaterialService {
             String progressWarning = "Content item has active student progress and was soft-deleted to preserve learner records";
             String combinedWarning = (warning != null) ? warning + "; " + progressWarning : progressWarning;
 
-            logger.info("Soft-deleted material ID {} due to active student progress by user ID {}", materialId, instructor.getId());
-            return new ContentRemovalResponse(materialId, true, true, combinedWarning, combinedWarning, criteriaWarning);
+            logger.info("Soft-deleted material ID {} due to active student progress by user ID {}", materialId,
+                    instructor.getId());
+            return new ContentRemovalResponse(materialId, true, true, combinedWarning, combinedWarning,
+                    criteriaWarning);
         } else {
             // Hard-delete: delete physical file and delete DB entity
             materialStorageService.deleteMaterialFile(material.getFileUrl());
             materialRepository.delete(material);
 
             logger.info("Hard-deleted material ID {} by user ID {}", materialId, instructor.getId());
-            return new ContentRemovalResponse(materialId, true, false, "Content item successfully deleted", warning, criteriaWarning);
+            return new ContentRemovalResponse(materialId, true, false, "Content item successfully deleted", warning,
+                    criteriaWarning);
         }
     }
 
@@ -466,12 +487,14 @@ public class SupplementaryMaterialService {
             if (lessonProgressRepository != null && lessonProgressRepository.existsByLessonId(material.getLessonId())) {
                 return true;
             }
-            if (lectureProgressRepository != null && lectureProgressRepository.existsByLectureId(material.getLessonId())) {
+            if (lectureProgressRepository != null
+                    && lectureProgressRepository.existsByLectureId(material.getLessonId())) {
                 return true;
             }
         }
         if (material.getLectureId() != null) {
-            if (lectureProgressRepository != null && lectureProgressRepository.existsByLectureId(material.getLectureId())) {
+            if (lectureProgressRepository != null
+                    && lectureProgressRepository.existsByLectureId(material.getLectureId())) {
                 return true;
             }
         }
@@ -495,19 +518,20 @@ public class SupplementaryMaterialService {
 
     private Course resolveCourseFromMaterial(LectureMaterial material) {
         if (material.getLessonId() != null) {
-            Lesson lesson = lessonRepository.findById(material.getLessonId()).orElse(null);
+            Lesson lesson = lessonRepository.findById(Objects.requireNonNull(material.getLessonId())).orElse(null);
             if (lesson != null) {
                 return extractCourseFromLesson(lesson);
             }
         }
         if (material.getModuleId() != null) {
-            CourseModule module = moduleRepository.findById(material.getModuleId()).orElse(null);
+            CourseModule module = moduleRepository.findById(Objects.requireNonNull(material.getModuleId()))
+                    .orElse(null);
             if (module != null) {
                 return module.getCourse();
             }
         }
         if (material.getLectureId() != null) {
-            Lecture lecture = lectureRepository.findById(material.getLectureId()).orElse(null);
+            Lecture lecture = lectureRepository.findById(Objects.requireNonNull(material.getLectureId())).orElse(null);
             if (lecture != null) {
                 return lecture.getCourse();
             }
