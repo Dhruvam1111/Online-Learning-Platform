@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,12 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final TokenBlacklistService tokenBlacklistService;
     private final EmailService emailService;
+
+    @Value("${app.public-api-url:${PUBLIC_API_URL:http://localhost:8080}}")
+    private String publicApiUrl = "http://localhost:8080";
+
+    @Value("${app.frontend-url:${FRONTEND_URL:http://localhost:3000}}")
+    private String frontendUrl = "http://localhost:3000";
 
     @Autowired
     public AuthService(
@@ -57,6 +64,25 @@ public class AuthService {
             PasswordEncoder passwordEncoder,
             JwtUtil jwtUtil) {
         this(userRepository, instructorProfileRepository, passwordEncoder, jwtUtil, new TokenBlacklistService(), null);
+    }
+
+    public void setPublicApiUrl(String publicApiUrl) {
+        this.publicApiUrl = publicApiUrl;
+    }
+
+    public void setFrontendUrl(String frontendUrl) {
+        this.frontendUrl = frontendUrl;
+    }
+
+    private String cleanBaseUrl(String url, String fallback) {
+        if (url == null || url.isBlank()) {
+            url = fallback;
+        }
+        url = url.trim();
+        while (url.endsWith("/")) {
+            url = url.substring(0, url.length() - 1);
+        }
+        return url;
     }
 
     /**
@@ -106,7 +132,7 @@ public class AuthService {
 
             // Generate verification token using JWT authentication setup
             String verificationToken = jwtUtil.generateToken(user.getId(), "VERIFY_EMAIL");
-            verificationLink = "http://localhost:8080/api/auth/verify-email?token=" + verificationToken;
+            verificationLink = cleanBaseUrl(publicApiUrl, "http://localhost:8080") + "/api/auth/verify-email?token=" + verificationToken;
 
             // Dispatch verification link through platform's logging/email channel
             logger.info("================================================================================");
@@ -268,7 +294,7 @@ public class AuthService {
 
         // Generate a single-use password reset token with 15-minute TTL
         String resetToken = jwtUtil.generatePasswordResetToken(user.getId(), 15 * 60 * 1000L);
-        String resetLink = "http://localhost:8080/api/auth/password-reset/confirm?token=" + resetToken;
+        String resetLink = cleanBaseUrl(publicApiUrl, "http://localhost:8080") + "/api/auth/password-reset/confirm?token=" + resetToken;
 
         if (emailService != null) {
             emailService.sendPasswordResetLinkEmail(user.getEmail(), user.getName(), resetLink, 15);

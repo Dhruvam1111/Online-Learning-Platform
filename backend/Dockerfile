@@ -60,6 +60,7 @@ ENV JWT_SECRET=""
 ENV JWT_EXPIRATION_MS="86400000"
 ENV PORT="8080"
 ENV FRONTEND_URL=""
+ENV PUBLIC_API_URL=""
 
 # Run the application
 ENTRYPOINT ["java", "-jar", "app.jar"]

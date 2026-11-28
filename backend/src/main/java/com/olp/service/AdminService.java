@@ -35,6 +35,7 @@ import com.olp.repository.CourseRepository;
 import com.olp.repository.CourseSubmissionRepository;
 import com.olp.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -67,6 +68,31 @@ private EnrollmentRepository enrollmentRepository;
 
 @Autowired(required = false)
 private PaymentRepository paymentRepository;
+
+    @Value("${app.public-api-url:${PUBLIC_API_URL:http://localhost:8080}}")
+    private String publicApiUrl = "http://localhost:8080";
+
+    @Value("${app.frontend-url:${FRONTEND_URL:http://localhost:3000}}")
+    private String frontendUrl = "http://localhost:3000";
+
+    public void setPublicApiUrl(String publicApiUrl) {
+        this.publicApiUrl = publicApiUrl;
+    }
+
+    public void setFrontendUrl(String frontendUrl) {
+        this.frontendUrl = frontendUrl;
+    }
+
+    private String cleanBaseUrl(String url, String fallback) {
+        if (url == null || url.isBlank()) {
+            url = fallback;
+        }
+        url = url.trim();
+        while (url.endsWith("/")) {
+            url = url.substring(0, url.length() - 1);
+        }
+        return url;
+    }
     public AdminService(
             UserRepository userRepository,
             CourseRepository courseRepository,
@@ -234,7 +260,7 @@ private PaymentRepository paymentRepository;
       }
 
       String resetToken = jwtUtil.generatePasswordResetToken(user.getId(), 15 * 60 * 1000L);
-      String resetLink = "http://localhost:8080/api/auth/password-reset/confirm?token=" + resetToken;
+      String resetLink = cleanBaseUrl(publicApiUrl, "http://localhost:8080") + "/api/auth/password-reset/confirm?token=" + resetToken;
 
       if (emailService != null) {
           emailService.sendPasswordResetLinkEmail(user.getEmail(), user.getName(), resetLink, 15);
