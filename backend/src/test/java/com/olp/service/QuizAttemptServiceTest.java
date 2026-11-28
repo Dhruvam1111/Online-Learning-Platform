@@ -7,7 +7,9 @@ import com.olp.dto.QuizEvaluationSummary;
 import com.olp.dto.QuizSettingsResponse;
 import com.olp.dto.QuizSubmissionRequest;
 import com.olp.entity.*;
+import com.olp.exception.InvalidCredentialsException;
 import com.olp.exception.QuizAttemptExpiredException;
+import com.olp.exception.ResourceNotFoundException;
 import com.olp.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -556,5 +558,120 @@ class QuizAttemptServiceTest {
                 assertTrue(studentSummary.getResultsPublished());
                 assertTrue(studentSummary.getFeedbackReleased());
                 assertEquals("Excellent performance throughout!", studentSummary.getOverallFeedback());
+        }
+
+        @Test
+        void testGetAttemptEvaluation_StudentCannotSeeDraftFeedbackOnManualGradingRequiredAnswer() {
+                publishedQuiz.setFeedbackReleased(true);
+                QuizAttempt submitted = new QuizAttempt(
+                                publishedQuiz, enrolledStudent, 1, baseTime, baseTime.plusMinutes(30));
+                submitted.setId(807);
+                submitted.setStatus(QuizAttemptStatus.SUBMITTED);
+                submitted.setIsPublished(false);
+
+                when(quizAttemptRepository.findByIdAndQuizId(807, 100)).thenReturn(Optional.of(submitted));
+
+                Question descQ = new Question(
+                                course, instructor, "Explain CAP theorem", QuestionType.DESCRIPTIVE,
+                                null, null, new BigDecimal("10.00"), BigDecimal.ZERO, BigDecimal.ZERO, "Rubric", true);
+                descQ.setId(62);
+
+                QuizAttemptAnswer manualWithDraftFeedback = new QuizAttemptAnswer(
+                                submitted, descQ, "Student response",
+                                BigDecimal.ZERO, new BigDecimal("10.00"),
+                                EvaluationStatus.MANUAL_GRADING_REQUIRED, "Draft feedback before grading", baseTime);
+                manualWithDraftFeedback.setId(14);
+
+                when(quizAttemptAnswerRepository.findByAttemptId(807)).thenReturn(List.of(manualWithDraftFeedback));
+
+                QuizEvaluationSummary studentSummary = attemptService.getAttemptEvaluation(enrolledStudent, 100, 807);
+
+                assertEquals(1, studentSummary.getResults().size());
+                assertNull(studentSummary.getResults().get(0).getFeedback(),
+                                "Draft feedback on ungraded/unpublished manual answer must be hidden from student");
+        }
+
+        @Test
+        void testGetAttemptEvaluation_MixedPublishedAndUnpublishedMasksOnlyUnpublishedForStudent() {
+                publishedQuiz.setFeedbackReleased(null); // defaults to enabled
+                QuizAttempt submitted = new QuizAttempt(
+                                publishedQuiz, enrolledStudent, 1, baseTime, baseTime.plusMinutes(30));
+                submitted.setId(808);
+                submitted.setStatus(QuizAttemptStatus.SUBMITTED);
+                submitted.setIsPublished(false);
+                submitted.setObtainedMarks(new BigDecimal("8.00"));
+                submitted.setOverallFeedback("Not yet finalized overall comment");
+
+                when(quizAttemptRepository.findByIdAndQuizId(808, 100)).thenReturn(Optional.of(submitted));
+
+                Question q1 = new Question(
+                                course, instructor, "Published Desc", QuestionType.DESCRIPTIVE,
+                                null, null, new BigDecimal("10.00"), BigDecimal.ZERO, BigDecimal.ZERO, null, true);
+                q1.setId(63);
+                Question q2 = new Question(
+                                course, instructor, "Unpublished Desc", QuestionType.DESCRIPTIVE,
+                                null, null, new BigDecimal("10.00"), BigDecimal.ZERO, BigDecimal.ZERO, null, true);
+                q2.setId(64);
+
+                QuizAttemptAnswer pubAns = new QuizAttemptAnswer(
+                                submitted, q1, "Ans 1", new BigDecimal("8.00"), new BigDecimal("10.00"),
+                                EvaluationStatus.PUBLISHED, "Visible feedback", baseTime);
+                QuizAttemptAnswer unpubAns = new QuizAttemptAnswer(
+                                submitted, q2, "Ans 2", new BigDecimal("7.00"), new BigDecimal("10.00"),
+                                EvaluationStatus.EVALUATED_UNPUBLISHED, "Hidden draft feedback", baseTime);
+
+                when(quizAttemptAnswerRepository.findByAttemptId(808)).thenReturn(List.of(pubAns, unpubAns));
+
+                QuizEvaluationSummary studentSummary = attemptService.getAttemptEvaluation(enrolledStudent, 100, 808);
+
+                assertTrue(studentSummary.getFeedbackReleased());
+                assertFalse(studentSummary.getResultsPublished());
+                assertNull(studentSummary.getOverallFeedback());
+                assertEquals(2, studentSummary.getResults().size());
+
+                // First answer is PUBLISHED -> marks and feedback visible
+                assertEquals(EvaluationStatus.PUBLISHED, studentSummary.getResults().get(0).getStatus());
+                assertEquals(new BigDecimal("8.00"), studentSummary.getResults().get(0).getAwardedMarks());
+                assertEquals("Visible feedback", studentSummary.getResults().get(0).getFeedback());
+
+                // Second answer is EVALUATED_UNPUBLISHED -> masked
+                assertEquals(EvaluationStatus.MANUAL_GRADING_REQUIRED, studentSummary.getResults().get(1).getStatus());
+                assertEquals(BigDecimal.ZERO, studentSummary.getResults().get(1).getAwardedMarks());
+                assertNull(studentSummary.getResults().get(1).getFeedback());
+        }
+
+        @Test
+        void testGetAttemptEvaluation_AdminSeesUnpublishedAndValidationErrorsHandled() {
+                assertThrows(InvalidCredentialsException.class,
+                                () -> attemptService.getAttemptEvaluation(null, 100, 800));
+                assertThrows(IllegalArgumentException.class,
+                                () -> attemptService.getAttemptEvaluation(enrolledStudent, null, 800));
+                assertThrows(IllegalArgumentException.class,
+                                () -> attemptService.getAttemptEvaluation(enrolledStudent, 100, null));
+
+                when(quizAttemptRepository.findByIdAndQuizId(999, 100)).thenReturn(Optional.empty());
+                assertThrows(ResourceNotFoundException.class,
+                                () -> attemptService.getAttemptEvaluation(enrolledStudent, 100, 999));
+
+                publishedQuiz.setFeedbackReleased(false);
+                QuizAttempt submitted = new QuizAttempt(
+                                publishedQuiz, enrolledStudent, 1, baseTime, baseTime.plusMinutes(30));
+                submitted.setId(809);
+                submitted.setIsPublished(false);
+                submitted.setOverallFeedback("Admin visible overall draft");
+                submitted.setGrader(instructor);
+                submitted.setFeedbackAt(baseTime);
+
+                when(quizAttemptRepository.findByIdAndQuizId(809, 100)).thenReturn(Optional.of(submitted));
+                when(quizAttemptAnswerRepository.findByAttemptId(809)).thenReturn(List.of());
+
+                User admin = new User("Admin", "admin@olp.com", "hash", "admin", "active");
+                admin.setId(99);
+                QuizEvaluationSummary adminSummary = attemptService.getAttemptEvaluation(admin, 100, 809);
+
+                assertEquals("Admin visible overall draft", adminSummary.getOverallFeedback());
+                assertEquals(instructor.getId(), adminSummary.getGraderId());
+                assertEquals("Dr. Owner", adminSummary.getGraderName());
+                assertEquals(baseTime, adminSummary.getFeedbackAt());
         }
 }
