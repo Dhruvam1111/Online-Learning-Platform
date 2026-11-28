@@ -2,9 +2,9 @@ name: Continuous Integration (CI)
 
 on:
   push:
-    branches: [ "main", "pranamya" ]
+    branches: [ "**" ]
   pull_request:
-    branches: [ "main", "pranamya" ]
+    branches: [ "**" ]
   workflow_dispatch:
 
 concurrency:
@@ -31,6 +31,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Detect modified paths
         id: filter
@@ -49,7 +51,12 @@ jobs:
               - '.github/workflows/ci.yml'
             docker:
               - '**/Dockerfile'
+              - '**/Dockerfile*'
+              - '**/.dockerignore'
               - 'docker-compose*.yml'
+              - 'frontend/focotech-react/nginx.conf'
+              - 'backend/pom.xml'
+              - 'frontend/focotech-react/package*.json'
               - '.github/workflows/ci.yml'
 
   security-secret-scan:
@@ -60,7 +67,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 50
+          fetch-depth: 0
 
       - name: Run Gitleaks secret detection
         uses: gitleaks/gitleaks-action@v2
@@ -107,8 +114,6 @@ jobs:
     name: Backend / PostgreSQL & Maven Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.database == 'true' || github.event_name == 'workflow_dispatch' }}
 
     services:
       postgres:
@@ -120,7 +125,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d olp_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
@@ -148,6 +153,14 @@ jobs:
           PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/migrations/20261110-payment-claims.sql
           PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/migrations/20261110-payment-hardening.sql
           PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/migrations/20261111-payment-completion.sql
+          if [ -f db/phase1-student-exams.sql ]; then
+            echo "Applying Phase 1 student exam schema..."
+            PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/phase1-student-exams.sql
+          fi
+          if [ -f db/04-student-study-schedule.sql ]; then
+            echo "Applying Phase 4 student study schedule schema..."
+            PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U postgres -d olp_test -f db/04-student-study-schedule.sql
+          fi
           echo "PostgreSQL schema successfully initialized."
 
       - name: Run Maven Tests against PostgreSQL
@@ -222,7 +235,11 @@ jobs:
           echo "container-validation: ${{ needs.container-validation.result }}"
           echo "==========================="
 
-          is_ok() {
+          is_required_ok() {
+            [ "$1" = "success" ]
+          }
+
+          is_optional_ok() {
             case "$1" in
               success|skipped) return 0 ;;
               *) return 1 ;;
@@ -230,12 +247,14 @@ jobs:
           }
 
           FAILED=""
-          ! is_ok "${{ needs.frontend-check.result }}" && FAILED="$FAILED frontend-check"
-          ! is_ok "${{ needs.backend-and-db-tests.result }}" && FAILED="$FAILED backend-and-db-tests"
-          ! is_ok "${{ needs.container-validation.result }}" && FAILED="$FAILED container-validation"
+          ! is_required_ok "${{ needs.detect-changes.result }}" && FAILED="$FAILED detect-changes"
+          ! is_required_ok "${{ needs.security-secret-scan.result }}" && FAILED="$FAILED security-secret-scan"
+          ! is_required_ok "${{ needs.backend-and-db-tests.result }}" && FAILED="$FAILED backend-and-db-tests"
+          ! is_optional_ok "${{ needs.frontend-check.result }}" && FAILED="$FAILED frontend-check"
+          ! is_optional_ok "${{ needs.container-validation.result }}" && FAILED="$FAILED container-validation"
 
           if [ -n "$FAILED" ]; then
             echo "CI Quality Gate FAILED: The following job(s) did not succeed: $FAILED"
             exit 1
           fi
-          echo "CI Quality Gate PASSED: All triggered validation jobs succeeded."
+          echo "CI Quality Gate PASSED: All required checks and triggered validation jobs succeeded."
