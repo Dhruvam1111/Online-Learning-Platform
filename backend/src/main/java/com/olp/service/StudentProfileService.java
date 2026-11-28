@@ -26,17 +26,7 @@ public class StudentProfileService {
 
     /** Resolves the current User from the Spring Security Authentication. */
     public User resolveUser(Authentication authentication) {
-        if (authentication == null || authentication.getPrincipal() == null) {
-            throw new InvalidCredentialsException("User is not authenticated");
-        }
-
-        Object principal = authentication.getPrincipal();
-        if (principal instanceof User user) {
-            return user;
-        }
-
-        return userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new InvalidCredentialsException("User not found"));
+        return com.olp.security.SecurityUtils.resolveUserByName(authentication, userRepository);
     }
 
     /** Returns the authenticated student's own profile (profile fields are null if not yet created). */
@@ -55,6 +45,9 @@ public class StudentProfileService {
     @Transactional
     public StudentProfileResponse updateProfile(User currentUser, UpdateStudentProfileRequest request) {
         requireStudent(currentUser, "update");
+        if (request == null) {
+            throw new IllegalArgumentException("Request body cannot be null");
+        }
 
         User user = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> new InvalidCredentialsException("User not found"));
